@@ -27,6 +27,10 @@ import androidx.core.view.setPadding
 import androidx.core.view.updatePadding
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
+import com.google.i18n.phonenumbers.NumberParseException
+import com.google.i18n.phonenumbers.PhoneNumberToCarrierMapper
+import com.google.i18n.phonenumbers.PhoneNumberUtil
+import com.google.i18n.phonenumbers.geocoding.PhoneNumberOfflineGeocoder
 import org.fossify.commons.extensions.*
 import org.fossify.commons.helpers.*
 import org.fossify.commons.models.SimpleListItem
@@ -35,6 +39,7 @@ import org.fossify.phone.databinding.ActivityCallBinding
 import org.fossify.phone.dialogs.DynamicBottomSheetChooserDialog
 import org.fossify.phone.extensions.*
 import org.fossify.phone.helpers.*
+import java.util.Locale
 import org.fossify.phone.models.AudioRoute
 import org.fossify.phone.models.CallContact
 import kotlin.math.max
@@ -65,6 +70,9 @@ class CallActivity : SimpleActivity() {
     private var dialpadHeight = 0f
 
     private var audioRouteChooserDialog: DynamicBottomSheetChooserDialog? = null
+    private val phoneNumberUtil = PhoneNumberUtil.getInstance()
+    private val phoneNumberOfflineGeocoder = PhoneNumberOfflineGeocoder.getInstance()
+    private val phoneNumberToCarrierMapper = PhoneNumberToCarrierMapper.getInstance()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -593,6 +601,7 @@ class CallActivity : SimpleActivity() {
             } else {
                 callerNumber.beGone()
             }
+            updateCallerIdEnrichment(number)
 
             callerAvatar.apply {
                 if (avatarUri.isNullOrEmpty()) {
@@ -610,6 +619,35 @@ class CallActivity : SimpleActivity() {
                             .into(this)
                     }
                 }
+            }
+        }
+    }
+
+    private fun updateCallerIdEnrichment(number: String) {
+        if (number.isBlank()) {
+            binding.callerLocation.beGone()
+            return
+        }
+        ensureBackgroundThread {
+            val locale = Locale.getDefault()
+            val defaultCountryCode = locale.country
+            val parsedNumber = try {
+                phoneNumberUtil.parse(number, defaultCountryCode)
+            } catch (_: NumberParseException) {
+                null
+            }
+
+            val location = parsedNumber?.let {
+                phoneNumberOfflineGeocoder.getDescriptionForNumber(it, locale, defaultCountryCode)
+            }.orEmpty().trim()
+            val carrier = parsedNumber?.let {
+                phoneNumberToCarrierMapper.getNameForNumber(it, locale)
+            }.orEmpty().trim()
+            val info = listOf(location, carrier).filter { it.isNotEmpty() }.joinToString(" • ")
+
+            runOnUiThread {
+                binding.callerLocation.text = info
+                binding.callerLocation.beVisibleIf(info.isNotEmpty())
             }
         }
     }

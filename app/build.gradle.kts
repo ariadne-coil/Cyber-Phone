@@ -132,6 +132,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.eventbus)
     implementation(libs.libphonenumber)
+    implementation(libs.carrier)
     implementation(libs.geocoder)
     implementation(libs.libphonenumberinfo)
     implementation(libs.okhttp)

@@ -97,12 +97,28 @@
         android:layout_marginTop="@dimen/normal_margin"
         android:gravity="center_horizontal"
         android:textSize="@dimen/call_status_text_size"
-        app:layout_constraintBottom_toTopOf="@id/call_status_label"
+        app:layout_constraintBottom_toTopOf="@id/caller_location"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/caller_name_label"
         android:textDirection="firstStrongLtr"
         tools:text="+1 (123) 456-7890" />
+
+    <org.fossify.commons.views.MyTextView
+        android:id="@+id/caller_location"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/normal_margin"
+        android:alpha="0.8"
+        android:gravity="center_horizontal"
+        android:textSize="@dimen/call_status_text_size"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/call_status_label"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/caller_number"
+        android:textDirection="firstStrongLtr"
+        tools:text="California • Verizon" />
 
     <org.fossify.commons.views.MyTextView
         android:id="@+id/call_status_label"
@@ -114,7 +130,7 @@
         app:layout_constraintBottom_toTopOf="@id/hold_status_label"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/caller_number"
+        app:layout_constraintTop_toBottomOf="@+id/caller_location"
         tools:text="Is Calling" />
 
     <TextView

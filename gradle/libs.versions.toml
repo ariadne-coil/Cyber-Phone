@@ -1,6 +1,7 @@
 [versions]
 #jetbrains
 geocoderVersion = "3.21"
+carrierVersion = "2.22"
 kotlin = "2.3.0"
 kotlinxSerializationJson = "1.9.0"
 #KSP
@@ -61,6 +62,7 @@ mmslib = { module = "org.fossify:mmslib", version.ref = "mmslib" }
 eventbus = { module = "org.greenrobot:eventbus", version.ref = "eventbus" }
 #Kotlin
 geocoder = { module = "com.googlecode.libphonenumber:geocoder", version.ref = "geocoderVersion" }
+carrier = { module = "com.googlecode.libphonenumber:carrier", version.ref = "carrierVersion" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 #Helpers
 ez-vcard = { module = "com.googlecode.ez-vcard:ez-vcard", version.ref = "ez-vcard" }
