@@ -89,6 +89,11 @@
     <string name="block_negative_ratings">Block negative community ratings</string>
     <string name="show_blocked_call_notifications">Show blocked call notifications</string>
     <string name="show_call_rating_notifications">Show call rating notifications</string>
+    <string name="spam_reputation_threshold">Spam reputation threshold</string>
+    <string name="spam_reputation_aggressive">Aggressive (&gt;=40% negative, &gt;=3 votes)</string>
+    <string name="spam_reputation_balanced">Balanced (&gt;=55% negative, &gt;=5 votes)</string>
+    <string name="spam_reputation_conservative">Conservative (&gt;=70% negative, &gt;=5 votes)</string>
+    <string name="spam_reputation_very_conservative">Very conservative (&gt;=85% negative, &gt;=10 votes)</string>
     <string name="call_rating_positive">Community rating: Positive</string>
     <string name="call_rating_neutral">Community rating: Neutral</string>
     <string name="call_rating_negative">Community rating: Negative</string>

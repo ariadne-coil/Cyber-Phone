@@ -2,6 +2,7 @@ package org.fossify.phone.blocking
 
 import android.content.Context
 import android.util.Log
+import androidx.annotation.Keep
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
@@ -140,6 +141,22 @@ object YacbSiaManager {
         }
 
         return featuredDatabase.getDbItemByNumber(number)?.name
+    }
+
+    @Keep
+    fun getRatingCounts(number: String): IntArray? {
+        if (!initialized || !communityDatabase.isOperational) {
+            return null
+        }
+        val communityItem = communityDatabase.getDbItemByNumber(number) ?: return null
+        if (!communityItem.hasRatings()) {
+            return null
+        }
+        return intArrayOf(
+            communityItem.negativeRatingsCount,
+            communityItem.positiveRatingsCount,
+            communityItem.neutralRatingsCount
+        )
     }
 
     fun updateSecondaryDb() {

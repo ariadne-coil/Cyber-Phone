@@ -64,6 +64,10 @@ import org.fossify.messages.helpers.LOCK_SCREEN_NOTHING
 import org.fossify.messages.helpers.LOCK_SCREEN_SENDER
 import org.fossify.messages.helpers.LOCK_SCREEN_SENDER_MESSAGE
 import org.fossify.messages.helpers.MessagesImporter
+import org.fossify.messages.helpers.SPAM_REPUTATION_AGGRESSIVE
+import org.fossify.messages.helpers.SPAM_REPUTATION_BALANCED
+import org.fossify.messages.helpers.SPAM_REPUTATION_CONSERVATIVE
+import org.fossify.messages.helpers.SPAM_REPUTATION_VERY_CONSERVATIVE
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.mesh.MeshConfig
 import org.fossify.mesh.MeshManager
@@ -151,6 +155,7 @@ class SettingsActivity : SimpleActivity() {
         setupLanguage()
         setupManageBlockedNumbers()
         setupManageBlockedKeywords()
+        setupSpamReputationThreshold()
         setupManageSpeedDial()
         setupChangeDateTimeFormat()
         setupFontSize()
@@ -289,6 +294,35 @@ class SettingsActivity : SimpleActivity() {
             }
         }
     }
+
+    private fun setupSpamReputationThreshold() = binding.apply {
+        settingsSpamReputationValue.text = getSpamReputationThresholdText()
+        settingsSpamReputationHolder.setOnClickListener {
+            val items = arrayListOf(
+                RadioItem(SPAM_REPUTATION_AGGRESSIVE, getString(R.string.spam_reputation_aggressive)),
+                RadioItem(SPAM_REPUTATION_BALANCED, getString(R.string.spam_reputation_balanced)),
+                RadioItem(SPAM_REPUTATION_CONSERVATIVE, getString(R.string.spam_reputation_conservative)),
+                RadioItem(
+                    SPAM_REPUTATION_VERY_CONSERVATIVE,
+                    getString(R.string.spam_reputation_very_conservative)
+                ),
+            )
+
+            RadioGroupDialog(this@SettingsActivity, items, messagesConfig.spamReputationThreshold) {
+                messagesConfig.spamReputationThreshold = it as Int
+                settingsSpamReputationValue.text = getSpamReputationThresholdText()
+            }
+        }
+    }
+
+    private fun getSpamReputationThresholdText() = getString(
+        when (messagesConfig.spamReputationThreshold) {
+            SPAM_REPUTATION_AGGRESSIVE -> R.string.spam_reputation_aggressive
+            SPAM_REPUTATION_CONSERVATIVE -> R.string.spam_reputation_conservative
+            SPAM_REPUTATION_VERY_CONSERVATIVE -> R.string.spam_reputation_very_conservative
+            else -> R.string.spam_reputation_balanced
+        }
+    )
 
     private fun setupCustomizeNotifications() = binding.apply {
         settingsCustomizeNotificationsHolder.setOnClickListener {

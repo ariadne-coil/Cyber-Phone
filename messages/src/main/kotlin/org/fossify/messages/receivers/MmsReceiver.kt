@@ -12,6 +12,7 @@ import org.fossify.messages.extensions.getConversations
 import org.fossify.messages.extensions.getLatestMMS
 import org.fossify.messages.extensions.getNameFromAddress
 import org.fossify.messages.extensions.insertOrUpdateConversation
+import org.fossify.messages.extensions.markMessageRead
 import org.fossify.messages.extensions.shouldUnarchive
 import org.fossify.messages.extensions.showReceivedMessageNotification
 import org.fossify.messages.extensions.updateConversationArchivedStatus

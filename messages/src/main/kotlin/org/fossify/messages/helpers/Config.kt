@@ -153,6 +153,10 @@ class Config(context: Context) : BaseConfig(context) {
         get() = prefs.getString(MESSAGE_CATEGORY_FILTER, MESSAGE_CATEGORY_MAIN) ?: MESSAGE_CATEGORY_MAIN
         set(value) = prefs.edit().putString(MESSAGE_CATEGORY_FILTER, value).apply()
 
+    var spamReputationThreshold: Int
+        get() = prefs.getInt(SPAM_REPUTATION_THRESHOLD, SPAM_REPUTATION_BALANCED)
+        set(value) = prefs.edit().putInt(SPAM_REPUTATION_THRESHOLD, value).apply()
+
     var e2ePublicKey: String
         get() = prefs.getString(E2E_PUBLIC_KEY, "") ?: ""
         set(value) = prefs.edit().putString(E2E_PUBLIC_KEY, value).apply()

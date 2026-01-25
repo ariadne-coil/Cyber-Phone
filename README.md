@@ -1,28 +1,82 @@
 # Cyber Phone
 <img alt="Logo" src="graphics/icon.webp" width="120" />
 
-Cyber Phone is a privacy-focused phone, contacts, and messaging app for modern Android. It combines dialer, SMS, caller ID enrichment, call screening, spam controls, and mesh-ready communications in one app.
+## The AntiFragile Communication Suite.
 
-**Features**
-- Default phone app with dialer, call history, and rich in-call UI
-- Fully integrated system contacts with in-app editing and quick add from calls/SMS
-- SMS conversations with category filters (Main/OTP/Spam), search, unread indicators, and status checks
-- Call and SMS blocking: number rules, patterns, neighbor spoofing handling, and cached community lists
-- Caller ID enrichment using libphonenumber geocoder and carrier lookup
-- Spam handling: suppressed spam notifications and auto-declined spam calls
-- End-to-end SMS encryption with key exchange; keys stored in contacts and editable
-- Reticulum-based mesh messaging and calls with configurable modes (mesh-only, fallback, standard)
-- Rich settings and modern Material UI
+Cyber Phone is a sovereign, privacy-focused communication solution for modern Android. It is designed for High-Entropy Environments where reliance on centralized infrastructure is a liability.
 
-**Build**
-- Open the project in Android Studio and build the `app` module.
-- Ensure Android SDK and required build tools are installed.
-- For release signing, provide a `keystore.properties` file (not tracked in git).
+We are building the **Shadow Stack.**
+## The Philosophy: Via Negativa
 
-**License**
-AGPL-3.0 (includes blocking engine code derived from Yet Another Call Blocker).
+Modern communication apps are bloated surveillance engines. They optimize for data extraction, not user agency. They add complexity to sell you convenience.
 
-**Acknowledgements**
+Cyber Phone solves the communication problem by Subtraction:
+
+*   No Google Play Services
+
+*   No Analytics
+
+*   No Cloud Dependencies
+
+*   No Admin Access for the State
+
+It is a Hardened Interface combining the utility of a modern dialer/messenger with the resilience of a mesh network
+## The Architecture
+1. Sovereign Interface
+
+A fully functional replacement for the stock Phone and SMS apps, built on the Fossify foundation.
+
+*   Rich Dialer & In-Call UI
+
+*   Caller ID Enrichment that uses local libphonenumber libraries for geocoding and carrier lookup
+
+*   Integrated system contacts with in-app editing
+
+2. Signal-to-Noise Optimization
+
+The Regime and the Market flood your bandwidth with noise. Cyber Phone creates a Cognitive Firewall.
+
+*   Automatic sorting of SMS (Main/OTP/Spam)
+
+*   Regex patterns, neighbor spoofing protection, and cached community blocklists
+
+*   Spam notifications are suppressed. Your attention is a scarce resource; we protect it
+
+3. Cryptographic Autonomy
+
+*   E2E SMS Encryption: Local key generation and exchange. Keys are stored in your contact list, editable by you
+
+4. Post-Infrastructure Resilience
+This is the core of the **Protocol.**
+Cyber Phone integrates the Reticulum Network Stack to enable off-grid communication.
+
+*   Seamless switching between Cellular and Mesh modes with an optional fallback mode
+
+*   Capable of routing messages via LoRa and WiFi
+
+*   If the ISP cuts the internet or the Telco towers go dark, the Mesh stays up
+
+## Build the Node
+
+To compile the app:
+
+*   Clone the Repo
+
+*   Ensure Android SDK and build tools are installed
+
+*   Open in Android Studio and build the app module
+
+*   Provide a keystore.properties file for release signing
+
+## License
+
+This project is licensed under AGPL-3.0.
+
+This is a strategic choice. It prevents Tivoization and Corporate Capture. If you fork this code to build a proprietary tool or lock it down inside a closed device, you are legally required to open-source your modifications.
+
+The Code belongs to the Commons.
+
+## Acknowledgements
 - Fossify (https://www.fossify.org)
 - Yet Another Call Blocker (https://gitlab.com/xynngh/YetAnotherCallBlocker)
 - Reticulum Network Stack (https://github.com/markqvist/Reticulum)

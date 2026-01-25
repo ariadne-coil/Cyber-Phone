@@ -5,6 +5,7 @@ import android.util.Patterns
 import org.fossify.commons.extensions.baseConfig
 import org.fossify.commons.extensions.isNumberBlocked
 import org.fossify.commons.extensions.normalizePhoneNumber
+import org.fossify.messages.extensions.config as messagesConfig
 import org.fossify.messages.models.Conversation
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
@@ -50,6 +51,7 @@ object MessageCategorizer {
     private var yacbInstance: Any? = null
     private var yacbInit: java.lang.reflect.Method? = null
     private var yacbGetRating: java.lang.reflect.Method? = null
+    private var yacbGetRatingCounts: java.lang.reflect.Method? = null
 
     fun extractOtp(body: String): String? {
         val match = otpCodeRegex.find(body) ?: otpSpacedCodeRegex.find(body) ?: return null
@@ -104,10 +106,13 @@ object MessageCategorizer {
                         yacbInstance = clazz.getField("INSTANCE").get(null)
                         yacbInit = runCatching { clazz.getMethod("init", Context::class.java) }.getOrNull()
                         yacbGetRating = clazz.getMethod("getRating", String::class.java)
+                        yacbGetRatingCounts =
+                            runCatching { clazz.getMethod("getRatingCounts", String::class.java) }.getOrNull()
                     } catch (_: Exception) {
                         yacbInstance = null
                         yacbInit = null
                         yacbGetRating = null
+                        yacbGetRatingCounts = null
                     } finally {
                         yacbLoaded.set(true)
                     }
@@ -122,6 +127,31 @@ object MessageCategorizer {
             return rating.toString()
         } catch (_: Exception) {
             return null
+        }
+    }
+
+    private fun getYacbRatingCounts(context: Context, number: String): IntArray? {
+        if (!yacbLoaded.get()) {
+            getYacbRating(context, number)
+        }
+        val instance = yacbInstance ?: return null
+        val method = yacbGetRatingCounts ?: return null
+        return try {
+            yacbInit?.invoke(instance, context.applicationContext)
+            method.invoke(instance, number) as? IntArray
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private data class ReputationThreshold(val minNegativeRatio: Double, val minVotes: Int)
+
+    private fun getReputationThreshold(context: Context): ReputationThreshold {
+        return when (context.messagesConfig.spamReputationThreshold) {
+            SPAM_REPUTATION_AGGRESSIVE -> ReputationThreshold(minNegativeRatio = 0.4, minVotes = 3)
+            SPAM_REPUTATION_CONSERVATIVE -> ReputationThreshold(minNegativeRatio = 0.7, minVotes = 5)
+            SPAM_REPUTATION_VERY_CONSERVATIVE -> ReputationThreshold(minNegativeRatio = 0.85, minVotes = 10)
+            else -> ReputationThreshold(minNegativeRatio = 0.55, minVotes = 5)
         }
     }
 
@@ -145,9 +175,26 @@ object MessageCategorizer {
         }
         val normalizedNumber = address.normalizePhoneNumber().trim()
         if (!isKnownContact && normalizedNumber.isNotEmpty()) {
-            val rating = getYacbRating(context, normalizedNumber)
-            if (rating == "NEGATIVE") {
-                return true
+            val counts = getYacbRatingCounts(context, normalizedNumber)
+            if (counts != null && counts.size >= 3) {
+                val negative = counts[0]
+                val positive = counts[1]
+                val neutral = counts[2]
+                val total = negative + positive + neutral
+                if (total > 0) {
+                    val threshold = getReputationThreshold(context)
+                    if (total >= threshold.minVotes) {
+                        val ratio = negative.toDouble() / total.toDouble()
+                        if (ratio >= threshold.minNegativeRatio) {
+                            return true
+                        }
+                    }
+                }
+            } else {
+                val rating = getYacbRating(context, normalizedNumber)
+                if (rating == "NEGATIVE") {
+                    return true
+                }
             }
         }
         return false
