@@ -18,6 +18,8 @@ import org.fossify.messages.extensions.insertOrUpdateConversation
 import org.fossify.messages.extensions.shouldUnarchive
 import org.fossify.messages.extensions.showReceivedMessageNotification
 import org.fossify.messages.extensions.updateConversationArchivedStatus
+import org.fossify.messages.helpers.E2eManager
+import org.fossify.messages.helpers.MessageCategorizer
 import org.fossify.messages.helpers.ReceiverUtils.isMessageFilteredOut
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
@@ -76,14 +78,19 @@ class MmsReceiver : MmsReceivedReceiver() {
             context.getNameFromAddress(address, it)
         }
 
-        context.showReceivedMessageNotification(
-            messageId = mms.id,
-            address = address,
-            senderName = senderName,
-            body = mms.body,
-            threadId = mms.threadId,
-            bitmap = glideBitmap
-        )
+        val displayBody = E2eManager.getDisplayBody(context, mms.threadId, mms.body)
+        val isKnownContact = senderName != address
+        val category = MessageCategorizer.categorizeMessage(displayBody, isKnownContact)
+        if (category != org.fossify.messages.helpers.MessageCategory.SPAM) {
+            context.showReceivedMessageNotification(
+                messageId = mms.id,
+                address = address,
+                senderName = senderName,
+                body = displayBody,
+                threadId = mms.threadId,
+                bitmap = glideBitmap
+            )
+        }
 
         val conversation = context.getConversations(mms.threadId).firstOrNull() ?: return
         runCatching { context.insertOrUpdateConversation(conversation) }

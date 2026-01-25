@@ -42,10 +42,53 @@
                     app:showDelay="250"
                     tools:visibility="visible" />
 
+                <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/message_category_group"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@id/conversations_progress_bar"
+                    android:layout_marginStart="@dimen/activity_margin"
+                    android:layout_marginTop="@dimen/normal_margin"
+                    android:layout_marginEnd="@dimen/activity_margin"
+                    app:selectionRequired="true"
+                    app:singleSelection="true">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/message_category_main"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:checkable="true"
+                        android:text="@string/messages_category_main" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/message_category_otp"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/medium_margin"
+                        android:layout_marginEnd="@dimen/medium_margin"
+                        android:layout_weight="1"
+                        android:checkable="true"
+                        android:text="@string/messages_category_otp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/message_category_spam"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:checkable="true"
+                        android:text="@string/messages_category_spam" />
+
+                </com.google.android.material.button.MaterialButtonToggleGroup>
+
                 <org.fossify.commons.views.MyTextView
                     android:id="@+id/no_conversations_placeholder"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_below="@id/message_category_group"
                     android:layout_centerHorizontal="true"
                     android:layout_marginTop="@dimen/bigger_margin"
                     android:alpha="0.8"
@@ -73,7 +116,8 @@
                 <com.qtalk.recyclerviewfastscroller.RecyclerViewFastScroller
                     android:id="@+id/conversations_fastscroller"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
+                    android:layout_height="wrap_content"
+                    android:layout_below="@id/message_category_group">
 
                     <org.fossify.commons.views.MyRecyclerView
                         android:id="@+id/conversations_list"

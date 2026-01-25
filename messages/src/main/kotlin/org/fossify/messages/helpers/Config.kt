@@ -149,6 +149,10 @@ class Config(context: Context) : BaseConfig(context) {
         set(keepConversationsArchived) = prefs.edit()
             .putBoolean(KEEP_CONVERSATIONS_ARCHIVED, keepConversationsArchived).apply()
 
+    var messageCategoryFilter: String
+        get() = prefs.getString(MESSAGE_CATEGORY_FILTER, MESSAGE_CATEGORY_MAIN) ?: MESSAGE_CATEGORY_MAIN
+        set(value) = prefs.edit().putString(MESSAGE_CATEGORY_FILTER, value).apply()
+
     var e2ePublicKey: String
         get() = prefs.getString(E2E_PUBLIC_KEY, "") ?: ""
         set(value) = prefs.edit().putString(E2E_PUBLIC_KEY, value).apply()

@@ -22,6 +22,7 @@ import org.fossify.messages.extensions.shouldUnarchive
 import org.fossify.messages.extensions.showReceivedMessageNotification
 import org.fossify.messages.extensions.updateConversationArchivedStatus
 import org.fossify.messages.helpers.E2eManager
+import org.fossify.messages.helpers.MessageCategorizer
 import org.fossify.messages.helpers.ReceiverUtils.isMessageFilteredOut
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
@@ -152,13 +153,17 @@ class SmsReceiver : BroadcastReceiver() {
         refreshMessages()
         refreshConversations()
         val displayBody = E2eManager.getDisplayBody(context, threadId, body)
-        context.showReceivedMessageNotification(
-            messageId = newMessageId,
-            address = address,
-            senderName = senderName,
-            body = displayBody,
-            threadId = threadId,
-            bitmap = bitmap
-        )
+        val isKnownContact = senderName != address
+        val category = MessageCategorizer.categorizeMessage(displayBody, isKnownContact)
+        if (category != org.fossify.messages.helpers.MessageCategory.SPAM) {
+            context.showReceivedMessageNotification(
+                messageId = newMessageId,
+                address = address,
+                senderName = senderName,
+                body = displayBody,
+                threadId = threadId,
+                bitmap = bitmap
+            )
+        }
     }
 }

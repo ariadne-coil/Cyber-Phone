@@ -126,6 +126,10 @@
     <string name="e2e_import_failed">Invalid key backup.</string>
     <string name="e2e_edit_contact_key">Edit contact key</string>
     <string name="e2e_contact_key_saved">Contact key updated.</string>
+    <string name="messages_category_main">Main</string>
+    <string name="messages_category_otp">OTP</string>
+    <string name="messages_category_spam">Spam</string>
+    <string name="copy_otp">Copy OTP</string>
     <string name="lock_screen_visibility">Lock screen notification visibility</string>
     <string name="sender_and_message">Sender and message</string>
     <string name="sender_only">Sender only</string>

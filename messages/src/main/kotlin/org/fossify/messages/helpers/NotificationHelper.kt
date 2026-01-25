@@ -8,9 +8,14 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Typeface
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.RingtoneManager
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.RelativeSizeSpan
+import android.text.style.StyleSpan
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.app.RemoteInput
@@ -23,6 +28,8 @@ import org.fossify.messages.activities.ThreadActivity
 import org.fossify.messages.extensions.config
 import org.fossify.messages.extensions.shortcutHelper
 import org.fossify.messages.messaging.isShortCodeWithLetters
+import org.fossify.messages.helpers.MessageCategorizer
+import org.fossify.messages.receivers.CopyOtpReceiver
 import org.fossify.messages.receivers.DeleteSmsReceiver
 import org.fossify.messages.receivers.DirectReplyReceiver
 import org.fossify.messages.receivers.MarkAsReadReceiver
@@ -123,20 +130,33 @@ class NotificationHelper(private val context: Context) {
         } else {
             null
         }
+        val otpCode = MessageCategorizer.extractOtp(body)
+        val isOtpMessage = otpCode != null && MessageCategorizer.isOtpMessage(body)
         val builder = NotificationCompat.Builder(context, notificationChannelId).apply {
-            when (context.config.lockScreenVisibilitySetting) {
-                LOCK_SCREEN_SENDER_MESSAGE -> {
-                    setLargeIcon(largeIcon)
-                    setStyle(getMessagesStyle(address, body, notificationId, sender))
+            if (isOtpMessage && otpCode != null) {
+                val styledOtp = SpannableString(otpCode).apply {
+                    setSpan(StyleSpan(Typeface.BOLD), 0, otpCode.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    setSpan(RelativeSizeSpan(1.4f), 0, otpCode.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 }
+                setContentTitle(sender)
+                setContentText(otpCode)
+                setLargeIcon(largeIcon)
+                setStyle(NotificationCompat.BigTextStyle().bigText(styledOtp))
+            } else {
+                when (context.config.lockScreenVisibilitySetting) {
+                    LOCK_SCREEN_SENDER_MESSAGE -> {
+                        setLargeIcon(largeIcon)
+                        setStyle(getMessagesStyle(address, body, notificationId, sender))
+                    }
 
-                LOCK_SCREEN_SENDER -> {
-                    setContentTitle(sender)
-                    setLargeIcon(largeIcon)
-                    val summaryText = context.getString(R.string.new_message)
-                    setStyle(
-                        NotificationCompat.BigTextStyle().setSummaryText(summaryText).bigText(body)
-                    )
+                    LOCK_SCREEN_SENDER -> {
+                        setContentTitle(sender)
+                        setLargeIcon(largeIcon)
+                        val summaryText = context.getString(R.string.new_message)
+                        setStyle(
+                            NotificationCompat.BigTextStyle().setSummaryText(summaryText).bigText(body)
+                        )
+                    }
                 }
             }
 
@@ -153,6 +173,24 @@ class NotificationHelper(private val context: Context) {
 
         if (replyAction != null && context.config.lockScreenVisibilitySetting == LOCK_SCREEN_SENDER_MESSAGE) {
             builder.addAction(replyAction)
+        }
+
+        if (isOtpMessage && otpCode != null) {
+            val copyIntent = Intent(context, CopyOtpReceiver::class.java).apply {
+                action = COPY_OTP
+                putExtra(EXTRA_OTP, otpCode)
+            }
+            val copyPendingIntent = PendingIntent.getBroadcast(
+                context,
+                notificationId + 100,
+                copyIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            )
+            builder.addAction(
+                org.fossify.commons.R.drawable.ic_copy_vector,
+                context.getString(R.string.copy_otp),
+                copyPendingIntent
+            )
         }
 
         builder.addAction(

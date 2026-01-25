@@ -63,6 +63,10 @@ import org.fossify.messages.extensions.getMessages
 import org.fossify.messages.extensions.insertOrUpdateConversation
 import org.fossify.messages.extensions.messagesDB
 import org.fossify.messages.helpers.E2eManager
+import org.fossify.messages.helpers.MESSAGE_CATEGORY_MAIN
+import org.fossify.messages.helpers.MESSAGE_CATEGORY_OTP
+import org.fossify.messages.helpers.MESSAGE_CATEGORY_SPAM
+import org.fossify.messages.helpers.MessageCategorizer
 import org.fossify.messages.helpers.SEARCHED_MESSAGE_ID
 import org.fossify.messages.helpers.THREAD_ID
 import org.fossify.messages.helpers.THREAD_TITLE
@@ -108,6 +112,7 @@ class MessagesFragment(
 
     override fun setupFragment() {
         setupOptionsMenu()
+        setupCategoryFilters()
         refreshMenuItems()
         activity?.setupEdgeToEdge(padBottomImeAndSystem = listOf(binding.conversationsList))
         applyMenuInsets()
@@ -168,6 +173,7 @@ class MessagesFragment(
         val host = activity ?: return
         updateMenuColors()
         refreshMenuItems()
+        updateCategoryFilterSelection()
 
         val currentTextColor = host.getProperTextColor()
         val currentFontSize = host.messagesConfig.fontSize
@@ -233,6 +239,49 @@ class MessagesFragment(
     private fun launchManageE2eKeys() {
         val host = activity ?: return
         host.startActivity(Intent(host, org.fossify.messages.activities.ManageE2eKeysActivity::class.java))
+    }
+
+    private fun setupCategoryFilters() {
+        binding.messageCategoryGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            val host = activity ?: return@addOnButtonCheckedListener
+            if (!isChecked) {
+                return@addOnButtonCheckedListener
+            }
+            val filter = when (checkedId) {
+                R.id.message_category_otp -> MESSAGE_CATEGORY_OTP
+                R.id.message_category_spam -> MESSAGE_CATEGORY_SPAM
+                else -> MESSAGE_CATEGORY_MAIN
+            }
+            if (host.messagesConfig.messageCategoryFilter != filter) {
+                host.messagesConfig.messageCategoryFilter = filter
+                refreshCategoryFilter()
+            }
+        }
+        updateCategoryFilterSelection()
+    }
+
+    private fun updateCategoryFilterSelection() {
+        val host = activity ?: return
+        val checkedId = when (host.messagesConfig.messageCategoryFilter) {
+            MESSAGE_CATEGORY_OTP -> R.id.message_category_otp
+            MESSAGE_CATEGORY_SPAM -> R.id.message_category_spam
+            else -> R.id.message_category_main
+        }
+        binding.messageCategoryGroup.check(checkedId)
+    }
+
+    private fun refreshCategoryFilter() {
+        val host = activity ?: return
+        ensureBackgroundThread {
+            val conversations = try {
+                host.conversationsDB.getNonArchived().toMutableList() as ArrayList<Conversation>
+            } catch (_: Exception) {
+                ArrayList()
+            }
+            host.runOnUiThread {
+                setupConversations(conversations)
+            }
+        }
     }
 
     private fun applyMenuInsets() {
@@ -464,7 +513,8 @@ class MessagesFragment(
 
     private fun setupConversations(conversations: ArrayList<Conversation>, cached: Boolean = false) {
         val host = activity ?: return
-        val sortedConversations = conversations
+        val filteredConversations = applyCategoryFilter(conversations)
+        val sortedConversations = filteredConversations
             .sortedWith(
                 compareByDescending<Conversation> {
                     host.messagesConfig.pinnedConversations.contains(it.threadId.toString())
@@ -472,10 +522,10 @@ class MessagesFragment(
             ).toMutableList() as ArrayList<Conversation>
 
         if (cached && host.messagesConfig.appRunCount == 1) {
-            showOrHideProgress(conversations.isEmpty())
+            showOrHideProgress(filteredConversations.isEmpty())
         } else {
             showOrHideProgress(false)
-            showOrHidePlaceholder(conversations.isEmpty())
+            showOrHidePlaceholder(filteredConversations.isEmpty())
         }
 
         try {
@@ -488,6 +538,23 @@ class MessagesFragment(
             }
         } catch (_: Exception) {
         }
+    }
+
+    private fun applyCategoryFilter(conversations: ArrayList<Conversation>): ArrayList<Conversation> {
+        val host = activity ?: return conversations
+        val filter = host.messagesConfig.messageCategoryFilter
+        if (filter == MESSAGE_CATEGORY_MAIN) {
+            return conversations
+        }
+        val filtered = conversations.filter { conversation ->
+            val category = MessageCategorizer.categorizeConversation(conversation)
+            when (filter) {
+                MESSAGE_CATEGORY_OTP -> category == org.fossify.messages.helpers.MessageCategory.OTP
+                MESSAGE_CATEGORY_SPAM -> category == org.fossify.messages.helpers.MessageCategory.SPAM
+                else -> true
+            }
+        }
+        return filtered.toMutableList() as ArrayList<Conversation>
     }
 
     private fun showOrHideProgress(show: Boolean) {
