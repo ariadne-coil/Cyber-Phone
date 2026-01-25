@@ -4,8 +4,10 @@ import android.content.Context
 import android.util.Patterns
 import org.fossify.commons.extensions.baseConfig
 import org.fossify.commons.extensions.isNumberBlocked
+import org.fossify.commons.extensions.normalizePhoneNumber
 import org.fossify.messages.models.Conversation
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 
 enum class MessageCategory {
     MAIN,
@@ -44,6 +46,10 @@ object MessageCategorizer {
         "unsubscribe",
         "click"
     )
+    private val yacbLoaded = AtomicBoolean(false)
+    private var yacbInstance: Any? = null
+    private var yacbInit: java.lang.reflect.Method? = null
+    private var yacbGetRating: java.lang.reflect.Method? = null
 
     fun extractOtp(body: String): String? {
         val match = otpCodeRegex.find(body) ?: otpSpacedCodeRegex.find(body) ?: return null
@@ -56,6 +62,16 @@ object MessageCategorizer {
             return false
         }
         return otpKeywordRegex.containsMatchIn(body)
+    }
+
+    fun isSpamHeuristic(body: String, isKnownContact: Boolean): Boolean {
+        if (isKnownContact || body.isBlank()) {
+            return false
+        }
+        val normalized = body.lowercase(Locale.getDefault())
+        val hasSpamKeyword = spamKeywords.any { normalized.contains(it) }
+        val hasUrl = Patterns.WEB_URL.matcher(body).find()
+        return hasSpamKeyword || hasUrl
     }
 
     fun categorizeMessage(
@@ -72,13 +88,40 @@ object MessageCategorizer {
         if (body.isBlank()) {
             return MessageCategory.MAIN
         }
-        val normalized = body.lowercase(Locale.getDefault())
-        val hasSpamKeyword = spamKeywords.any { normalized.contains(it) }
-        val hasUrl = Patterns.WEB_URL.matcher(body).find()
-        return if (!isKnownContact && (hasSpamKeyword || hasUrl)) {
+        return if (isSpamHeuristic(body, isKnownContact)) {
             MessageCategory.SPAM
         } else {
             MessageCategory.MAIN
+        }
+    }
+
+    private fun getYacbRating(context: Context, number: String): String? {
+        if (!yacbLoaded.get()) {
+            synchronized(this) {
+                if (!yacbLoaded.get()) {
+                    try {
+                        val clazz = Class.forName("org.fossify.phone.blocking.YacbSiaManager")
+                        yacbInstance = clazz.getField("INSTANCE").get(null)
+                        yacbInit = runCatching { clazz.getMethod("init", Context::class.java) }.getOrNull()
+                        yacbGetRating = clazz.getMethod("getRating", String::class.java)
+                    } catch (_: Exception) {
+                        yacbInstance = null
+                        yacbInit = null
+                        yacbGetRating = null
+                    } finally {
+                        yacbLoaded.set(true)
+                    }
+                }
+            }
+        }
+
+        val instance = yacbInstance ?: return null
+        try {
+            yacbInit?.invoke(instance, context.applicationContext)
+            val rating = yacbGetRating?.invoke(instance, number) ?: return null
+            return rating.toString()
+        } catch (_: Exception) {
+            return null
         }
     }
 
@@ -96,6 +139,16 @@ object MessageCategorizer {
         }
         if (context.baseConfig.blockUnknownNumbers && !isKnownContact) {
             return true
+        }
+        if (!isKnownContact && isSpamHeuristic(body, isKnownContact)) {
+            return true
+        }
+        val normalizedNumber = address.normalizePhoneNumber().trim()
+        if (!isKnownContact && normalizedNumber.isNotEmpty()) {
+            val rating = getYacbRating(context, normalizedNumber)
+            if (rating == "NEGATIVE") {
+                return true
+            }
         }
         return false
     }
