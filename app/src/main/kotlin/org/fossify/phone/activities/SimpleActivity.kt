@@ -1,9 +1,9 @@
 package org.fossify.phone.activities
 
-import org.fossify.commons.activities.BaseSimpleActivity
 import org.fossify.phone.R
+import org.fossify.messages.activities.SimpleActivity as MessagesSimpleActivity
 
-open class SimpleActivity : BaseSimpleActivity() {
+open class SimpleActivity : MessagesSimpleActivity() {
     override fun getAppIconIDs() = arrayListOf(
         R.mipmap.ic_launcher_red,
         R.mipmap.ic_launcher_pink,

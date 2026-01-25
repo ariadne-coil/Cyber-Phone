@@ -14,6 +14,7 @@ import android.provider.Settings
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.viewpager.widget.ViewPager
 import com.google.android.material.snackbar.Snackbar
 import me.grantland.widget.AutofitHelper
@@ -23,7 +24,6 @@ import org.fossify.commons.dialogs.PermissionRequiredDialog
 import org.fossify.commons.dialogs.RadioGroupDialog
 import org.fossify.commons.extensions.*
 import org.fossify.commons.helpers.*
-import org.fossify.commons.models.FAQItem
 import org.fossify.commons.models.RadioItem
 import org.fossify.commons.models.contacts.Contact
 import org.fossify.phone.BuildConfig
@@ -38,10 +38,12 @@ import org.fossify.phone.extensions.handleFullScreenNotificationsPermission
 import org.fossify.phone.extensions.launchCreateNewContactIntent
 import org.fossify.phone.fragments.ContactsFragment
 import org.fossify.phone.fragments.FavoritesFragment
+import org.fossify.phone.fragments.MessagesFragment
 import org.fossify.phone.fragments.MyViewPagerFragment
 import org.fossify.phone.fragments.RecentsFragment
 import org.fossify.phone.helpers.OPEN_DIAL_PAD_AT_LAUNCH
 import org.fossify.phone.helpers.RecentsHelper
+import org.fossify.phone.helpers.TAB_MESSAGES
 import org.fossify.phone.helpers.tabsList
 import org.fossify.phone.models.Events
 import org.greenrobot.eventbus.EventBus
@@ -57,6 +59,7 @@ class MainActivity : SimpleActivity() {
     private var storedShowTabs = 0
     private var storedFontSize = 0
     private var storedStartNameWithSurname = false
+    private var mainHolderBehavior: CoordinatorLayout.Behavior<*>? = null
     var cachedContacts = ArrayList<Contact>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -121,6 +124,10 @@ class MainActivity : SimpleActivity() {
 
         updateTextColors(binding.mainHolder)
         setupTabColors()
+        updateTabUi(getVisibleTabs().getOrNull(binding.viewPager.currentItem) ?: TAB_CONTACTS)
+        if (getVisibleTabs().getOrNull(binding.viewPager.currentItem) == TAB_MESSAGES) {
+            getMessagesFragment()?.onTabSelected()
+        }
 
         getAllFragments().forEach {
             it?.setupColors(getProperTextColor(), getProperPrimaryColor(), getProperPrimaryColor())
@@ -159,6 +166,10 @@ class MainActivity : SimpleActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
         super.onActivityResult(requestCode, resultCode, resultData)
+        if (requestCode == MessagesFragment.REQUEST_CODE_SET_DEFAULT_SMS) {
+            getMessagesFragment()?.handleActivityResult(requestCode, resultCode)
+            return
+        }
         // we don't really care about the result, the app can work without being the default Dialer too
         if (requestCode == REQUEST_CODE_SET_DEFAULT_DIALER) {
             checkContactPermissions()
@@ -202,7 +213,6 @@ class MainActivity : SimpleActivity() {
             findItem(R.id.create_new_contact).isVisible = currentFragment == getContactsFragment()
             findItem(R.id.change_view_type).isVisible = currentFragment == getFavoritesFragment()
             findItem(R.id.column_count).isVisible = currentFragment == getFavoritesFragment() && config.viewType == VIEW_TYPE_GRID
-            findItem(R.id.more_apps_from_us).isVisible = !resources.getBoolean(R.bool.hide_google_relations)
         }
     }
 
@@ -228,7 +238,6 @@ class MainActivity : SimpleActivity() {
                     R.id.create_new_contact -> launchCreateNewContactIntent()
                     R.id.sort -> showSortingDialog(showCustomSorting = getCurrentFragment() is FavoritesFragment)
                     R.id.filter -> showFilterDialog()
-                    R.id.more_apps_from_us -> launchMoreAppsFromUsIntent()
                     R.id.settings -> launchSettings()
                     R.id.change_view_type -> changeViewType()
                     R.id.column_count -> changeColumnCount()
@@ -265,6 +274,13 @@ class MainActivity : SimpleActivity() {
 
     private fun updateMenuColors() {
         binding.mainMenu.updateColors()
+    }
+
+    private fun selectTab(tabType: Int) {
+        val position = getVisibleTabs().indexOf(tabType)
+        if (position != -1) {
+            binding.mainTabsHolder.getTabAt(position)?.select()
+        }
     }
 
     private fun checkContactPermissions() {
@@ -331,41 +347,11 @@ class MainActivity : SimpleActivity() {
     private fun getInactiveTabIndexes(activeIndex: Int) = (0 until binding.mainTabsHolder.tabCount).filter { it != activeIndex }
 
     private fun getSelectedTabDrawableIds(): List<Int> {
-        val showTabs = config.showTabs
-        val icons = mutableListOf<Int>()
-
-        if (showTabs and TAB_CONTACTS != 0) {
-            icons.add(R.drawable.ic_person_vector)
-        }
-
-        if (showTabs and TAB_FAVORITES != 0) {
-            icons.add(R.drawable.ic_star_vector)
-        }
-
-        if (showTabs and TAB_CALL_HISTORY != 0) {
-            icons.add(R.drawable.ic_clock_filled_vector)
-        }
-
-        return icons
+        return getVisibleTabs().map { getTabIconRes(it, selected = true) }
     }
 
     private fun getDeselectedTabDrawableIds(): ArrayList<Int> {
-        val showTabs = config.showTabs
-        val icons = ArrayList<Int>()
-
-        if (showTabs and TAB_CONTACTS != 0) {
-            icons.add(R.drawable.ic_person_outline_vector)
-        }
-
-        if (showTabs and TAB_FAVORITES != 0) {
-            icons.add(R.drawable.ic_star_outline_vector)
-        }
-
-        if (showTabs and TAB_CALL_HISTORY != 0) {
-            icons.add(R.drawable.ic_clock_vector)
-        }
-
-        return icons
+        return ArrayList(getVisibleTabs().map { getTabIconRes(it, selected = false) })
     }
 
     private fun initFragments() {
@@ -380,6 +366,7 @@ class MainActivity : SimpleActivity() {
                 getAllFragments().forEach {
                     it?.finishActMode()
                 }
+                updateTabUi(getVisibleTabs().getOrNull(position) ?: TAB_CONTACTS)
                 refreshMenuItems()
             }
         })
@@ -432,13 +419,26 @@ class MainActivity : SimpleActivity() {
                 updateBottomTabItemColors(it.customView, false, getDeselectedTabDrawableIds()[it.position])
             },
             tabSelectedAction = {
-                getCurrentFragment()?.onSearchQueryChanged(binding.mainMenu.getCurrentQuery())
+                val tabType = getVisibleTabs().getOrNull(it.position)
                 binding.viewPager.currentItem = it.position
                 updateBottomTabItemColors(it.customView, true, getSelectedTabDrawableIds()[it.position])
 
                 val lastPosition = binding.mainTabsHolder.tabCount - 1
                 if (it.position == lastPosition && config.showTabs and TAB_CALL_HISTORY > 0) {
                     clearMissedCalls()
+                }
+                updateTabUi(tabType ?: TAB_CONTACTS)
+                if (tabType == TAB_MESSAGES) {
+                    getMessagesFragment()?.onTabSelected()
+                } else {
+                    if (binding.mainMenu.isSearchOpen) {
+                        getCurrentFragment()?.onSearchQueryChanged(binding.mainMenu.getCurrentQuery())
+                    } else {
+                        getCurrentFragment()?.onSearchQueryChanged("")
+                    }
+                    if (tabType == TAB_CONTACTS) {
+                        getContactsFragment()?.refreshItems()
+                    }
                 }
             }
         )
@@ -449,22 +449,20 @@ class MainActivity : SimpleActivity() {
     }
 
     private fun getTabIcon(position: Int): Drawable {
-        val drawableId = when (position) {
-            0 -> R.drawable.ic_person_vector
-            1 -> R.drawable.ic_star_vector
-            else -> R.drawable.ic_clock_vector
-        }
-
+        val tabType = getVisibleTabs().getOrNull(position) ?: TAB_CONTACTS
+        val drawableId = getTabIconRes(tabType, selected = true)
         return resources.getColoredDrawableWithColor(drawableId, getProperTextColor())
     }
 
     private fun getTabLabel(position: Int): String {
-        val stringId = when (position) {
-            0 -> R.string.contacts_tab
-            1 -> R.string.favorites_tab
-            else -> R.string.call_history_tab
+        val tabType = getVisibleTabs().getOrNull(position) ?: TAB_CONTACTS
+        val stringId = when (tabType) {
+            TAB_CONTACTS -> R.string.contacts_tab
+            TAB_FAVORITES -> R.string.favorites_tab
+            TAB_CALL_HISTORY -> R.string.call_history_tab
+            TAB_MESSAGES -> R.string.messages_tab
+            else -> R.string.contacts_tab
         }
-
         return resources.getString(stringId)
     }
 
@@ -497,6 +495,7 @@ class MainActivity : SimpleActivity() {
         getContactsFragment()?.refreshItems()
         getFavoritesFragment()?.refreshItems()
         getRecentsFragment()?.refreshItems()
+        getMessagesFragment()?.refreshItems()
     }
 
     private fun getAllFragments(): ArrayList<MyViewPagerFragment<*>?> {
@@ -515,6 +514,10 @@ class MainActivity : SimpleActivity() {
             fragments.add(getRecentsFragment())
         }
 
+        if (showTabs and TAB_MESSAGES > 0) {
+            fragments.add(getMessagesFragment())
+        }
+
         return fragments
     }
 
@@ -526,31 +529,45 @@ class MainActivity : SimpleActivity() {
 
     private fun getRecentsFragment(): RecentsFragment? = findViewById(R.id.recents_fragment)
 
+    private fun getMessagesFragment(): MessagesFragment? = findViewById(R.id.messages_fragment)
+
+    private fun getVisibleTabs(): List<Int> = tabsList.filter { it and config.showTabs != 0 }
+
+    private fun updateTabUi(tabType: Int) {
+        val isMessagesTab = tabType == TAB_MESSAGES
+        binding.mainMenu.beGoneIf(isMessagesTab)
+        binding.mainDialpadButton.beGoneIf(isMessagesTab)
+        updateMainHolderBehavior(isMessagesTab)
+        if (isMessagesTab) {
+            binding.mainMenu.closeSearch()
+        }
+    }
+
+    private fun updateMainHolderBehavior(isMessagesTab: Boolean) {
+        val params = binding.mainHolder.layoutParams as CoordinatorLayout.LayoutParams
+        if (mainHolderBehavior == null) {
+            mainHolderBehavior = params.behavior
+        }
+
+        params.behavior = if (isMessagesTab) null else mainHolderBehavior
+        binding.mainHolder.layoutParams = params
+    }
+
+    private fun getTabIconRes(tabType: Int, selected: Boolean): Int {
+        return when (tabType) {
+            TAB_CONTACTS -> if (selected) R.drawable.ic_person_vector else R.drawable.ic_person_outline_vector
+            TAB_FAVORITES -> if (selected) R.drawable.ic_star_vector else R.drawable.ic_star_outline_vector
+            TAB_CALL_HISTORY -> if (selected) R.drawable.ic_clock_filled_vector else R.drawable.ic_clock_vector
+            TAB_MESSAGES -> R.drawable.ic_sms_vector
+            else -> R.drawable.ic_person_vector
+        }
+    }
+
     private fun getDefaultTab(): Int {
-        val showTabsMask = config.showTabs
+        val visibleTabs = getVisibleTabs()
         return when (config.defaultTab) {
             TAB_LAST_USED -> if (config.lastUsedViewPagerPage < binding.mainTabsHolder.tabCount) config.lastUsedViewPagerPage else 0
-            TAB_CONTACTS -> 0
-            TAB_FAVORITES -> if (showTabsMask and TAB_CONTACTS > 0) 1 else 0
-            else -> {
-                if (showTabsMask and TAB_CALL_HISTORY > 0) {
-                    if (showTabsMask and TAB_CONTACTS > 0) {
-                        if (showTabsMask and TAB_FAVORITES > 0) {
-                            2
-                        } else {
-                            1
-                        }
-                    } else {
-                        if (showTabsMask and TAB_FAVORITES > 0) {
-                            1
-                        } else {
-                            0
-                        }
-                    }
-                } else {
-                    0
-                }
-            }
+            else -> visibleTabs.indexOf(config.defaultTab).takeIf { it >= 0 } ?: 0
         }
     }
 
@@ -560,21 +577,7 @@ class MainActivity : SimpleActivity() {
     }
 
     private fun launchAbout() {
-        val licenses = LICENSE_GLIDE or LICENSE_INDICATOR_FAST_SCROLL or LICENSE_AUTOFITTEXTVIEW
-
-        val faqItems = arrayListOf(
-            FAQItem(R.string.faq_1_title, R.string.faq_1_text),
-            FAQItem(R.string.faq_2_title, R.string.faq_2_text),
-            FAQItem(R.string.faq_3_title, R.string.faq_3_text),
-            FAQItem(R.string.faq_9_title_commons, R.string.faq_9_text_commons)
-        )
-
-        if (!resources.getBoolean(R.bool.hide_google_relations)) {
-            faqItems.add(FAQItem(R.string.faq_2_title_commons, R.string.faq_2_text_commons))
-            faqItems.add(FAQItem(R.string.faq_6_title_commons, R.string.faq_6_text_commons))
-        }
-
-        startAboutActivity(R.string.app_name, licenses, BuildConfig.VERSION_NAME, faqItems, true)
+        startActivity(Intent(this, CyberAboutActivity::class.java))
     }
 
     private fun showSortingDialog(showCustomSorting: Boolean) {

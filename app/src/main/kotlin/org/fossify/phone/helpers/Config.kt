@@ -135,4 +135,16 @@ class Config(context: Context) : BaseConfig(context) {
     var alwaysShowFullscreen: Boolean
         get() = prefs.getBoolean(ALWAYS_SHOW_FULLSCREEN, false)
         set(alwaysShowFullscreen) = prefs.edit().putBoolean(ALWAYS_SHOW_FULLSCREEN, alwaysShowFullscreen).apply()
+
+    var blockNegativeRatings: Boolean
+        get() = prefs.getBoolean(BLOCK_NEGATIVE_RATINGS, false)
+        set(value) = prefs.edit().putBoolean(BLOCK_NEGATIVE_RATINGS, value).apply()
+
+    var showBlockedCallNotifications: Boolean
+        get() = prefs.getBoolean(SHOW_BLOCKED_CALL_NOTIFICATIONS, false)
+        set(value) = prefs.edit().putBoolean(SHOW_BLOCKED_CALL_NOTIFICATIONS, value).apply()
+
+    var showCallRatingNotifications: Boolean
+        get() = prefs.getBoolean(SHOW_CALL_RATING_NOTIFICATIONS, false)
+        set(value) = prefs.edit().putBoolean(SHOW_CALL_RATING_NOTIFICATIONS, value).apply()
 }

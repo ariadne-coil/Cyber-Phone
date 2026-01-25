@@ -13,6 +13,7 @@ import org.fossify.phone.extensions.keyguardManager
 import org.fossify.phone.extensions.powerManager
 import org.fossify.phone.helpers.CallManager
 import org.fossify.phone.helpers.CallNotificationManager
+import org.fossify.phone.helpers.DiagnosticsLogger
 import org.fossify.phone.helpers.NoCall
 import org.fossify.phone.models.Events
 import org.greenrobot.eventbus.EventBus
@@ -36,6 +37,7 @@ class CallService : InCallService() {
         CallManager.onCallAdded(call)
         CallManager.inCallService = this
         call.registerCallback(callListener)
+        val number = call.details.handle?.schemeSpecificPart
 
         // Incoming/Outgoing (locked): high priority (FSI)
         // Incoming (unlocked): if user opted in, low priority ➜ manual activity start, otherwise high priority (FSI)
@@ -50,16 +52,24 @@ class CallService : InCallService() {
         }
 
         callNotificationManager.setupNotification(lowPriority)
-        if (
-            lowPriority
-            || !hasPermission(PERMISSION_POST_NOTIFICATIONS)
-            || !canUseFullScreenIntent()
-        ) {
+        DiagnosticsLogger.log(
+            this,
+            "onCallAdded incoming=$isIncoming locked=$isDeviceLocked lowPriority=$lowPriority " +
+                "postNotif=${hasPermission(PERMISSION_POST_NOTIFICATIONS)} " +
+                "fsi=${canUseFullScreenIntent()} number=${maskNumber(number)}"
+        )
+        val shouldStartActivity = isIncoming ||
+            lowPriority ||
+            !hasPermission(PERMISSION_POST_NOTIFICATIONS) ||
+            !canUseFullScreenIntent()
+        if (shouldStartActivity) {
             try {
+                DiagnosticsLogger.log(this, "startActivity attempt")
                 startActivity(CallActivity.getStartIntent(this))
-            } catch (_: Exception) {
-                // seems like startActivity can throw AndroidRuntimeException and
-                // ActivityNotFoundException, not yet sure when and why, lets show a notification
+                DiagnosticsLogger.log(this, "startActivity dispatched")
+            } catch (e: Exception) {
+                // If launching the UI fails, fall back to a regular notification.
+                DiagnosticsLogger.log(this, "startActivity failed: ${e::class.java.simpleName}")
                 callNotificationManager.setupNotification()
             }
         }
@@ -83,6 +93,7 @@ class CallService : InCallService() {
         EventBus.getDefault().post(Events.RefreshCallLog)
     }
 
+    @Suppress("DEPRECATION")
     override fun onCallAudioStateChanged(audioState: CallAudioState?) {
         super.onCallAudioStateChanged(audioState)
         if (audioState != null) {
@@ -93,5 +104,19 @@ class CallService : InCallService() {
     override fun onDestroy() {
         super.onDestroy()
         callNotificationManager.cancelNotification()
+    }
+
+    private fun maskNumber(number: String?): String {
+        if (number.isNullOrBlank()) {
+            return "unknown"
+        }
+
+        val digits = number.filter { it.isDigit() }
+        if (digits.length <= 4) {
+            return digits
+        }
+
+        val suffix = digits.takeLast(4)
+        return "****$suffix"
     }
 }

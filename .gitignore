@@ -11,3 +11,11 @@ keystore.properties
 fastlane/fastlane.json
 fastlane/report.xml
 .kotlin/
+/app/Keystore/
+/app/core/
+/app/release/
+/_messages/
+/_yacb/
+/tmp/
+/LXMF-0.9.3.zip
+/third_party/

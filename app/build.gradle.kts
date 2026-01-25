@@ -5,7 +5,6 @@ import java.io.FileInputStream
 
 plugins {
     alias(libs.plugins.android)
-    alias(libs.plugins.kotlinAndroid)
     alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.detekt)
 }
@@ -32,7 +31,6 @@ android {
         targetSdk = project.libs.versions.app.build.targetSDK.get().toInt()
         versionName = project.property("VERSION_NAME").toString()
         versionCode = project.property("VERSION_CODE").toString().toInt()
-        setProperty("archivesBaseName", "phone-$versionCode")
     }
 
     signingConfigs {
@@ -75,13 +73,6 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
-    }
-
-    flavorDimensions.add("variants")
-    productFlavors {
-        register("core")
-        register("foss")
-        register("gplay")
     }
 
     sourceSets {
@@ -128,7 +119,7 @@ android {
 }
 
 detekt {
-    baseline = file("detekt-baseline.xml")
+    baseline = layout.projectDirectory.file("detekt-baseline.xml").asFile
     config.setFrom("$rootDir/detekt.yml")
     buildUponDefaultConfig = true
     allRules = false
@@ -142,5 +133,10 @@ dependencies {
     implementation(libs.eventbus)
     implementation(libs.libphonenumber)
     implementation(libs.geocoder)
+    implementation(libs.libphonenumberinfo)
+    implementation(libs.okhttp)
+    implementation(libs.slf4j.android)
+    implementation(libs.work.runtime)
     detektPlugins(libs.compose.detekt)
+    implementation(project(":messages"))
 }

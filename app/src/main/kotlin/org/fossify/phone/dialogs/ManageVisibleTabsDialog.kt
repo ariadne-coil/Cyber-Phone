@@ -12,6 +12,7 @@ import org.fossify.phone.R
 import org.fossify.phone.databinding.DialogManageVisibleTabsBinding
 import org.fossify.phone.extensions.config
 import org.fossify.phone.helpers.ALL_TABS_MASK
+import org.fossify.phone.helpers.TAB_MESSAGES
 
 class ManageVisibleTabsDialog(val activity: BaseSimpleActivity) {
     private val binding by activity.viewBinding(DialogManageVisibleTabsBinding::inflate)
@@ -22,6 +23,7 @@ class ManageVisibleTabsDialog(val activity: BaseSimpleActivity) {
             put(TAB_CONTACTS, R.id.manage_visible_tabs_contacts)
             put(TAB_FAVORITES, R.id.manage_visible_tabs_favorites)
             put(TAB_CALL_HISTORY, R.id.manage_visible_tabs_call_history)
+            put(TAB_MESSAGES, R.id.manage_visible_tabs_messages)
         }
 
         val showTabs = activity.config.showTabs

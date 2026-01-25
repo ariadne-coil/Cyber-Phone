@@ -4,37 +4,24 @@ import android.os.Build
 import android.telecom.Call
 import android.telecom.CallScreeningService
 import androidx.annotation.RequiresApi
-import org.fossify.commons.extensions.baseConfig
-import org.fossify.commons.extensions.getMyContactsCursor
-import org.fossify.commons.extensions.isNumberBlocked
-import org.fossify.commons.extensions.normalizePhoneNumber
-import org.fossify.commons.helpers.SimpleContactsHelper
+import org.fossify.phone.blocking.YacbBlockingEngine
+import org.fossify.phone.blocking.YacbCallNotificationHelper
 
 @RequiresApi(Build.VERSION_CODES.N)
 class SimpleCallScreeningService : CallScreeningService() {
+    private val blockingEngine by lazy { YacbBlockingEngine(this) }
 
     override fun onScreenCall(callDetails: Call.Details) {
         val number = callDetails.handle?.schemeSpecificPart
-        when {
-            number != null && isNumberBlocked(number.normalizePhoneNumber()) -> {
-                respondToCall(callDetails, isBlocked = true)
-            }
-
-            number != null && baseConfig.blockUnknownNumbers -> {
-                val simpleContactsHelper = SimpleContactsHelper(this)
-                val privateCursor = getMyContactsCursor(favoritesOnly = false, withPhoneNumbersOnly = true)
-                simpleContactsHelper.exists(number, privateCursor) { exists ->
-                    respondToCall(callDetails, isBlocked = !exists)
+        blockingEngine.evaluateCall(number) { decision ->
+            decision.callInfo?.let { info ->
+                if (decision.shouldBlock) {
+                    YacbCallNotificationHelper.notifyBlockedCall(this, info)
+                } else {
+                    YacbCallNotificationHelper.notifyIncomingCallInfo(this, info)
                 }
             }
-
-            number == null && baseConfig.blockHiddenNumbers -> {
-                respondToCall(callDetails, isBlocked = true)
-            }
-
-            else -> {
-                respondToCall(callDetails, isBlocked = false)
-            }
+            respondToCall(callDetails, isBlocked = decision.shouldBlock)
         }
     }
 

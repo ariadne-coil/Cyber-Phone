@@ -1,11 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_launcher_name">Phone</string>
+    <string name="app_launcher_name">Cyber Phone</string>
+    <string name="messages_tab">Messages</string>
+    <string name="open_messages">Open Messages</string>
+    <string name="messages_placeholder">Your messages live here</string>
+    <string name="messages">Messages</string>
     <string name="default_phone_app_prompt">Please make this app the default Phone app</string>
     <string name="allow_displaying_over_other_apps">Please allow displaying over other apps for reliable behaviour</string>
 
     <!-- Contacts -->
     <string name="could_not_access_contacts">Could not access your contacts</string>
+    <string name="mesh_address">Mesh address</string>
+    <string name="mesh_address_hint">Mesh address (mesh:...)</string>
+    <string name="mesh_address_copy">Copy</string>
+    <string name="mesh_address_share">Share</string>
+    <string name="mesh_address_paste">Paste</string>
+    <string name="mesh_address_clear">Clear</string>
+    <string name="mesh_address_saved">Mesh address saved</string>
+    <string name="mesh_address_removed">Mesh address removed</string>
+    <string name="mesh_address_invalid">Mesh address must be 32 hex characters</string>
+    <string name="mesh_address_private_contact">Mesh address is unavailable for private contacts</string>
+    <string name="mesh_address_clipboard_empty">Clipboard is empty</string>
 
     <!-- Recents -->
     <string name="no_previous_calls">No previous calls have been found</string>
@@ -67,6 +82,16 @@
     <string name="call_is_being_connected">Your call is being connected…</string>
     <string name="call_notification_channel">Call status</string>
     <string name="call_notification_channel_high_priority">Call status (high priority)</string>
+    <string name="notification_channel_blocked_calls">Blocked calls</string>
+    <string name="notification_channel_call_info">Call rating alerts</string>
+    <string name="notification_blocked_call">Call blocked</string>
+    <string name="notification_incoming_call">Incoming call</string>
+    <string name="block_negative_ratings">Block negative community ratings</string>
+    <string name="show_blocked_call_notifications">Show blocked call notifications</string>
+    <string name="show_call_rating_notifications">Show call rating notifications</string>
+    <string name="call_rating_positive">Community rating: Positive</string>
+    <string name="call_rating_neutral">Community rating: Neutral</string>
+    <string name="call_rating_negative">Community rating: Negative</string>
 
     <!-- Speed dial -->
     <string name="speed_dial">Speed dial</string>
@@ -83,6 +108,12 @@
     <string name="export_call_history">Export call history</string>
     <string name="import_call_history">Import call history</string>
     <string name="calling_accounts">Calling accounts</string>
+    <string name="mesh_networking">Mesh networking</string>
+    <string name="mesh_mode">Mesh mode</string>
+    <string name="mesh_mode_standard">Standard (cellular and Wi-Fi)</string>
+    <string name="mesh_mode_fallback">Mesh with fallback</string>
+    <string name="mesh_mode_mesh_only">Mesh only</string>
+    <string name="mesh_routing_enabled">Allow routing for other devices (act as node)</string>
 
     <!-- FAQ -->
     <string name="faq_1_title">I hear incoming calls, but the screen doesn\'t turn on. What can I do?</string>
@@ -91,6 +122,12 @@
     <string name="faq_2_text">Due to system restrictions, emergency calls can only be made through your system\'s default dialer or phone app. To ensure emergency calls work properly, you need to keep the system app installed and enabled.</string>
     <string name="faq_3_title">Why are some of my contacts missing from the app?</string>
     <string name="faq_3_text">Fossify Phone only displays contacts that have a phone number associated with them. Contacts without a phone number are not shown in the app.</string>
+
+    <!-- About -->
+    <string name="about_author_title">Author</string>
+    <string name="about_author_text">https://ariadnecyber.substack.com/</string>
+    <string name="about_ack_title">Acknowledgements</string>
+    <string name="about_ack_text">Fossify Phone\nFossify Messages\nFossify Commons\nYet Another Call Blocker</string>
     <!--
         Haven't found some strings? There's more at
         https://github.com/FossifyOrg/Commons/tree/master/commons/src/main/res

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/mesh_address_scrollview"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:id="@+id/mesh_address_holder"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="@dimen/activity_margin"
+        android:paddingBottom="@dimen/medium_margin">
+
+        <org.fossify.commons.views.MyTextInputLayout
+            android:id="@+id/mesh_address_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/activity_margin"
+            android:layout_marginEnd="@dimen/activity_margin"
+            android:hint="@string/mesh_address_hint">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/mesh_address_input"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="text"
+                android:textCursorDrawable="@null"
+                android:textSize="@dimen/bigger_text_size" />
+
+        </org.fossify.commons.views.MyTextInputLayout>
+
+        <LinearLayout
+            android:id="@+id/mesh_address_actions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/activity_margin"
+            android:layout_marginTop="@dimen/medium_margin"
+            android:layout_marginEnd="@dimen/activity_margin"
+            android:gravity="end"
+            android:orientation="horizontal">
+
+            <org.fossify.commons.views.MyTextView
+                android:id="@+id/mesh_address_paste"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="@dimen/medium_margin"
+                android:padding="@dimen/medium_margin"
+                android:text="@string/mesh_address_paste" />
+
+            <org.fossify.commons.views.MyTextView
+                android:id="@+id/mesh_address_copy"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="@dimen/medium_margin"
+                android:padding="@dimen/medium_margin"
+                android:text="@string/mesh_address_copy" />
+
+            <org.fossify.commons.views.MyTextView
+                android:id="@+id/mesh_address_share"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="@dimen/medium_margin"
+                android:padding="@dimen/medium_margin"
+                android:text="@string/mesh_address_share" />
+
+            <org.fossify.commons.views.MyTextView
+                android:id="@+id/mesh_address_clear"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="@dimen/medium_margin"
+                android:text="@string/mesh_address_clear" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

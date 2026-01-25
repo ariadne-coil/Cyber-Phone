@@ -14,6 +14,8 @@ The Fossify Phone App offers a fluid and responsive mobile interface, enhancing 
 🌐 **OPEN-SOURCE ASSURANCE:**  
 With the Fossify Phone App, transparency is at your fingertips. Built on an open-source foundation, our app allows you to review our code on GitHub, fostering trust and a community committed to privacy.
 
+License: AGPL-3.0 (includes blocking engine code derived from Yet Another Call Blocker).
+
 🖼️ **TAILOR-MADE CUSTOMIZATION:**  
 Customize your mobile experience with the Fossify Phone App. Adjust your app settings for a personalized interface, from thematic designs to functional preferences. Enjoy a user interface that's intuitive and uniquely yours.
 

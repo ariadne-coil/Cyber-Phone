@@ -20,7 +20,6 @@ import org.fossify.commons.adapters.MyRecyclerViewAdapter
 import org.fossify.commons.databinding.ItemContactWithoutNumberBinding
 import org.fossify.commons.databinding.ItemContactWithoutNumberGridBinding
 import org.fossify.commons.dialogs.ConfirmationDialog
-import org.fossify.commons.dialogs.FeatureLockedDialog
 import org.fossify.commons.extensions.*
 import org.fossify.commons.helpers.*
 import org.fossify.commons.interfaces.ItemMoveCallback
@@ -34,6 +33,7 @@ import org.fossify.phone.extensions.areMultipleSIMsAvailable
 import org.fossify.phone.extensions.callContactWithSim
 import org.fossify.phone.extensions.config
 import org.fossify.phone.extensions.startContactDetailsIntent
+import org.fossify.phone.dialogs.MeshAddressDialog
 import org.fossify.phone.interfaces.RefreshItemsListener
 import java.util.Collections
 
@@ -92,10 +92,11 @@ class ContactsAdapter(
             findItem(R.id.cab_remove_default_sim).isVisible = isOneItemSelected && (activity.config.getCustomSIM(selectedNumber) ?: "") != ""
 
             findItem(R.id.cab_delete).isVisible = showDeleteButton
-            findItem(R.id.cab_create_shortcut).title = activity.addLockedLabelIfNeeded(R.string.create_shortcut)
+            findItem(R.id.cab_create_shortcut).title = activity.getString(R.string.create_shortcut)
             findItem(R.id.cab_create_shortcut).isVisible = isOneItemSelected && isOreoPlus()
             findItem(R.id.cab_view_details).isVisible = isOneItemSelected
             findItem(R.id.cab_block_unblock_contact).isVisible = isOneItemSelected && isNougatPlus()
+            findItem(R.id.cab_mesh_address).isVisible = isOneItemSelected
             getCabBlockContactTitle { title ->
                 findItem(R.id.cab_block_unblock_contact).title = title
             }
@@ -115,6 +116,7 @@ class ContactsAdapter(
             R.id.cab_delete -> askConfirmDelete()
             R.id.cab_send_sms -> sendSMS()
             R.id.cab_view_details -> viewContactDetails()
+            R.id.cab_mesh_address -> showMeshAddress()
             R.id.cab_create_shortcut -> tryCreateShortcut()
             R.id.cab_select_all -> selectAll()
         }
@@ -168,23 +170,19 @@ class ContactsAdapter(
                 R.string.block_contact
             }
 
-            callback(activity.addLockedLabelIfNeeded(cabItemTitleRes))
+            callback(activity.getString(cabItemTitleRes))
         }
     }
 
     private fun tryBlockingUnblocking() {
         val contact = getSelectedItems().firstOrNull() ?: return
 
-        if (activity.isOrWasThankYouInstalled()) {
-            activity.isContactBlocked(contact) { blocked ->
-                if (blocked) {
-                    tryUnblocking(contact)
-                } else {
-                    tryBlocking(contact)
-                }
+        activity.isContactBlocked(contact) { blocked ->
+            if (blocked) {
+                tryUnblocking(contact)
+            } else {
+                tryBlocking(contact)
             }
-        } else {
-            FeatureLockedDialog(activity) { }
         }
     }
 
@@ -269,6 +267,14 @@ class ContactsAdapter(
         activity.startContactDetailsIntent(contact)
     }
 
+    private fun showMeshAddress() {
+        val contact = getSelectedItems().firstOrNull() ?: return
+        MeshAddressDialog(activity, contact) {
+            refreshItemsListener?.refreshItems()
+        }
+        finishActMode()
+    }
+
     private fun askConfirmDelete() {
         val itemsCnt = selectedKeys.size
         val firstItem = getSelectedItems().firstOrNull() ?: return
@@ -317,11 +323,7 @@ class ContactsAdapter(
     }
 
     private fun tryCreateShortcut() {
-        if (activity.isOrWasThankYouInstalled()) {
-            createShortcut()
-        } else {
-            FeatureLockedDialog(activity) { }
-        }
+        createShortcut()
     }
 
     @SuppressLint("NewApi")

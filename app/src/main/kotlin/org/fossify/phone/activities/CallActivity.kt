@@ -70,7 +70,12 @@ class CallActivity : SimpleActivity() {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
 
+        DiagnosticsLogger.log(
+            this,
+            "CallActivity onCreate state=${CallManager.getState()}"
+        )
         if (CallManager.getPhoneState() == NoCall) {
+            DiagnosticsLogger.log(this, "CallActivity finishing: no active call")
             finish()
             return
         }
@@ -828,6 +833,7 @@ class CallActivity : SimpleActivity() {
     }
 
     @SuppressLint("NewApi")
+    @Suppress("DEPRECATION")
     private fun addLockScreenFlags() {
         if (isOreoMr1Plus()) {
             setShowWhenLocked(true)

@@ -10,7 +10,9 @@ import org.fossify.phone.R
 import org.fossify.phone.activities.SimpleActivity
 import org.fossify.phone.extensions.config
 import org.fossify.phone.fragments.MyViewPagerFragment
+import org.fossify.phone.helpers.TAB_MESSAGES
 import org.fossify.phone.helpers.tabsList
+import org.fossify.phone.interfaces.RefreshItemsListener
 
 class ViewPagerAdapter(val activity: SimpleActivity) : PagerAdapter() {
 
@@ -21,6 +23,9 @@ class ViewPagerAdapter(val activity: SimpleActivity) : PagerAdapter() {
 
         (view as MyViewPagerFragment<*>).apply {
             setupFragment(activity)
+            if (this is RefreshItemsListener) {
+                refreshItems()
+            }
         }
 
         return view
@@ -47,6 +52,10 @@ class ViewPagerAdapter(val activity: SimpleActivity) : PagerAdapter() {
 
         if (showTabs and TAB_CALL_HISTORY > 0) {
             fragments.add(R.layout.fragment_recents)
+        }
+
+        if (showTabs and TAB_MESSAGES > 0) {
+            fragments.add(R.layout.fragment_messages)
         }
 
         return if (position < fragments.size) fragments[position] else fragments.last()

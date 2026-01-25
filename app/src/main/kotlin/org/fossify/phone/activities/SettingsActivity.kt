@@ -9,14 +9,15 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.fossify.commons.activities.ManageBlockedNumbersActivity
 import org.fossify.commons.dialogs.ChangeDateTimeFormatDialog
-import org.fossify.commons.dialogs.FeatureLockedDialog
 import org.fossify.commons.dialogs.RadioGroupDialog
-import org.fossify.commons.extensions.addLockedLabelIfNeeded
+import org.fossify.commons.dialogs.ConfirmationDialog
+import org.fossify.commons.dialogs.SecurityDialog
 import org.fossify.commons.extensions.baseConfig
 import org.fossify.commons.extensions.beVisibleIf
+import org.fossify.commons.extensions.formatWithDeprecatedBadge
+import org.fossify.commons.extensions.getBlockedNumbers
 import org.fossify.commons.extensions.getFontSizeText
 import org.fossify.commons.extensions.getProperPrimaryColor
-import org.fossify.commons.extensions.isOrWasThankYouInstalled
 import org.fossify.commons.extensions.showErrorToast
 import org.fossify.commons.extensions.toast
 import org.fossify.commons.extensions.updateTextColors
@@ -26,6 +27,8 @@ import org.fossify.commons.helpers.FONT_SIZE_LARGE
 import org.fossify.commons.helpers.FONT_SIZE_MEDIUM
 import org.fossify.commons.helpers.FONT_SIZE_SMALL
 import org.fossify.commons.helpers.NavigationIcon
+import org.fossify.commons.helpers.PROTECTION_FINGERPRINT
+import org.fossify.commons.helpers.SHOW_ALL_TABS
 import org.fossify.commons.helpers.TAB_CALL_HISTORY
 import org.fossify.commons.helpers.TAB_CONTACTS
 import org.fossify.commons.helpers.TAB_FAVORITES
@@ -33,6 +36,7 @@ import org.fossify.commons.helpers.TAB_LAST_USED
 import org.fossify.commons.helpers.isNougatPlus
 import org.fossify.commons.helpers.isQPlus
 import org.fossify.commons.helpers.isTiramisuPlus
+import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.models.RadioItem
 import org.fossify.phone.R
 import org.fossify.phone.databinding.ActivitySettingsBinding
@@ -40,9 +44,30 @@ import org.fossify.phone.dialogs.ExportCallHistoryDialog
 import org.fossify.phone.dialogs.ManageVisibleTabsDialog
 import org.fossify.phone.extensions.canLaunchAccountsConfiguration
 import org.fossify.phone.extensions.config
+import org.fossify.phone.helpers.TAB_MESSAGES
 import org.fossify.phone.extensions.launchAccountsConfiguration
 import org.fossify.phone.helpers.RecentsHelper
 import org.fossify.phone.models.RecentCall
+import org.fossify.messages.activities.ManageBlockedKeywordsActivity
+import org.fossify.messages.dialogs.ExportMessagesDialog
+import org.fossify.messages.extensions.config as messagesConfig
+import org.fossify.messages.extensions.emptyMessagesRecycleBin
+import org.fossify.messages.extensions.messagesDB
+import org.fossify.messages.helpers.FILE_SIZE_100_KB
+import org.fossify.messages.helpers.FILE_SIZE_1_MB
+import org.fossify.messages.helpers.FILE_SIZE_200_KB
+import org.fossify.messages.helpers.FILE_SIZE_2_MB
+import org.fossify.messages.helpers.FILE_SIZE_300_KB
+import org.fossify.messages.helpers.FILE_SIZE_600_KB
+import org.fossify.messages.helpers.FILE_SIZE_NONE
+import org.fossify.messages.helpers.LOCK_SCREEN_NOTHING
+import org.fossify.messages.helpers.LOCK_SCREEN_SENDER
+import org.fossify.messages.helpers.LOCK_SCREEN_SENDER_MESSAGE
+import org.fossify.messages.helpers.MessagesImporter
+import org.fossify.messages.helpers.refreshConversations
+import org.fossify.mesh.MeshConfig
+import org.fossify.mesh.MeshManager
+import org.fossify.mesh.MeshMode
 import java.util.Locale
 import kotlin.system.exitProcess
 
@@ -55,6 +80,18 @@ class SettingsActivity : SimpleActivity() {
                 // Workaround for https://github.com/FossifyOrg/Messages/issues/88
                 add("application/octet-stream")
             }
+        }
+    }
+
+    private var blockedNumbersAtPause = -1
+    private var recycleBinMessages = 0
+    private val messagesFileType = "application/json"
+    private val messageImportFileTypes = buildList {
+        add("application/json")
+        add("application/xml")
+        add("text/xml")
+        if (!isQPlus()) {
+            add("application/octet-stream")
         }
     }
 
@@ -76,6 +113,22 @@ class SettingsActivity : SimpleActivity() {
         }
     }
 
+    private var exportMessagesDialog: ExportMessagesDialog? = null
+    private val getMessagesContent =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                MessagesImporter(this).importMessages(uri)
+            }
+        }
+
+    private val saveMessagesDocument =
+        registerForActivityResult(ActivityResultContracts.CreateDocument(messagesFileType)) { uri ->
+            if (uri != null) {
+                toast(org.fossify.commons.R.string.exporting)
+                exportMessagesDialog?.exportMessages(uri)
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
@@ -93,9 +146,11 @@ class SettingsActivity : SimpleActivity() {
         setupTopAppBar(binding.settingsAppbar, NavigationIcon.Arrow)
 
         setupCustomizeColors()
+        setupCustomizeNotifications()
         setupUseEnglish()
         setupLanguage()
         setupManageBlockedNumbers()
+        setupManageBlockedKeywords()
         setupManageSpeedDial()
         setupChangeDateTimeFormat()
         setupFontSize()
@@ -103,6 +158,7 @@ class SettingsActivity : SimpleActivity() {
         setupDefaultTab()
         setupDialPadOpen()
         setupGroupSubsequentCalls()
+        setupBlockNegativeRatings()
         setupStartNameWithSurname()
         setupFormatPhoneNumbers()
         setupDialpadVibrations()
@@ -112,9 +168,31 @@ class SettingsActivity : SimpleActivity() {
         setupDisableProximitySensor()
         setupDisableSwipeToAnswer()
         setupAlwaysShowFullscreen()
+        setupMeshMode()
+        setupMeshRouting()
+        setupShowCharacterCounter()
+        setupUseSimpleCharacters()
+        setupSendOnEnter()
+        setupEnableDeliveryReports()
+        setupSendLongMessageAsMMS()
+        setupGroupMessageAsMMS()
+        setupLockScreenVisibility()
+        setupMMSFileSizeLimit()
+        setupKeepConversationsArchived()
+        setupUseRecycleBin()
+        setupEmptyRecycleBin()
+        setupAppPasswordProtection()
+        setupShowBlockedCallNotifications()
+        setupShowCallRatingNotifications()
         setupCallsExport()
         setupCallsImport()
+        setupMessagesExport()
+        setupMessagesImport()
         updateTextColors(binding.settingsHolder)
+
+        if (blockedNumbersAtPause != -1 && blockedNumbersAtPause != getBlockedNumbers().hashCode()) {
+            refreshConversations()
+        }
 
         binding.apply {
             arrayOf(
@@ -122,12 +200,24 @@ class SettingsActivity : SimpleActivity() {
                 settingsGeneralSettingsLabel,
                 settingsStartupLabel,
                 settingsCallsLabel,
+                settingsMeshLabel,
                 settingsDialpadSectionLabel,
+                settingsNotificationsLabel,
+                settingsOutgoingMessagesLabel,
+                settingsArchivedMessagesLabel,
+                settingsRecycleBinLabel,
+                settingsSecurityLabel,
+                settingsMessagesMigratingLabel,
                 settingsMigrationSectionLabel
             ).forEach {
                 it.setTextColor(getProperPrimaryColor())
             }
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        blockedNumbersAtPause = getBlockedNumbers().hashCode()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -181,19 +271,255 @@ class SettingsActivity : SimpleActivity() {
 
     private fun setupManageBlockedNumbers() {
         binding.apply {
-            settingsManageBlockedNumbersLabel.text = addLockedLabelIfNeeded(R.string.manage_blocked_numbers)
+            settingsManageBlockedNumbersLabel.text = getString(R.string.manage_blocked_numbers)
             settingsManageBlockedNumbersHolder.beVisibleIf(isNougatPlus())
             settingsManageBlockedNumbersHolder.setOnClickListener {
-                if (isOrWasThankYouInstalled()) {
-                    Intent(this@SettingsActivity, ManageBlockedNumbersActivity::class.java).apply {
-                        startActivity(this)
-                    }
-                } else {
-                    FeatureLockedDialog(this@SettingsActivity) { }
+                Intent(this@SettingsActivity, ManageBlockedNumbersActivity::class.java).apply {
+                    startActivity(this)
                 }
             }
         }
     }
+
+    private fun setupManageBlockedKeywords() = binding.apply {
+        settingsManageBlockedKeywords.text = getString(R.string.manage_blocked_keywords)
+        settingsManageBlockedKeywordsHolder.setOnClickListener {
+            Intent(this@SettingsActivity, ManageBlockedKeywordsActivity::class.java).apply {
+                startActivity(this)
+            }
+        }
+    }
+
+    private fun setupCustomizeNotifications() = binding.apply {
+        settingsCustomizeNotificationsHolder.setOnClickListener {
+            launchCustomizeNotificationsIntent()
+        }
+    }
+
+    private fun setupShowCharacterCounter() = binding.apply {
+        settingsShowCharacterCounter.isChecked = messagesConfig.showCharacterCounter
+        settingsShowCharacterCounterHolder.setOnClickListener {
+            settingsShowCharacterCounter.toggle()
+            messagesConfig.showCharacterCounter = settingsShowCharacterCounter.isChecked
+        }
+    }
+
+    private fun setupUseSimpleCharacters() = binding.apply {
+        settingsUseSimpleCharacters.isChecked = messagesConfig.useSimpleCharacters
+        settingsUseSimpleCharactersHolder.setOnClickListener {
+            settingsUseSimpleCharacters.toggle()
+            messagesConfig.useSimpleCharacters = settingsUseSimpleCharacters.isChecked
+        }
+    }
+
+    private fun setupSendOnEnter() = binding.apply {
+        settingsSendOnEnter.isChecked = messagesConfig.sendOnEnter
+        settingsSendOnEnterHolder.setOnClickListener {
+            settingsSendOnEnter.toggle()
+            messagesConfig.sendOnEnter = settingsSendOnEnter.isChecked
+        }
+    }
+
+    private fun setupEnableDeliveryReports() = binding.apply {
+        settingsEnableDeliveryReports.isChecked = messagesConfig.enableDeliveryReports
+        settingsEnableDeliveryReportsHolder.setOnClickListener {
+            settingsEnableDeliveryReports.toggle()
+            messagesConfig.enableDeliveryReports = settingsEnableDeliveryReports.isChecked
+        }
+    }
+
+    private fun setupSendLongMessageAsMMS() = binding.apply {
+        settingsSendLongMessageMms.isChecked = messagesConfig.sendLongMessageMMS
+        settingsSendLongMessageMmsHolder.setOnClickListener {
+            settingsSendLongMessageMms.toggle()
+            messagesConfig.sendLongMessageMMS = settingsSendLongMessageMms.isChecked
+        }
+    }
+
+    private fun setupGroupMessageAsMMS() = binding.apply {
+        settingsSendGroupMessageMms.isChecked = messagesConfig.sendGroupMessageMMS
+        settingsSendGroupMessageMmsHolder.setOnClickListener {
+            settingsSendGroupMessageMms.toggle()
+            messagesConfig.sendGroupMessageMMS = settingsSendGroupMessageMms.isChecked
+        }
+    }
+
+    private fun setupKeepConversationsArchived() = binding.apply {
+        settingsKeepConversationsArchived.isChecked = messagesConfig.keepConversationsArchived
+        settingsKeepConversationsArchivedHolder.setOnClickListener {
+            settingsKeepConversationsArchived.toggle()
+            messagesConfig.keepConversationsArchived = settingsKeepConversationsArchived.isChecked
+        }
+    }
+
+    private fun setupLockScreenVisibility() = binding.apply {
+        settingsLockScreenVisibility.text = getLockScreenVisibilityText()
+        settingsLockScreenVisibilityHolder.setOnClickListener {
+            val items = arrayListOf(
+                RadioItem(LOCK_SCREEN_SENDER_MESSAGE, getString(R.string.sender_and_message)),
+                RadioItem(LOCK_SCREEN_SENDER, getString(R.string.sender_only)),
+                RadioItem(LOCK_SCREEN_NOTHING, getString(org.fossify.commons.R.string.nothing)),
+            )
+
+            RadioGroupDialog(this@SettingsActivity, items, messagesConfig.lockScreenVisibilitySetting) {
+                messagesConfig.lockScreenVisibilitySetting = it as Int
+                settingsLockScreenVisibility.text = getLockScreenVisibilityText()
+            }
+        }
+    }
+
+    private fun getLockScreenVisibilityText() = getString(
+        when (messagesConfig.lockScreenVisibilitySetting) {
+            LOCK_SCREEN_SENDER_MESSAGE -> R.string.sender_and_message
+            LOCK_SCREEN_SENDER -> R.string.sender_only
+            else -> org.fossify.commons.R.string.nothing
+        }
+    )
+
+    private fun setupMMSFileSizeLimit() = binding.apply {
+        settingsMmsFileSizeLimit.text = getMmsFileLimitText()
+        settingsMmsFileSizeLimitHolder.setOnClickListener {
+            val items = arrayListOf(
+                RadioItem(7, getString(R.string.mms_file_size_limit_none), FILE_SIZE_NONE),
+                RadioItem(6, getString(R.string.mms_file_size_limit_2mb), FILE_SIZE_2_MB),
+                RadioItem(5, getString(R.string.mms_file_size_limit_1mb), FILE_SIZE_1_MB),
+                RadioItem(4, getString(R.string.mms_file_size_limit_600kb), FILE_SIZE_600_KB),
+                RadioItem(3, getString(R.string.mms_file_size_limit_300kb), FILE_SIZE_300_KB),
+                RadioItem(2, getString(R.string.mms_file_size_limit_200kb), FILE_SIZE_200_KB),
+                RadioItem(1, getString(R.string.mms_file_size_limit_100kb), FILE_SIZE_100_KB),
+            )
+
+            val checkedItemId = items.find { it.value == messagesConfig.mmsFileSizeLimit }?.id ?: 7
+            RadioGroupDialog(this@SettingsActivity, items, checkedItemId) {
+                messagesConfig.mmsFileSizeLimit = it as Long
+                settingsMmsFileSizeLimit.text = getMmsFileLimitText()
+            }
+        }
+    }
+
+    private fun setupUseRecycleBin() = binding.apply {
+        updateRecycleBinButtons()
+        settingsUseRecycleBin.isChecked = messagesConfig.useRecycleBin
+        settingsUseRecycleBin.text = formatWithDeprecatedBadge(
+            labelRes = org.fossify.commons.R.string.move_items_into_recycle_bin
+        )
+        settingsUseRecycleBinHolder.setOnClickListener {
+            settingsUseRecycleBin.toggle()
+            messagesConfig.useRecycleBin = settingsUseRecycleBin.isChecked
+            updateRecycleBinButtons()
+        }
+    }
+
+    private fun updateRecycleBinButtons() = binding.apply {
+        settingsEmptyRecycleBinHolder.beVisibleIf(messagesConfig.useRecycleBin)
+    }
+
+    private fun setupEmptyRecycleBin() = binding.apply {
+        ensureBackgroundThread {
+            recycleBinMessages = messagesDB.getArchivedCount()
+            runOnUiThread {
+                settingsEmptyRecycleBinSize.text =
+                    resources.getQuantityString(
+                        R.plurals.delete_messages,
+                        recycleBinMessages,
+                        recycleBinMessages
+                    )
+            }
+        }
+
+        settingsEmptyRecycleBinHolder.setOnClickListener {
+            if (recycleBinMessages == 0) {
+                toast(org.fossify.commons.R.string.recycle_bin_empty)
+            } else {
+                ConfirmationDialog(
+                    activity = this@SettingsActivity,
+                    message = "",
+                    messageId = R.string.empty_recycle_bin_messages_confirmation,
+                    positive = org.fossify.commons.R.string.yes,
+                    negative = org.fossify.commons.R.string.no
+                ) {
+                    ensureBackgroundThread {
+                        emptyMessagesRecycleBin()
+                    }
+                    recycleBinMessages = 0
+                    settingsEmptyRecycleBinSize.text =
+                        resources.getQuantityString(
+                            R.plurals.delete_messages,
+                            recycleBinMessages,
+                            recycleBinMessages
+                        )
+                }
+            }
+        }
+    }
+
+    private fun setupAppPasswordProtection() = binding.apply {
+        settingsAppPasswordProtection.isChecked = messagesConfig.isAppPasswordProtectionOn
+        settingsAppPasswordProtectionHolder.setOnClickListener {
+            val tabToShow = if (messagesConfig.isAppPasswordProtectionOn) {
+                messagesConfig.appProtectionType
+            } else {
+                SHOW_ALL_TABS
+            }
+
+            SecurityDialog(
+                activity = this@SettingsActivity,
+                requiredHash = messagesConfig.appPasswordHash,
+                showTabIndex = tabToShow
+            ) { hash, type, success ->
+                if (success) {
+                    val hasPasswordProtection = messagesConfig.isAppPasswordProtectionOn
+                    settingsAppPasswordProtection.isChecked = !hasPasswordProtection
+                    messagesConfig.isAppPasswordProtectionOn = !hasPasswordProtection
+                    messagesConfig.appPasswordHash = if (hasPasswordProtection) "" else hash
+                    messagesConfig.appProtectionType = type
+
+                    if (messagesConfig.isAppPasswordProtectionOn) {
+                        val confirmationTextId =
+                            if (messagesConfig.appProtectionType == PROTECTION_FINGERPRINT) {
+                                org.fossify.commons.R.string.fingerprint_setup_successfully
+                            } else {
+                                org.fossify.commons.R.string.protection_setup_successfully
+                            }
+
+                        ConfirmationDialog(
+                            activity = this@SettingsActivity,
+                            message = "",
+                            messageId = confirmationTextId,
+                            positive = org.fossify.commons.R.string.ok,
+                            negative = 0
+                        ) { }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun setupMessagesExport() {
+        binding.settingsExportMessagesHolder.setOnClickListener {
+            exportMessagesDialog = ExportMessagesDialog(this) { fileName ->
+                saveMessagesDocument.launch("$fileName.json")
+            }
+        }
+    }
+
+    private fun setupMessagesImport() {
+        binding.settingsImportMessagesHolder.setOnClickListener {
+            getMessagesContent.launch(messageImportFileTypes.toTypedArray())
+        }
+    }
+
+    private fun getMmsFileLimitText() = getString(
+        when (messagesConfig.mmsFileSizeLimit) {
+            FILE_SIZE_100_KB -> R.string.mms_file_size_limit_100kb
+            FILE_SIZE_200_KB -> R.string.mms_file_size_limit_200kb
+            FILE_SIZE_300_KB -> R.string.mms_file_size_limit_300kb
+            FILE_SIZE_600_KB -> R.string.mms_file_size_limit_600kb
+            FILE_SIZE_1_MB -> R.string.mms_file_size_limit_1mb
+            FILE_SIZE_2_MB -> R.string.mms_file_size_limit_2mb
+            else -> R.string.mms_file_size_limit_none
+        }
+    )
 
     private fun setupManageSpeedDial() {
         binding.settingsManageSpeedDialHolder.setOnClickListener {
@@ -239,6 +565,7 @@ class SettingsActivity : SimpleActivity() {
                 RadioItem(TAB_CONTACTS, getString(R.string.contacts_tab)),
                 RadioItem(TAB_FAVORITES, getString(R.string.favorites_tab)),
                 RadioItem(TAB_CALL_HISTORY, getString(R.string.call_history_tab)),
+                RadioItem(TAB_MESSAGES, getString(R.string.messages_tab)),
                 RadioItem(TAB_LAST_USED, getString(R.string.last_used_tab))
             )
 
@@ -254,6 +581,7 @@ class SettingsActivity : SimpleActivity() {
             TAB_CONTACTS -> R.string.contacts_tab
             TAB_FAVORITES -> R.string.favorites_tab
             TAB_CALL_HISTORY -> R.string.call_history_tab
+            TAB_MESSAGES -> R.string.messages_tab
             else -> R.string.last_used_tab
         }
     )
@@ -275,6 +603,14 @@ class SettingsActivity : SimpleActivity() {
                 settingsGroupSubsequentCalls.toggle()
                 config.groupSubsequentCalls = settingsGroupSubsequentCalls.isChecked
             }
+        }
+    }
+
+    private fun setupBlockNegativeRatings() = binding.apply {
+        settingsBlockNegativeRatings.isChecked = config.blockNegativeRatings
+        settingsBlockNegativeRatingsHolder.setOnClickListener {
+            settingsBlockNegativeRatings.toggle()
+            config.blockNegativeRatings = settingsBlockNegativeRatings.isChecked
         }
     }
 
@@ -363,6 +699,77 @@ class SettingsActivity : SimpleActivity() {
                 settingsAlwaysShowFullscreen.toggle()
                 config.alwaysShowFullscreen = settingsAlwaysShowFullscreen.isChecked
             }
+        }
+    }
+
+    private fun setupMeshMode() = binding.apply {
+        val meshConfig = MeshConfig.newInstance(this@SettingsActivity)
+        settingsMeshModeValue.text = getMeshModeLabel(meshConfig.getMeshMode())
+        settingsMeshModeHolder.setOnClickListener {
+            val items = arrayListOf(
+                RadioItem(MeshMode.STANDARD_ONLY.id, getString(R.string.mesh_mode_standard)),
+                RadioItem(MeshMode.MESH_WITH_FALLBACK.id, getString(R.string.mesh_mode_fallback)),
+                RadioItem(MeshMode.MESH_ONLY.id, getString(R.string.mesh_mode_mesh_only))
+            )
+
+            RadioGroupDialog(this@SettingsActivity, items, meshConfig.meshMode) {
+                meshConfig.meshMode = it as Int
+                settingsMeshModeValue.text = getMeshModeLabel(meshConfig.getMeshMode())
+                updateMeshRoutingUi(meshConfig)
+                MeshManager.sync(this@SettingsActivity)
+            }
+        }
+
+        updateMeshRoutingUi(meshConfig)
+    }
+
+    private fun setupMeshRouting() = binding.apply {
+        val meshConfig = MeshConfig.newInstance(this@SettingsActivity)
+        settingsMeshRouting.isChecked = meshConfig.meshRoutingEnabled
+        settingsMeshRoutingHolder.setOnClickListener {
+            settingsMeshRouting.toggle()
+            val routingEnabled = settingsMeshRouting.isChecked
+            meshConfig.meshRoutingEnabled = routingEnabled
+            if (routingEnabled && meshConfig.getMeshMode() == MeshMode.STANDARD_ONLY) {
+                meshConfig.meshMode = MeshMode.MESH_WITH_FALLBACK.id
+                settingsMeshModeValue.text = getMeshModeLabel(meshConfig.getMeshMode())
+            }
+            updateMeshRoutingUi(meshConfig)
+            MeshManager.sync(this@SettingsActivity)
+        }
+    }
+
+    private fun updateMeshRoutingUi(meshConfig: MeshConfig) = binding.apply {
+        val isMeshEnabled = meshConfig.getMeshMode() != MeshMode.STANDARD_ONLY
+        settingsMeshRouting.isEnabled = isMeshEnabled
+        settingsMeshRoutingHolder.isEnabled = isMeshEnabled
+        if (!isMeshEnabled && meshConfig.meshRoutingEnabled) {
+            meshConfig.meshRoutingEnabled = false
+            settingsMeshRouting.isChecked = false
+        }
+    }
+
+    private fun getMeshModeLabel(mode: MeshMode): String {
+        return when (mode) {
+            MeshMode.STANDARD_ONLY -> getString(R.string.mesh_mode_standard)
+            MeshMode.MESH_WITH_FALLBACK -> getString(R.string.mesh_mode_fallback)
+            MeshMode.MESH_ONLY -> getString(R.string.mesh_mode_mesh_only)
+        }
+    }
+
+    private fun setupShowBlockedCallNotifications() = binding.apply {
+        settingsShowBlockedCallNotifications.isChecked = config.showBlockedCallNotifications
+        settingsShowBlockedCallNotificationsHolder.setOnClickListener {
+            settingsShowBlockedCallNotifications.toggle()
+            config.showBlockedCallNotifications = settingsShowBlockedCallNotifications.isChecked
+        }
+    }
+
+    private fun setupShowCallRatingNotifications() = binding.apply {
+        settingsShowCallRatingNotifications.isChecked = config.showCallRatingNotifications
+        settingsShowCallRatingNotificationsHolder.setOnClickListener {
+            settingsShowCallRatingNotifications.toggle()
+            config.showCallRatingNotifications = settingsShowCallRatingNotifications.isChecked
         }
     }
 
