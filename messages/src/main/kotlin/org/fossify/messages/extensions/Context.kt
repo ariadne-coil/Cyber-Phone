@@ -150,15 +150,9 @@ fun Context.getMessages(
     val selectionArgs = arrayOf(threadId.toString())
     val sortOrder = "${Sms.DATE} DESC LIMIT $limit"
 
-    val blockStatus = HashMap<String, Boolean>()
-    val blockedNumbers = getBlockedNumbers()
     var messages = ArrayList<Message>()
     queryCursor(uri, projection, selection, selectionArgs, sortOrder, showErrors = true) { cursor ->
         val senderNumber = cursor.getStringValue(Sms.ADDRESS) ?: return@queryCursor
-        val isNumberBlocked = blockStatus.getOrPut(senderNumber) { isNumberBlocked(senderNumber, blockedNumbers) }
-        if (isNumberBlocked) {
-            return@queryCursor
-        }
 
         val id = cursor.getLongValue(Sms._ID)
         val body = cursor.getStringValue(Sms.BODY)
@@ -395,7 +389,6 @@ fun Context.getConversations(
 
     val conversations = ArrayList<Conversation>()
     val simpleContactHelper = SimpleContactsHelper(this)
-    val blockedNumbers = getBlockedNumbers()
     val unreadMap = getUnreadCountsByThread()
     try {
         queryCursorUnsafe(
@@ -429,12 +422,7 @@ fun Context.getConversations(
             val recipientIds =
                 rawIds.split(" ").filter { it.areDigitsOnly() }.map { it.toInt() }.toMutableList()
             val phoneNumbers = getThreadPhoneNumbers(recipientIds)
-            if (phoneNumbers.isEmpty() || phoneNumbers.any {
-                    isNumberBlocked(
-                        it,
-                        blockedNumbers
-                    )
-                }) {
+            if (phoneNumbers.isEmpty()) {
                 return@queryCursorUnsafe
             }
 

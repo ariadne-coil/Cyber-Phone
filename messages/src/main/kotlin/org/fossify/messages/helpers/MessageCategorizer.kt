@@ -1,6 +1,9 @@
 package org.fossify.messages.helpers
 
+import android.content.Context
 import android.util.Patterns
+import org.fossify.commons.extensions.baseConfig
+import org.fossify.commons.extensions.isNumberBlocked
 import org.fossify.messages.models.Conversation
 import java.util.Locale
 
@@ -9,6 +12,11 @@ enum class MessageCategory {
     OTP,
     SPAM
 }
+
+data class MessageClassification(
+    val category: MessageCategory,
+    val isBlocked: Boolean
+)
 
 object MessageCategorizer {
     private val otpKeywordRegex =
@@ -50,12 +58,19 @@ object MessageCategorizer {
         return otpKeywordRegex.containsMatchIn(body)
     }
 
-    fun categorizeMessage(body: String, isKnownContact: Boolean): MessageCategory {
-        if (body.isBlank()) {
-            return MessageCategory.MAIN
-        }
+    fun categorizeMessage(
+        body: String,
+        isKnownContact: Boolean,
+        isBlocked: Boolean
+    ): MessageCategory {
         if (isOtpMessage(body)) {
             return MessageCategory.OTP
+        }
+        if (isBlocked) {
+            return MessageCategory.SPAM
+        }
+        if (body.isBlank()) {
+            return MessageCategory.MAIN
         }
         val normalized = body.lowercase(Locale.getDefault())
         val hasSpamKeyword = spamKeywords.any { normalized.contains(it) }
@@ -67,12 +82,41 @@ object MessageCategorizer {
         }
     }
 
-    fun categorizeConversation(conversation: Conversation): MessageCategory {
-        if (conversation.isGroupConversation) {
-            return MessageCategory.MAIN
+    fun isBlockedMessage(
+        context: Context,
+        address: String,
+        body: String,
+        isKnownContact: Boolean
+    ): Boolean {
+        if (ReceiverUtils.isMessageFilteredOut(context, body)) {
+            return true
         }
+        if (context.isNumberBlocked(address)) {
+            return true
+        }
+        if (context.baseConfig.blockUnknownNumbers && !isKnownContact) {
+            return true
+        }
+        return false
+    }
+
+    fun classifyMessage(
+        context: Context,
+        address: String,
+        body: String,
+        isKnownContact: Boolean
+    ): MessageClassification {
+        val isBlocked = isBlockedMessage(context, address, body, isKnownContact)
+        val category = categorizeMessage(body, isKnownContact, isBlocked)
+        return MessageClassification(category, isBlocked)
+    }
+
+    fun classifyConversation(
+        context: Context,
+        conversation: Conversation
+    ): MessageClassification {
         val isKnownContact =
             conversation.title.isNotBlank() && conversation.title != conversation.phoneNumber
-        return categorizeMessage(conversation.snippet, isKnownContact)
+        return classifyMessage(context, conversation.phoneNumber, conversation.snippet, isKnownContact)
     }
 }

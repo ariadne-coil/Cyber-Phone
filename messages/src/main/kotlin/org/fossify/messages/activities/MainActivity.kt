@@ -493,11 +493,17 @@ class MainActivity : SimpleActivity() {
     private fun applyCategoryFilter(conversations: ArrayList<Conversation>): ArrayList<Conversation> {
         val filter = config.messageCategoryFilter
         val filtered = conversations.filter { conversation ->
-            val category = MessageCategorizer.categorizeConversation(conversation)
+            val classification = MessageCategorizer.classifyConversation(this, conversation)
             when (filter) {
-                MESSAGE_CATEGORY_OTP -> category == org.fossify.messages.helpers.MessageCategory.OTP
-                MESSAGE_CATEGORY_SPAM -> category == org.fossify.messages.helpers.MessageCategory.SPAM
-                else -> category == org.fossify.messages.helpers.MessageCategory.MAIN
+                MESSAGE_CATEGORY_OTP ->
+                    classification.category == org.fossify.messages.helpers.MessageCategory.OTP
+                MESSAGE_CATEGORY_SPAM ->
+                    classification.category == org.fossify.messages.helpers.MessageCategory.SPAM &&
+                        classification.isBlocked
+                else ->
+                    classification.category == org.fossify.messages.helpers.MessageCategory.MAIN ||
+                        (classification.category == org.fossify.messages.helpers.MessageCategory.SPAM &&
+                            !classification.isBlocked)
             }
         }
         return filtered.toMutableList() as ArrayList<Conversation>

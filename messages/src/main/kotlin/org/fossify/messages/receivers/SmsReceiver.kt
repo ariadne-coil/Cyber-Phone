@@ -4,9 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
-import org.fossify.commons.extensions.baseConfig
 import org.fossify.commons.extensions.getMyContactsCursor
-import org.fossify.commons.extensions.isNumberBlocked
 import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.models.PhoneNumber
@@ -23,7 +21,6 @@ import org.fossify.messages.extensions.showReceivedMessageNotification
 import org.fossify.messages.extensions.updateConversationArchivedStatus
 import org.fossify.messages.helpers.E2eManager
 import org.fossify.messages.helpers.MessageCategorizer
-import org.fossify.messages.helpers.ReceiverUtils.isMessageFilteredOut
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
 import org.fossify.messages.models.Message
@@ -45,15 +42,6 @@ class SmsReceiver : BroadcastReceiver() {
                 val subject = parts.last().pseudoSubject.orEmpty()
                 val status = parts.last().status
                 val body = buildString { parts.forEach { append(it.messageBody.orEmpty()) } }
-
-                if (isMessageFilteredOut(appContext, body)) return@ensureBackgroundThread
-                if (appContext.isNumberBlocked(address)) return@ensureBackgroundThread
-                if (appContext.baseConfig.blockUnknownNumbers) {
-                    appContext.getMyContactsCursor(favoritesOnly = false, withPhoneNumbersOnly = true).use {
-                        val isKnownContact = SimpleContactsHelper(appContext).existsSync(address, it)
-                        if (!isKnownContact) return@ensureBackgroundThread
-                    }
-                }
 
                 val subscriptionId = intent.getIntExtra("subscription", -1)
                 val date = System.currentTimeMillis()
@@ -89,7 +77,6 @@ class SmsReceiver : BroadcastReceiver() {
         subject: String,
         body: String,
         date: Long,
-        read: Int = 0,
         threadId: Long,
         type: Int = Telephony.Sms.MESSAGE_TYPE_INBOX,
         subscriptionId: Int,
@@ -98,12 +85,20 @@ class SmsReceiver : BroadcastReceiver() {
         val photoUri = SimpleContactsHelper(context).getPhotoUriFromPhoneNumber(address)
         val bitmap = context.getNotificationBitmap(photoUri)
 
+        val senderName = context.getMyContactsCursor(favoritesOnly = false, withPhoneNumbersOnly = true).use {
+            context.getNameFromAddress(address, it)
+        }
+        val isKnownContact = senderName != address
+        val displayBody = E2eManager.getDisplayBody(context, threadId, body)
+        val isBlocked = MessageCategorizer.isBlockedMessage(context, address, displayBody, isKnownContact)
+        val readFlag = if (isBlocked) 1 else 0
+
         val newMessageId = context.insertNewSMS(
             address = address,
             subject = subject,
             body = body,
             date = date,
-            read = read,
+            read = readFlag,
             threadId = threadId,
             type = type,
             subscriptionId = subscriptionId
@@ -111,10 +106,6 @@ class SmsReceiver : BroadcastReceiver() {
 
         context.getConversations(threadId).firstOrNull()?.let { conv ->
             runCatching { context.insertOrUpdateConversation(conv) }
-        }
-
-        val senderName = context.getMyContactsCursor(favoritesOnly = false, withPhoneNumbersOnly = true).use {
-            context.getNameFromAddress(address, it)
         }
 
         val participant = SimpleContact(
@@ -134,7 +125,7 @@ class SmsReceiver : BroadcastReceiver() {
             status = status,
             participants = arrayListOf(participant),
             date = (date / 1000).toInt(),
-            read = false,
+            read = readFlag == 1,
             threadId = threadId,
             isMMS = false,
             attachment = null,
@@ -152,10 +143,8 @@ class SmsReceiver : BroadcastReceiver() {
 
         refreshMessages()
         refreshConversations()
-        val displayBody = E2eManager.getDisplayBody(context, threadId, body)
-        val isKnownContact = senderName != address
-        val category = MessageCategorizer.categorizeMessage(displayBody, isKnownContact)
-        if (category != org.fossify.messages.helpers.MessageCategory.SPAM) {
+        val category = MessageCategorizer.categorizeMessage(displayBody, isKnownContact, isBlocked)
+        if (!isBlocked && category != org.fossify.messages.helpers.MessageCategory.SPAM) {
             context.showReceivedMessageNotification(
                 messageId = newMessageId,
                 address = address,
