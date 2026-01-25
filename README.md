@@ -1,36 +1,30 @@
-# Fossify Phone
+# Cyber Phone
 <img alt="Logo" src="graphics/icon.webp" width="120" />
 
-<a href='https://play.google.com/store/apps/details?id=org.fossify.phone'><img alt='Get it on Google Play' src='https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png' height=80/></a> <a href="https://f-droid.org/packages/org.fossify.phone/"><img src="https://fdroid.gitlab.io/artwork/badge/get-it-on-en.svg" alt="Get it on F-Droid" height=80/></a> <a href="https://apt.izzysoft.de/fdroid/index/apk/org.fossify.phone"><img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroid.png" alt="Get it on IzzyOnDroid" height=80/></a>
+Cyber Phone is a privacy-focused phone, contacts, and messaging app for modern Android. It combines dialer, SMS, caller ID enrichment, call screening, spam controls, and mesh-ready communications in one app.
 
-Empower your calls, and safeguard your data. Fossify Phone redefines the mobile app experience with unmatched privacy and efficiency. Free from ads and intrusive permissions, it's designed for seamless and secure everyday communication.
+**Features**
+- Default phone app with dialer, call history, and rich in-call UI
+- Fully integrated system contacts with in-app editing and quick add from calls/SMS
+- SMS conversations with category filters (Main/OTP/Spam), search, unread indicators, and status checks
+- Call and SMS blocking: number rules, patterns, neighbor spoofing handling, and cached community lists
+- Caller ID enrichment using libphonenumber geocoder and carrier lookup
+- Spam handling: suppressed spam notifications and auto-declined spam calls
+- End-to-end SMS encryption with key exchange; keys stored in contacts and editable
+- Reticulum-based mesh messaging and calls with configurable modes (mesh-only, fallback, standard)
+- Rich settings and modern Material UI
 
-📱 **YOUR PRIVACY, OUR PRIORITY:**  
-Welcome to the Fossify Phone App, where your digital privacy is paramount. Switch to a mobile experience that respects your data, ensuring your personal information remains secure and private.
+**Build**
+- Open the project in Android Studio and build the `app` module.
+- Ensure Android SDK and required build tools are installed.
+- For release signing, provide a `keystore.properties` file (not tracked in git).
 
-🚀 **SEAMLESS PERFORMANCE:**  
-The Fossify Phone App offers a fluid and responsive mobile interface, enhancing your phone's performance while safeguarding your privacy. Experience a lag-free, smooth user experience, optimized for efficiency and speed.
+**License**
+AGPL-3.0 (includes blocking engine code derived from Yet Another Call Blocker).
 
-🌐 **OPEN-SOURCE ASSURANCE:**  
-With the Fossify Phone App, transparency is at your fingertips. Built on an open-source foundation, our app allows you to review our code on GitHub, fostering trust and a community committed to privacy.
-
-License: AGPL-3.0 (includes blocking engine code derived from Yet Another Call Blocker).
-
-🖼️ **TAILOR-MADE CUSTOMIZATION:**  
-Customize your mobile experience with the Fossify Phone App. Adjust your app settings for a personalized interface, from thematic designs to functional preferences. Enjoy a user interface that's intuitive and uniquely yours.
-
-🔋 **EFFICIENT RESOURCE MANAGEMENT:**  
-The Fossify Phone App is designed for optimal resource usage, contributing to extended battery life. It's light on your phone's resources, ensuring your device runs efficiently with minimized battery drain.
-
-Download the Fossify Phone App now and step into a mobile world where privacy seamlessly blends with functionality. Your journey towards a safer, personalized mobile experience starts here.
-
-➡️ Explore more Fossify apps: https://www.fossify.org<br>
-➡️ Open-Source Code: https://www.github.com/FossifyOrg<br>
-➡️ Join the community on Reddit: https://www.reddit.com/r/Fossify<br>
-➡️ Connect on Telegram: https://t.me/Fossify
-
-<div align="center">
-<img alt="App image" src="fastlane/metadata/android/en-US/images/phoneScreenshots/1_en-US.png" width="30%">
-<img alt="App image" src="fastlane/metadata/android/en-US/images/phoneScreenshots/2_en-US.png" width="30%">
-<img alt="App image" src="fastlane/metadata/android/en-US/images/phoneScreenshots/3_en-US.png" width="30%">
-</div>
+**Acknowledgements**
+- Fossify (https://www.fossify.org)
+- Yet Another Call Blocker (https://gitlab.com/xynngh/YetAnotherCallBlocker)
+- Reticulum Network Stack (https://github.com/markqvist/Reticulum)
+- LXMF (https://github.com/markqvist/LXMF)
+- libphonenumber (https://github.com/google/libphonenumber)
