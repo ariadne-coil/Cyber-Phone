@@ -141,3 +141,9 @@ dependencies {
     detektPlugins(libs.compose.detekt)
     implementation(project(":messages"))
 }
+
+tasks.register("testClasses") {
+    group = "verification"
+    description = "Runs unit tests (alias for testDebugUnitTest)."
+    dependsOn("testDebugUnitTest")
+}
