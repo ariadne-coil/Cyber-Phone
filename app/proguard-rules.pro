@@ -21,3 +21,12 @@
     public static <1> INSTANCE;
     kotlinx.serialization.KSerializer serializer(...);
 }
+
+# Gson
+-keepattributes Signature
+-keep class org.fossify.commons.models.SimpleContact { *; }
+-keep class org.fossify.messages.models.Attachment { *; }
+-keep class org.fossify.messages.models.MessageAttachment { *; }
+
+-dontwarn com.google.auto.value.AutoValue
+-dontwarn com.google.auto.value.AutoValue$Builder

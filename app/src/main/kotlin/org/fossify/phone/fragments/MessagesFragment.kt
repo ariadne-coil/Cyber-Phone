@@ -12,6 +12,14 @@ import android.graphics.drawable.LayerDrawable
 import android.provider.Telephony
 import android.text.TextUtils
 import android.util.AttributeSet
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 import androidx.appcompat.content.res.AppCompatResources
 import org.fossify.commons.dialogs.PermissionRequiredDialog
 import org.fossify.commons.extensions.adjustAlpha
@@ -75,6 +83,8 @@ import org.fossify.messages.models.Events
 import org.fossify.messages.models.Message
 import org.fossify.messages.models.SearchResult
 import org.fossify.mesh.lxmf.LxmfAddress
+import org.fossify.messages.extensions.messageCategoryCacheDB
+import org.fossify.messages.models.MessageCategoryCache
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
@@ -85,6 +95,12 @@ class MessagesFragment(
 ) : MyViewPagerFragment<MyViewPagerFragment.InnerBinding>(context, attributeSet) {
     companion object {
         const val REQUEST_CODE_SET_DEFAULT_SMS = 1002
+        private const val RENDER_DEBOUNCE_MS = 150L
+        private const val CLASSIFY_FAST_LIMIT = 100
+        private const val CLASSIFY_CHUNK_SIZE = 200
+        private const val CLASSIFY_CHUNK_DELAY_MS = 120L
+        private const val CLASSIFY_UI_DEBOUNCE_MS = 120L
+        private const val FULL_SYNC_COOLDOWN_MS = 60_000L
     }
 
     private lateinit var binding: FragmentMessagesContentBinding
@@ -99,6 +115,27 @@ class MessagesFragment(
     private var menuBasePaddingTop = 0
     private var menuBasePaddingRight = 0
     private var menuBasePaddingBottom = 0
+    private var cachedConversations = arrayListOf<Conversation>()
+    private val classificationCache = ConcurrentHashMap<Long, org.fossify.messages.helpers.MessageClassification>()
+    private val classificationInFlight =
+        Collections.newSetFromMap(ConcurrentHashMap<Long, Boolean>())
+    private val hydratedThreadIds =
+        Collections.newSetFromMap(ConcurrentHashMap<Long, Boolean>())
+    private var classificationGeneration = 0
+    private var classificationExecutor: ScheduledExecutorService =
+        Executors.newSingleThreadScheduledExecutor()
+    private val classificationHandler = Handler(Looper.getMainLooper())
+    private var classificationUiRefresh: Runnable? = null
+    private var renderGeneration = 0
+    private var refreshGeneration = 0
+    private val renderHandler = Handler(Looper.getMainLooper())
+    private var pendingRender: Runnable? = null
+    private var pendingConversations: ArrayList<Conversation>? = null
+    private var pendingCached = false
+    private var isReloadingConversations = false
+    private var isTabActive = false
+    private var needsRefresh = false
+    private var lastFullSyncMs = 0L
 
     override fun onFinishInflate() {
         super.onFinishInflate()
@@ -113,6 +150,7 @@ class MessagesFragment(
     override fun setupFragment() {
         setupOptionsMenu()
         setupCategoryFilters()
+        loadPersistentClassificationCache()
         refreshMenuItems()
         activity?.setupEdgeToEdge(padBottomImeAndSystem = listOf(binding.conversationsList))
         applyMenuInsets()
@@ -136,10 +174,16 @@ class MessagesFragment(
         } catch (_: Exception) {
         }
         bus = null
+        isTabActive = false
+        pendingRender?.let { renderHandler.removeCallbacks(it) }
+        classificationUiRefresh?.let { classificationHandler.removeCallbacks(it) }
+        classificationExecutor.shutdownNow()
     }
 
     fun onTabSelected() {
         val host = activity ?: return
+        isTabActive = true
+        ensureClassificationExecutor()
         if (host.checkAppSideloading()) {
             return
         }
@@ -155,6 +199,10 @@ class MessagesFragment(
                 loadMessages()
             } else {
                 refreshItems()
+                if (needsRefresh) {
+                    needsRefresh = false
+                    refreshFilteredList(cached = true)
+                }
             }
         }
     }
@@ -271,17 +319,7 @@ class MessagesFragment(
     }
 
     private fun refreshCategoryFilter() {
-        val host = activity ?: return
-        ensureBackgroundThread {
-            val conversations = try {
-                host.conversationsDB.getNonArchived().toMutableList() as ArrayList<Conversation>
-            } catch (_: Exception) {
-                ArrayList()
-            }
-            host.runOnUiThread {
-                setupConversations(conversations)
-            }
-        }
+        refreshFilteredList(cached = true)
     }
 
     private fun applyMenuInsets() {
@@ -413,12 +451,35 @@ class MessagesFragment(
 
             host.runOnUiThread {
                 setupConversations(conversations, cached = true)
-                getNewConversations((conversations + archived).toMutableList() as ArrayList<Conversation>)
+                maybeScheduleFullSync((conversations + archived).toMutableList() as ArrayList<Conversation>)
+            }
+            if (conversations.isEmpty()) {
+                val privateCursor = host.getMyContactsCursor(favoritesOnly = false, withPhoneNumbersOnly = true)
+                val privateContacts = MyContactsContentProvider.getSimpleContacts(host, privateCursor)
+                val freshConversations = host.getConversations(privateContacts = privateContacts)
+                if (freshConversations.isNotEmpty()) {
+                    freshConversations.forEach { conv ->
+                        host.conversationsDB.insertOrUpdate(conv)
+                    }
+                    host.runOnUiThread {
+                        setupConversations(ArrayList(freshConversations))
+                    }
+                }
             }
             conversations.forEach {
                 host.clearExpiredScheduledMessages(it.threadId)
             }
         }
+    }
+
+    private fun maybeScheduleFullSync(cachedConversations: ArrayList<Conversation>) {
+        val host = activity ?: return
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastFullSyncMs < FULL_SYNC_COOLDOWN_MS) {
+            return
+        }
+        lastFullSyncMs = now
+        getNewConversations(cachedConversations)
     }
 
     private fun getNewConversations(cachedConversations: ArrayList<Conversation>) {
@@ -427,6 +488,22 @@ class MessagesFragment(
         ensureBackgroundThread {
             val privateContacts = MyContactsContentProvider.getSimpleContacts(host, privateCursor)
             val conversations = host.getConversations(privateContacts = privateContacts)
+            if (conversations.isEmpty()) {
+                host.runOnUiThread {
+                    if (cachedConversations.isEmpty()) {
+                        showOrHideProgress(false)
+                        showOrHidePlaceholder(true)
+                        binding.noConversationsPlaceholder.text =
+                            host.getString(org.fossify.commons.R.string.unknown_error_occurred)
+                        binding.noConversationsPlaceholder2.beVisible()
+                        binding.noConversationsPlaceholder2.text =
+                            host.getString(R.string.allow_permissions)
+                    } else {
+                        setupConversations(cachedConversations)
+                    }
+                }
+                return@ensureBackgroundThread
+            }
 
             conversations.forEach { clonedConversation ->
                 val threadIds = cachedConversations.map { it.threadId }
@@ -478,6 +555,14 @@ class MessagesFragment(
             val allConversations = host.conversationsDB.getNonArchived() as ArrayList<Conversation>
             host.runOnUiThread {
                 setupConversations(allConversations)
+                isReloadingConversations = false
+            }
+            ensureBackgroundThread {
+                try {
+                    val threadIds = allConversations.map { it.threadId }
+                    host.messageCategoryCacheDB.deleteMissingThreadIds(threadIds)
+                } catch (_: Exception) {
+                }
             }
 
             if (host.messagesConfig.appRunCount == 1) {
@@ -512,25 +597,62 @@ class MessagesFragment(
     }
 
     private fun setupConversations(conversations: ArrayList<Conversation>, cached: Boolean = false) {
+        cachedConversations = conversations
+        hydrateClassificationCache(conversations)
+        refreshFilteredList(cached)
+        scheduleClassification(conversations)
+    }
+
+    private fun renderConversations(conversations: ArrayList<Conversation>, cached: Boolean) {
+        updateConversationsUi(conversations, cached)
+    }
+
+    private fun performRenderConversations(conversations: ArrayList<Conversation>, cached: Boolean) {
         val host = activity ?: return
-        val filteredConversations = applyCategoryFilter(conversations)
-        val sortedConversations = filteredConversations
-            .sortedWith(
-                compareByDescending<Conversation> {
-                    host.messagesConfig.pinnedConversations.contains(it.threadId.toString())
-                }.thenByDescending { it.date }
-            ).toMutableList() as ArrayList<Conversation>
+        val generation = ++renderGeneration
+        ensureBackgroundThread {
+            val sortedConversations = conversations
 
-        if (cached && host.messagesConfig.appRunCount == 1) {
-            showOrHideProgress(filteredConversations.isEmpty())
-        } else {
-            showOrHideProgress(false)
-            showOrHidePlaceholder(filteredConversations.isEmpty())
+            host.runOnUiThread {
+                if (generation != renderGeneration) {
+                    return@runOnUiThread
+                }
+                if (cached && host.messagesConfig.appRunCount == 1) {
+                    showOrHideProgress(sortedConversations.isEmpty())
+                } else {
+                    showOrHideProgress(false)
+                    showOrHidePlaceholder(sortedConversations.isEmpty())
+                }
+
+                try {
+                    getOrCreateConversationsAdapter()?.apply {
+                        updateConversations(sortedConversations) {
+                            if (!cached) {
+                                showOrHidePlaceholder(currentList.isEmpty())
+                            }
+                        }
+                    }
+                } catch (_: Exception) {
+                }
+            }
         }
+    }
 
+    private fun fastRenderConversations(conversations: ArrayList<Conversation>, cached: Boolean) {
+        if (conversations.isEmpty()) {
+            showOrHideProgress(false)
+            showOrHidePlaceholder(true)
+            return
+        }
+        updateConversationsUi(conversations, cached)
+    }
+
+    private fun updateConversationsUi(conversations: ArrayList<Conversation>, cached: Boolean) {
+        showOrHideProgress(false)
+        showOrHidePlaceholder(conversations.isEmpty())
         try {
             getOrCreateConversationsAdapter()?.apply {
-                updateConversations(sortedConversations) {
+                updateConversations(conversations) {
                     if (!cached) {
                         showOrHidePlaceholder(currentList.isEmpty())
                     }
@@ -540,24 +662,203 @@ class MessagesFragment(
         }
     }
 
-    private fun applyCategoryFilter(conversations: ArrayList<Conversation>): ArrayList<Conversation> {
-        val host = activity ?: return conversations
-        val filter = host.messagesConfig.messageCategoryFilter
-        val filtered = conversations.filter { conversation ->
-            val classification = MessageCategorizer.classifyConversation(host, conversation)
-            when (filter) {
-                MESSAGE_CATEGORY_OTP ->
-                    classification.category == org.fossify.messages.helpers.MessageCategory.OTP
-                MESSAGE_CATEGORY_SPAM ->
-                    classification.category == org.fossify.messages.helpers.MessageCategory.SPAM &&
-                        classification.isBlocked
-                else ->
-                    classification.category == org.fossify.messages.helpers.MessageCategory.MAIN ||
-                        (classification.category == org.fossify.messages.helpers.MessageCategory.SPAM &&
-                            !classification.isBlocked)
+    private fun loadPersistentClassificationCache() {
+        val host = activity ?: return
+        ensureBackgroundThread {
+            val cached = try {
+                host.messageCategoryCacheDB.getAll()
+            } catch (_: Exception) {
+                emptyList()
+            }
+            if (cached.isEmpty()) {
+                return@ensureBackgroundThread
+            }
+            val map = HashMap<Long, org.fossify.messages.helpers.MessageClassification>(cached.size)
+            cached.forEach { entry ->
+                val category = when (entry.category) {
+                    1 -> org.fossify.messages.helpers.MessageCategory.OTP
+                    2 -> org.fossify.messages.helpers.MessageCategory.SPAM
+                    else -> org.fossify.messages.helpers.MessageCategory.MAIN
+                }
+                map[entry.threadId] = org.fossify.messages.helpers.MessageClassification(
+                    category = category,
+                    isBlocked = entry.isBlocked == 1
+                )
+            }
+            host.runOnUiThread {
+                classificationCache.clear()
+                classificationCache.putAll(map)
+                if (cachedConversations.isNotEmpty()) {
+                    refreshFilteredList(cached = true)
+                }
             }
         }
-        return filtered.toMutableList() as ArrayList<Conversation>
+    }
+
+    private fun hydrateClassificationCache(conversations: List<Conversation>) {
+        val host = activity ?: return
+        if (conversations.isEmpty()) return
+        val missing = conversations.map { it.threadId }
+            .filterNot { hydratedThreadIds.contains(it) }
+        if (missing.isEmpty()) {
+            return
+        }
+        ensureBackgroundThread {
+            val cached = try {
+                host.messageCategoryCacheDB.getByThreadIds(missing)
+            } catch (_: Exception) {
+                emptyList()
+            }
+            if (cached.isEmpty()) {
+                host.runOnUiThread {
+                    missing.forEach { hydratedThreadIds.add(it) }
+                }
+                return@ensureBackgroundThread
+            }
+            val map = HashMap<Long, org.fossify.messages.helpers.MessageClassification>(cached.size)
+            cached.forEach { entry ->
+                val category = when (entry.category) {
+                    1 -> org.fossify.messages.helpers.MessageCategory.OTP
+                    2 -> org.fossify.messages.helpers.MessageCategory.SPAM
+                    else -> org.fossify.messages.helpers.MessageCategory.MAIN
+                }
+                map[entry.threadId] = org.fossify.messages.helpers.MessageClassification(
+                    category = category,
+                    isBlocked = entry.isBlocked == 1
+                )
+            }
+            host.runOnUiThread {
+                classificationCache.putAll(map)
+                missing.forEach { hydratedThreadIds.add(it) }
+                if (cachedConversations.isNotEmpty()) {
+                    refreshFilteredList(cached = true)
+                }
+            }
+        }
+    }
+    private fun persistClassificationBatch(
+        host: Context,
+        updates: Map<Long, org.fossify.messages.helpers.MessageClassification>
+    ) {
+        if (updates.isEmpty()) {
+            return
+        }
+        val now = System.currentTimeMillis()
+        val entries = updates.map { (threadId, classification) ->
+            val categoryId = when (classification.category) {
+                org.fossify.messages.helpers.MessageCategory.MAIN -> 0
+                org.fossify.messages.helpers.MessageCategory.OTP -> 1
+                org.fossify.messages.helpers.MessageCategory.SPAM -> 2
+            }
+            MessageCategoryCache(
+                threadId = threadId,
+                category = categoryId,
+                isBlocked = if (classification.isBlocked) 1 else 0,
+                updatedAt = now
+            )
+        }
+        ensureBackgroundThread {
+            try {
+                host.messageCategoryCacheDB.insertAll(entries)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun refreshFilteredList(cached: Boolean) {
+        val host = activity ?: return
+        val generation = ++refreshGeneration
+        host.runOnUiThread {
+            showOrHideProgress(true)
+            showOrHidePlaceholder(false)
+        }
+        ensureBackgroundThread {
+            val conversations = try {
+                when (host.messagesConfig.messageCategoryFilter) {
+                    MESSAGE_CATEGORY_OTP ->
+                        host.conversationsDB.getNonArchivedOtp()
+                    MESSAGE_CATEGORY_SPAM ->
+                        host.conversationsDB.getNonArchivedSpam()
+                    else ->
+                        host.conversationsDB.getNonArchivedMain()
+                }.toMutableList() as ArrayList<Conversation>
+            } catch (_: Exception) {
+                ArrayList()
+            }
+            host.runOnUiThread {
+                if (generation != refreshGeneration || !isTabActive) {
+                    return@runOnUiThread
+                }
+                updateConversationsUi(conversations, cached)
+            }
+        }
+    }
+
+    private fun ensureClassificationExecutor() {
+        if (classificationExecutor.isShutdown || classificationExecutor.isTerminated) {
+            classificationExecutor = Executors.newSingleThreadScheduledExecutor()
+        }
+    }
+
+    private fun scheduleClassification(conversations: List<Conversation>) {
+        val host = activity ?: return
+        if (!isTabActive || conversations.isEmpty()) {
+            return
+        }
+        ensureClassificationExecutor()
+        val generation = ++classificationGeneration
+        classificationInFlight.clear()
+        val sorted = conversations.sortedByDescending { it.date }
+        val fastBatch = sorted.take(CLASSIFY_FAST_LIMIT)
+        val remaining = sorted.drop(CLASSIFY_FAST_LIMIT)
+        queueClassificationBatch(host, generation, fastBatch, 0L)
+        remaining.chunked(CLASSIFY_CHUNK_SIZE).forEachIndexed { index, chunk ->
+            val delay = CLASSIFY_CHUNK_DELAY_MS * (index + 1)
+            queueClassificationBatch(host, generation, chunk, delay)
+        }
+    }
+
+    private fun queueClassificationBatch(
+        host: Context,
+        generation: Int,
+        batch: List<Conversation>,
+        delayMs: Long
+    ) {
+        if (batch.isEmpty()) return
+        classificationExecutor.schedule({
+            if (!isTabActive || generation != classificationGeneration) {
+                return@schedule
+            }
+            val updates = HashMap<Long, org.fossify.messages.helpers.MessageClassification>()
+            batch.forEach { conversation ->
+                val threadId = conversation.threadId
+                if (classificationCache.containsKey(threadId)) {
+                    return@forEach
+                }
+                if (!classificationInFlight.add(threadId)) {
+                    return@forEach
+                }
+                val classification = MessageCategorizer.classifyConversation(host, conversation)
+                updates[threadId] = classification
+            }
+            if (updates.isEmpty()) {
+                return@schedule
+            }
+            classificationCache.putAll(updates)
+            persistClassificationBatch(host, updates)
+            scheduleClassificationUiRefresh()
+        }, delayMs, TimeUnit.MILLISECONDS)
+    }
+
+    private fun scheduleClassificationUiRefresh() {
+        if (!isTabActive) return
+        classificationUiRefresh?.let { classificationHandler.removeCallbacks(it) }
+        val runnable = Runnable {
+            if (!isTabActive) return@Runnable
+            refreshFilteredList(cached = true)
+        }
+        classificationUiRefresh = runnable
+        classificationHandler.postDelayed(runnable, CLASSIFY_UI_DEBOUNCE_MS)
     }
 
     private fun showOrHideProgress(show: Boolean) {
@@ -780,7 +1081,11 @@ class MessagesFragment(
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     fun refreshConversations(@Suppress("unused") event: Events.RefreshConversations) {
-        initMessenger()
+        if (!isTabActive) {
+            needsRefresh = true
+            return
+        }
+        refreshFilteredList(cached = false)
     }
 
     private fun checkWhatsNewDialog() {

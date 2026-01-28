@@ -67,6 +67,22 @@
     <string name="mesh_service_channel_name">Mesh network</string>
     <string name="mesh_service_title">Mesh network active</string>
     <string name="mesh_service_text">Routing and messaging are available</string>
+    <string name="mesh_service_status">Nodes: %1$d • Routing: %2$s</string>
+    <string name="mesh_routing_in_use">In use</string>
+    <string name="mesh_routing_idle">Idle</string>
+    <string name="mesh_status">Mesh status</string>
+    <string name="ai_spam_classification">AI spam classification</string>
+    <string name="ai_spam_model_source">AI model</string>
+    <string name="ai_spam_model_update">Update AI model</string>
+    <string name="ai_spam_model_not_set">No model selected</string>
+    <string name="ai_spam_model_not_downloaded">Model not downloaded</string>
+    <string name="ai_spam_model_ready">Model ready</string>
+    <string name="ai_spam_model_updated">AI model updated</string>
+    <string name="ai_spam_model_update_failed">AI model update failed</string>
+    <string name="ai_spam_model_select">Choose AI model</string>
+    <string name="ai_spam_model_mediapipe_bert">MediaPipe BERT (accurate)</string>
+    <string name="ai_spam_model_mediapipe_average_word">MediaPipe Average Word (fast)</string>
+    <string name="allow_permissions">Allow permissions to load messages</string>
     <!-- Archive -->
     <string name="unarchive">Unarchive</string>
     <string name="empty_archive">Delete all archived conversations</string>

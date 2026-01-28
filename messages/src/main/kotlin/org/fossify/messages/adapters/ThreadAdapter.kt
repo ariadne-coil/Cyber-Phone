@@ -107,7 +107,7 @@ class ThreadAdapter(
 
     init {
         setupDragListener(true)
-        setHasStableIds(true)
+        setHasStableIds(false)
         (recyclerView.itemAnimator as? SimpleItemAnimator)?.supportsChangeAnimations = false
     }
 
@@ -339,6 +339,7 @@ class ThreadAdapter(
         scrollPosition: Int = -1,
         smoothScroll: Boolean = false
     ) {
+        recyclerView.recycledViewPool.clear()
         val latestMessages = newMessages.toMutableList()
         submitList(latestMessages) {
             if (scrollPosition != -1) {

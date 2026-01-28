@@ -82,5 +82,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.bouncycastle)
     implementation(libs.msgpack.core)
+    implementation(libs.libphonenumber)
+    implementation(libs.tfLiteTaskText)
     detektPlugins(libs.compose.detekt)
 }

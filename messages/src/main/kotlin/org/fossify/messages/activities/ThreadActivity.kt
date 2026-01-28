@@ -11,6 +11,7 @@ import android.content.res.ColorStateList
 import android.graphics.drawable.LayerDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.ContactsContract
 import android.provider.DocumentsContract
 import android.provider.MediaStore
@@ -204,6 +205,7 @@ import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
 import org.joda.time.DateTime
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 class ThreadActivity : SimpleActivity() {
     private var threadId = 0L
@@ -224,6 +226,7 @@ class ThreadActivity : SimpleActivity() {
     private var isJumpingToMessage = false
     private var isRecycleBin = false
     private var isLaunchedFromShortcut = false
+    private var hasDeferredThreadRefresh = false
 
     private var isScheduledMessage: Boolean = false
     private var messageToResend: Long? = null
@@ -512,8 +515,15 @@ class ThreadActivity : SimpleActivity() {
             } catch (e: Exception) {
                 ArrayList()
             }
+            if (messages.size > THREAD_INITIAL_LOAD_LIMIT) {
+                messages = ArrayList(messages.takeLast(THREAD_INITIAL_LOAD_LIMIT))
+            }
             messages = ArrayList(messages.map { message ->
-                message.copy(body = E2eManager.getDisplayBody(this, message.threadId, message.body))
+                val displayResult = E2eManager.getDisplayResult(this, message.threadId, message.body, message.date.toLong())
+                if (displayResult.shouldPersist && displayResult.body != message.body) {
+                    messagesDB.updateBody(message.id, displayResult.body)
+                }
+                message.copy(body = displayResult.body)
             })
             clearExpiredScheduledMessages(threadId, messages)
             messages.removeAll { it.isScheduled && it.millis() < System.currentTimeMillis() }
@@ -551,8 +561,16 @@ class ThreadActivity : SimpleActivity() {
             finish()
             return
         }
-        val privateCursor = getMyContactsCursor(favoritesOnly = false, withPhoneNumbersOnly = true)
+        if (!isRecycleBin) {
+            val lastSync = threadSyncTimes[threadId] ?: 0L
+            val now = SystemClock.elapsedRealtime()
+            if (messages.isNotEmpty() && participants.isNotEmpty() && now - lastSync < THREAD_SYNC_COOLDOWN_MS) {
+                runOnUiThread { callback() }
+                return
+            }
+        }
         ensureBackgroundThread {
+            val privateCursor = getMyContactsCursor(favoritesOnly = false, withPhoneNumbersOnly = true)
             privateContacts = MyContactsContentProvider.getSimpleContacts(this, privateCursor)
 
             val cachedMessagesCode = messages.clone().hashCode()
@@ -629,6 +647,7 @@ class ThreadActivity : SimpleActivity() {
 
             setupAdapter()
             runOnUiThread {
+                threadSyncTimes[threadId] = SystemClock.elapsedRealtime()
                 setupThreadTitle()
                 setupSIMSelector()
                 callback()
@@ -639,6 +658,8 @@ class ThreadActivity : SimpleActivity() {
     private fun getOrCreateThreadAdapter(): ThreadAdapter {
         var currAdapter = binding.threadMessagesList.adapter
         if (currAdapter == null) {
+            binding.threadMessagesList.itemAnimator = null
+            binding.threadMessagesList.setItemViewCacheSize(0)
             currAdapter = ThreadAdapter(
                 activity = this,
                 recyclerView = binding.threadMessagesList,
@@ -663,14 +684,31 @@ class ThreadActivity : SimpleActivity() {
 
         runOnUiThread {
             refreshMenuItems()
-            getOrCreateThreadAdapter().apply {
-                val layoutManager = binding.threadMessagesList.layoutManager as LinearLayoutManager
-                val lastPosition = itemCount - 1
-                val lastVisiblePosition = layoutManager.findLastVisibleItemPosition()
-                val shouldScrollToBottom =
-                    currentList.lastOrNull() != threadItems.lastOrNull() && lastPosition - lastVisiblePosition == 1
-                updateMessages(threadItems, if (shouldScrollToBottom) lastPosition else -1)
+            val layoutManager = LinearLayoutManager(this).apply {
+                stackFromEnd = true
             }
+            binding.threadMessagesList.layoutManager = layoutManager
+            val existingAdapter = binding.threadMessagesList.adapter as? ThreadAdapter
+            val lastPosition = existingAdapter?.itemCount?.minus(1) ?: -1
+            val lastVisiblePosition = layoutManager.findLastVisibleItemPosition()
+            val shouldScrollToBottom =
+                existingAdapter?.currentList?.lastOrNull() != threadItems.lastOrNull() &&
+                    lastPosition != -1 &&
+                    lastPosition - lastVisiblePosition == 1
+
+            val adapter = ThreadAdapter(
+                activity = this,
+                recyclerView = binding.threadMessagesList,
+                itemClick = { handleItemClick(it) },
+                isRecycleBin = isRecycleBin,
+                deleteMessages = { messages, toRecycleBin, fromRecycleBin ->
+                    deleteMessages(messages, toRecycleBin, fromRecycleBin)
+                }
+            )
+            binding.threadMessagesList.adapter = null
+            binding.threadMessagesList.setRecycledViewPool(RecyclerView.RecycledViewPool())
+            binding.threadMessagesList.swapAdapter(adapter, true)
+            adapter.updateMessages(threadItems, if (shouldScrollToBottom) lastPosition else -1)
         }
 
         SimpleContactsHelper(this).getAvailableContacts(false) { contacts ->
@@ -873,17 +911,27 @@ class ThreadActivity : SimpleActivity() {
                 setupButtons()
                 setupConversation()
                 setupCachedMessages {
-                    setupThread {
-                        val searchedMessageId = intent.getLongExtra(SEARCHED_MESSAGE_ID, -1L)
-                        intent.removeExtra(SEARCHED_MESSAGE_ID)
-                        if (searchedMessageId != -1L) {
-                            jumpToMessage(searchedMessageId)
-                        }
-                    }
                     setupScrollListener()
+                    deferThreadRefresh()
                 }
             } else {
                 finish()
+            }
+        }
+    }
+
+    private fun deferThreadRefresh() {
+        if (hasDeferredThreadRefresh) {
+            return
+        }
+        hasDeferredThreadRefresh = true
+        binding.threadMessagesList.post {
+            setupThread {
+                val searchedMessageId = intent.getLongExtra(SEARCHED_MESSAGE_ID, -1L)
+                intent.removeExtra(SEARCHED_MESSAGE_ID)
+                if (searchedMessageId != -1L) {
+                    jumpToMessage(searchedMessageId)
+                }
             }
         }
     }
@@ -2264,5 +2312,8 @@ class ThreadActivity : SimpleActivity() {
         private const val MIN_DATE_TIME_DIFF_SECS = 300
         private const val SCROLL_TO_BOTTOM_FAB_LIMIT = 20
         private const val PREFETCH_THRESHOLD = 45
+        private const val THREAD_SYNC_COOLDOWN_MS = 30_000L
+        private const val THREAD_INITIAL_LOAD_LIMIT = 200
+        private val threadSyncTimes = ConcurrentHashMap<Long, Long>()
     }
 }

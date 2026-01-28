@@ -64,6 +64,7 @@ import org.fossify.messages.helpers.generateRandomId
 import org.fossify.messages.interfaces.AttachmentsDao
 import org.fossify.messages.interfaces.ConversationsDao
 import org.fossify.messages.interfaces.DraftsDao
+import org.fossify.messages.interfaces.MessageCategoryCacheDao
 import org.fossify.messages.interfaces.MessageAttachmentsDao
 import org.fossify.messages.interfaces.MessagesDao
 import org.fossify.messages.messaging.MessagingUtils
@@ -101,6 +102,9 @@ val Context.messagesDB: MessagesDao
 
 val Context.draftsDB: DraftsDao
     get() = getMessagesDB().DraftsDao()
+
+val Context.messageCategoryCacheDB: MessageCategoryCacheDao
+    get() = getMessagesDB().MessageCategoryCacheDao()
 
 val Context.notificationHelper
     get() = NotificationHelper(this)
@@ -183,7 +187,7 @@ fun Context.getMessages(
             )
         }
         val isMMS = false
-        val displayBody = body?.let { E2eManager.getDisplayBody(this, thread, it) } ?: ""
+        val displayBody = body?.let { E2eManager.getDisplayBody(this, thread, it, date.toLong()) } ?: ""
         val message =
             Message(
                 id = id,
@@ -271,7 +275,7 @@ fun Context.getMMS(
         val isMMS = true
         val attachment = getMmsAttachment(mmsId)
         val body = attachment.text
-        val displayBody = E2eManager.getDisplayBody(this, threadId, body)
+        val displayBody = E2eManager.getDisplayBody(this, threadId, body, date.toLong())
         var senderNumber = ""
         var senderName = ""
         var senderPhotoUri = ""
@@ -399,14 +403,6 @@ fun Context.getConversations(
             sortOrder
         ) { cursor ->
             val id = cursor.getLongValue(Threads._ID)
-            var snippet = cursor.getStringValue(Threads.SNIPPET) ?: ""
-            if (snippet.isEmpty()) {
-                snippet = getThreadSnippet(id)
-            }
-            if (snippet.isNotEmpty()) {
-                snippet = E2eManager.getDisplayBody(this, id, snippet)
-            }
-
             var date = cursor.getLongValue(Threads.DATE)
             if (date.toString().length > 10) {
                 date /= 1000
@@ -416,6 +412,14 @@ fun Context.getConversations(
             val draft = draftsDB.getDraftById(id)
             if (draft != null) {
                 date = draft.date / 1000
+            }
+
+            var snippet = cursor.getStringValue(Threads.SNIPPET) ?: ""
+            if (snippet.isEmpty()) {
+                snippet = getThreadSnippet(id)
+            }
+            if (snippet.isNotEmpty()) {
+                snippet = E2eManager.getDisplayBody(this, id, snippet, date)
             }
 
             val rawIds = cursor.getStringValue(Threads.RECIPIENT_IDS)

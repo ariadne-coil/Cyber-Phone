@@ -4,6 +4,7 @@ import android.content.Context
 import java.util.LinkedHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 object RnsNode {
     private const val DEFAULT_UDP_PORT = 4242
@@ -14,6 +15,8 @@ object RnsNode {
     private const val RESOURCE_REQUEST_LIMIT = 512
     private const val RESOURCE_REQUEST_COOLDOWN_MS = 15_000L
     private const val RESOURCE_ASSEMBLY_TIMEOUT_MS = 5 * 60 * 1000L
+    private const val DIRECT_NEIGHBOR_TIMEOUT_MS = 5 * 60 * 1000L
+    private const val ROUTING_ACTIVITY_WINDOW_MS = 2 * 60 * 1000L
 
     private val interfaces = mutableListOf<RnsInterface>()
     private val running = AtomicBooleanState()
@@ -33,6 +36,7 @@ object RnsNode {
     private val activeLinksById = ConcurrentHashMap<String, RnsLink>()
     private val activeLinksByDestination = ConcurrentHashMap<String, String>()
     private val pendingLinkResources = ConcurrentHashMap<String, CopyOnWriteArrayList<PendingLinkResource>>()
+    private val lastRoutingActivityMs = AtomicLong(0L)
 
     private var routingEnabled = false
 
@@ -75,6 +79,23 @@ object RnsNode {
 
     fun setRoutingEnabled(enabled: Boolean) {
         routingEnabled = enabled
+    }
+
+    fun getDirectNeighborCount(timeoutMs: Long = DIRECT_NEIGHBOR_TIMEOUT_MS): Int {
+        val now = System.currentTimeMillis()
+        return pathTable.values.count { entry ->
+            entry.hops <= 1 && now - entry.timestamp <= timeoutMs
+        }
+    }
+
+    fun getActiveLinkCount(): Int = activeLinksById.size
+
+    fun hasRecentRoutingActivity(windowMs: Long = ROUTING_ACTIVITY_WINDOW_MS): Boolean {
+        val last = lastRoutingActivityMs.get()
+        if (last <= 0L) {
+            return false
+        }
+        return System.currentTimeMillis() - last <= windowMs
     }
 
     fun addResourceListener(listener: (RnsResource) -> Unit) {
@@ -444,12 +465,14 @@ object RnsNode {
 
     private fun forwardAnnounce(raw: ByteArray, packet: RnsPacket, iface: RnsInterface) {
         if (packet.hops >= MAX_HOPS) return
+        recordRoutingActivity()
         val forwarded = rawWithIncrementedHops(raw, packet.hops)
         interfaces.filter { it != iface }.forEach { it.send(forwarded) }
     }
 
     private fun forwardResource(raw: ByteArray, packet: RnsPacket, iface: RnsInterface) {
         if (packet.hops >= MAX_HOPS) return
+        recordRoutingActivity()
         val forwarded = rawWithIncrementedHops(raw, packet.hops)
         interfaces.filter { it != iface }.forEach { it.send(forwarded) }
     }
@@ -460,7 +483,14 @@ object RnsNode {
         val path = pathTable[destKey] ?: return
         val forwarded = rawWithIncrementedHops(raw, packet.hops)
         if (path.interfaceRef != iface) {
+            recordRoutingActivity()
             path.interfaceRef.send(forwarded)
+        }
+    }
+
+    private fun recordRoutingActivity() {
+        if (routingEnabled) {
+            lastRoutingActivityMs.set(System.currentTimeMillis())
         }
     }
 
@@ -597,7 +627,10 @@ object RnsNode {
         val interfaceRef: RnsInterface,
         val hops: Int,
         val timestamp: Long
-    )
+    ) {
+        val lastSeen: Long
+            get() = timestamp
+    }
 
     data class LocalDestination(
         val destination: RnsDestination,

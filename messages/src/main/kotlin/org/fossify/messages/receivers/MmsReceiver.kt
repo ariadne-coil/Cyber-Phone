@@ -13,6 +13,8 @@ import org.fossify.messages.extensions.getLatestMMS
 import org.fossify.messages.extensions.getNameFromAddress
 import org.fossify.messages.extensions.insertOrUpdateConversation
 import org.fossify.messages.extensions.markMessageRead
+import org.fossify.messages.extensions.messageCategoryCacheDB
+import org.fossify.messages.extensions.messagesDB
 import org.fossify.messages.extensions.shouldUnarchive
 import org.fossify.messages.extensions.showReceivedMessageNotification
 import org.fossify.messages.extensions.updateConversationArchivedStatus
@@ -21,6 +23,7 @@ import org.fossify.messages.helpers.MessageCategorizer
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
 import org.fossify.messages.models.Message
+import org.fossify.messages.models.MessageCategoryCache
 
 class MmsReceiver : MmsReceivedReceiver() {
 
@@ -67,7 +70,8 @@ class MmsReceiver : MmsReceivedReceiver() {
             context.getNameFromAddress(address, it)
         }
 
-        val displayBody = E2eManager.getDisplayBody(context, mms.threadId, mms.body)
+        val displayResult = E2eManager.getDisplayResult(context, mms.threadId, mms.body, mms.date.toLong())
+        val displayBody = displayResult.body
         val isKnownContact = senderName != address
         val isBlocked = MessageCategorizer.isBlockedMessage(context, address, displayBody, isKnownContact)
         val category = MessageCategorizer.categorizeMessage(displayBody, isKnownContact, isBlocked)
@@ -81,8 +85,28 @@ class MmsReceiver : MmsReceivedReceiver() {
                 bitmap = glideBitmap
             )
         }
+        ensureBackgroundThread {
+            val categoryId = when (category) {
+                org.fossify.messages.helpers.MessageCategory.MAIN -> 0
+                org.fossify.messages.helpers.MessageCategory.OTP -> 1
+                org.fossify.messages.helpers.MessageCategory.SPAM -> 2
+            }
+            val entry = MessageCategoryCache(
+                threadId = mms.threadId,
+                category = categoryId,
+                isBlocked = if (isBlocked) 1 else 0,
+                updatedAt = System.currentTimeMillis()
+            )
+            try {
+                context.messageCategoryCacheDB.insert(entry)
+            } catch (_: Exception) {
+            }
+        }
         if (isBlocked) {
             context.markMessageRead(mms.id, isMMS = true)
+        }
+        if (displayResult.shouldPersist && displayBody != mms.body) {
+            context.messagesDB.updateBody(mms.id, displayBody)
         }
 
         val conversation = context.getConversations(mms.threadId).firstOrNull() ?: return

@@ -157,6 +157,22 @@ class Config(context: Context) : BaseConfig(context) {
         get() = prefs.getInt(SPAM_REPUTATION_THRESHOLD, SPAM_REPUTATION_BALANCED)
         set(value) = prefs.edit().putInt(SPAM_REPUTATION_THRESHOLD, value).apply()
 
+    var aiSpamEnabled: Boolean
+        get() = prefs.getBoolean(AI_SPAM_ENABLED, false)
+        set(value) = prefs.edit().putBoolean(AI_SPAM_ENABLED, value).apply()
+
+    var aiSpamModelUrl: String
+        get() = prefs.getString(AI_SPAM_MODEL_URL, "") ?: ""
+        set(value) = prefs.edit().putString(AI_SPAM_MODEL_URL, value).apply()
+
+    var aiSpamModelEtag: String
+        get() = prefs.getString(AI_SPAM_MODEL_ETAG, "") ?: ""
+        set(value) = prefs.edit().putString(AI_SPAM_MODEL_ETAG, value).apply()
+
+    var aiSpamModelLastCheck: Long
+        get() = prefs.getLong(AI_SPAM_MODEL_LAST_CHECK, 0L)
+        set(value) = prefs.edit().putLong(AI_SPAM_MODEL_LAST_CHECK, value).apply()
+
     var e2ePublicKey: String
         get() = prefs.getString(E2E_PUBLIC_KEY, "") ?: ""
         set(value) = prefs.edit().putString(E2E_PUBLIC_KEY, value).apply()
@@ -176,4 +192,8 @@ class Config(context: Context) : BaseConfig(context) {
     var e2eKeySentThreads: Set<String>
         get() = prefs.getStringSet(E2E_KEY_SENT_THREADS, HashSet()) ?: HashSet()
         set(value) = prefs.edit().putStringSet(E2E_KEY_SENT_THREADS, value).apply()
+
+    var e2eKeySetTimes: String
+        get() = prefs.getString(E2E_KEY_SET_TIMES, "") ?: ""
+        set(value) = prefs.edit().putString(E2E_KEY_SET_TIMES, value).apply()
 }

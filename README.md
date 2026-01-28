@@ -56,6 +56,10 @@ Cyber Phone integrates the Reticulum Network Stack to enable off-grid communicat
 
 *   If the ISP cuts the internet or the Telco towers go dark, the Mesh stays up
 
+5. On-Device Intelligence
+
+*   Optional AI spam classification that runs entirely on-device and is privacy friendly
+
 ## Build the Node
 
 To compile the app:
@@ -82,3 +86,5 @@ The Code belongs to the Commons.
 - Reticulum Network Stack (https://github.com/markqvist/Reticulum)
 - LXMF (https://github.com/markqvist/LXMF)
 - libphonenumber (https://github.com/google/libphonenumber)
+- Hugging Face (https://huggingface.co)
+- Google AI Edge / MediaPipe models (https://ai.google.dev/edge)

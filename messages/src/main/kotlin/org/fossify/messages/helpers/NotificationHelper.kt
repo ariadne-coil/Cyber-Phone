@@ -19,7 +19,9 @@ import android.text.style.StyleSpan
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.app.RemoteInput
+import com.google.i18n.phonenumbers.PhoneNumberUtil
 import org.fossify.commons.extensions.getProperPrimaryColor
+import org.fossify.commons.extensions.normalizePhoneNumber
 import org.fossify.commons.extensions.notificationManager
 import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.commons.helpers.ensureBackgroundThread
@@ -134,11 +136,12 @@ class NotificationHelper(private val context: Context) {
         val isOtpMessage = otpCode != null && MessageCategorizer.isOtpMessage(body)
         val builder = NotificationCompat.Builder(context, notificationChannelId).apply {
             if (isOtpMessage && otpCode != null) {
+                val otpSender = resolveOtpSender(address, sender)
                 val styledOtp = SpannableString(otpCode).apply {
                     setSpan(StyleSpan(Typeface.BOLD), 0, otpCode.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                    setSpan(RelativeSizeSpan(1.4f), 0, otpCode.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    setSpan(RelativeSizeSpan(1.8f), 0, otpCode.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 }
-                setContentTitle(sender)
+                setContentTitle(otpSender)
                 setContentText(otpCode)
                 setLargeIcon(largeIcon)
                 setStyle(NotificationCompat.BigTextStyle().bigText(styledOtp))
@@ -221,6 +224,27 @@ class NotificationHelper(private val context: Context) {
             ensureBackgroundThread {
                 context.shortcutHelper.reportReceiveMessageUsage(threadId)
             }
+        }
+    }
+
+    private fun resolveOtpSender(address: String, sender: String?): String {
+        val resolved = sender?.trim().orEmpty()
+        if (resolved.isNotEmpty() && resolved != address) {
+            return resolved
+        }
+
+        val normalized = address.normalizePhoneNumber()
+        if (normalized.isBlank()) {
+            return address
+        }
+
+        val phoneUtil = PhoneNumberUtil.getInstance()
+        return try {
+            val parsed = phoneUtil.parse(normalized, null)
+            val formatted = phoneUtil.format(parsed, PhoneNumberUtil.PhoneNumberFormat.INTERNATIONAL)
+            if (formatted.isNotBlank()) formatted else address
+        } catch (_: Exception) {
+            address
         }
     }
 

@@ -54,6 +54,7 @@ object E2eManager {
         cfg.e2eSharedSecrets = ""
         cfg.e2eEncryptedThreads = emptySet()
         cfg.e2eKeySentThreads = emptySet()
+        cfg.e2eKeySetTimes = ""
     }
 
     fun getPublicKeyBase64(context: Context): String {
@@ -96,6 +97,7 @@ object E2eManager {
         cfg.e2eSharedSecrets = ""
         cfg.e2eEncryptedThreads = emptySet()
         cfg.e2eKeySentThreads = emptySet()
+        cfg.e2eKeySetTimes = ""
         return true
     }
 
@@ -116,11 +118,12 @@ object E2eManager {
         threadId: Long,
         address: String,
         text: String,
+        receivedAtMillis: Long,
         subscriptionId: Int,
     ): Boolean {
         val publicKeyBase64 = extractKeyFromMessage(text) ?: return false
         val secret = deriveSharedSecret(context, publicKeyBase64) ?: return false
-        storeSharedSecret(context, threadId, secret)
+        storeSharedSecret(context, threadId, secret, receivedAtMillis / 1000L)
         setThreadEncrypted(context, threadId, true)
         storeContactPublicKeyForAddress(context, address, publicKeyBase64)
 
@@ -152,20 +155,49 @@ object E2eManager {
         return E2E_ENCRYPTED_MESSAGE_PREFIX + encodeBase64(combined)
     }
 
+    data class DisplayResult(
+        val body: String,
+        val shouldPersist: Boolean
+    )
+
     fun getDisplayBody(context: Context, threadId: Long, text: String): String {
+        return getDisplayResult(context, threadId, text, null).body
+    }
+
+    fun getDisplayBody(
+        context: Context,
+        threadId: Long,
+        text: String,
+        messageDateSeconds: Long?
+    ): String {
+        return getDisplayResult(context, threadId, text, messageDateSeconds).body
+    }
+
+    fun getDisplayResult(
+        context: Context,
+        threadId: Long,
+        text: String,
+        messageDateSeconds: Long?
+    ): DisplayResult {
         if (isKeyExchangeMessage(text)) {
-            return context.getString(R.string.e2e_key_exchange_message)
+            return DisplayResult(context.getString(R.string.e2e_key_exchange_message), false)
         }
         if (!isEncryptedMessage(text)) {
-            return text
+            return DisplayResult(text, false)
         }
 
-        val secret = getSharedSecret(context, threadId) ?: return context.getString(R.string.e2e_decrypt_failed)
+        val keySetTime = getKeySetTimeSeconds(context, threadId)
+        if (keySetTime != null && messageDateSeconds != null && messageDateSeconds < keySetTime) {
+            return DisplayResult(text, false)
+        }
+
+        val secret = getSharedSecret(context, threadId)
+            ?: return DisplayResult(text, false)
         val payload = decodeBase64(text.removePrefix(E2E_ENCRYPTED_MESSAGE_PREFIX)) ?: return context.getString(
             R.string.e2e_decrypt_failed
-        )
+        ).let { DisplayResult(it, false) }
         if (payload.size <= NONCE_BYTES) {
-            return context.getString(R.string.e2e_decrypt_failed)
+            return DisplayResult(context.getString(R.string.e2e_decrypt_failed), false)
         }
 
         val nonce = payload.copyOfRange(0, NONCE_BYTES)
@@ -175,9 +207,9 @@ object E2eManager {
             val key = deriveAesKey(secret, threadId)
             cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(GCM_TAG_BITS, nonce))
             val plain = cipher.doFinal(ciphertext)
-            String(plain, Charsets.UTF_8)
+            DisplayResult(String(plain, Charsets.UTF_8), true)
         } catch (_: Exception) {
-            context.getString(R.string.e2e_decrypt_failed)
+            DisplayResult(context.getString(R.string.e2e_decrypt_failed), false)
         }
     }
 
@@ -217,7 +249,7 @@ object E2eManager {
         }
         val publicKey = getContactPublicKey(context, contact) ?: return false
         val secret = deriveSharedSecret(context, publicKey) ?: return false
-        storeSharedSecret(context, threadId, secret)
+        storeSharedSecret(context, threadId, secret, System.currentTimeMillis() / 1000L)
         return true
     }
 
@@ -226,6 +258,9 @@ object E2eManager {
         val secrets = decodeSharedSecrets(cfg.e2eSharedSecrets).toMutableMap()
         secrets.remove(threadId.toString())
         cfg.e2eSharedSecrets = encodeSharedSecrets(secrets)
+        val times = decodeKeySetTimes(cfg.e2eKeySetTimes).toMutableMap()
+        times.remove(threadId.toString())
+        cfg.e2eKeySetTimes = encodeKeySetTimes(times)
     }
 
     fun storeContactPublicKey(
@@ -460,11 +495,17 @@ object E2eManager {
         return selection to selectionArgs
     }
 
-    private fun storeSharedSecret(context: Context, threadId: Long, secret: ByteArray) {
+    private fun storeSharedSecret(
+        context: Context,
+        threadId: Long,
+        secret: ByteArray,
+        keySetTimeSeconds: Long
+    ) {
         val cfg = context.config
         val secrets = decodeSharedSecrets(cfg.e2eSharedSecrets).toMutableMap()
         secrets[threadId.toString()] = encodeBase64(secret)
         cfg.e2eSharedSecrets = encodeSharedSecrets(secrets)
+        setKeySetTimeSeconds(context, threadId, keySetTimeSeconds)
     }
 
     private fun getSharedSecret(context: Context, threadId: Long): ByteArray? {
@@ -537,6 +578,33 @@ object E2eManager {
     }
 
     private fun decodeSharedSecrets(data: String): Map<String, String> {
+        if (data.isBlank()) {
+            return emptyMap()
+        }
+        val type = object : com.google.gson.reflect.TypeToken<Map<String, String>>() {}.type
+        return org.fossify.messages.extensions.gson.gson.fromJson(data, type) ?: emptyMap()
+    }
+
+    private fun setKeySetTimeSeconds(context: Context, threadId: Long, timeSeconds: Long) {
+        val cfg = context.config
+        val times = decodeKeySetTimes(cfg.e2eKeySetTimes).toMutableMap()
+        times[threadId.toString()] = timeSeconds.toString()
+        cfg.e2eKeySetTimes = encodeKeySetTimes(times)
+    }
+
+    private fun getKeySetTimeSeconds(context: Context, threadId: Long): Long? {
+        val times = decodeKeySetTimes(context.config.e2eKeySetTimes)
+        return times[threadId.toString()]?.toLongOrNull()
+    }
+
+    private fun encodeKeySetTimes(times: Map<String, String>): String {
+        if (times.isEmpty()) {
+            return ""
+        }
+        return org.fossify.messages.extensions.gson.gson.toJson(times)
+    }
+
+    private fun decodeKeySetTimes(data: String): Map<String, String> {
         if (data.isBlank()) {
             return emptyMap()
         }

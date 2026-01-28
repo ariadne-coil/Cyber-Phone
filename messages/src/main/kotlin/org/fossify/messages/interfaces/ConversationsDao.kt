@@ -19,6 +19,61 @@ interface ConversationsDao {
         return getNonArchivedWithLatestSnippet().map { it.toConversation() }
     }
 
+    @Query(
+        "SELECT " +
+            "(SELECT body FROM messages " +
+            "LEFT OUTER JOIN recycle_bin_messages ON messages.id = recycle_bin_messages.id " +
+            "WHERE recycle_bin_messages.id IS NULL AND messages.thread_id = conversations.thread_id " +
+            "ORDER BY messages.date DESC LIMIT 1) as new_snippet, * " +
+            "FROM conversations " +
+            "LEFT JOIN message_category_cache ON message_category_cache.thread_id = conversations.thread_id " +
+            "WHERE archived = 0 AND (" +
+            "message_category_cache.thread_id IS NULL OR " +
+            "message_category_cache.category = 0 OR " +
+            "(message_category_cache.category = 2 AND message_category_cache.is_blocked = 0)" +
+            ") " +
+            "ORDER BY conversations.date DESC"
+    )
+    fun getNonArchivedMainWithLatestSnippet(): List<ConversationWithSnippetOverride>
+
+    fun getNonArchivedMain(): List<Conversation> {
+        return getNonArchivedMainWithLatestSnippet().map { it.toConversation() }
+    }
+
+    @Query(
+        "SELECT " +
+            "(SELECT body FROM messages " +
+            "LEFT OUTER JOIN recycle_bin_messages ON messages.id = recycle_bin_messages.id " +
+            "WHERE recycle_bin_messages.id IS NULL AND messages.thread_id = conversations.thread_id " +
+            "ORDER BY messages.date DESC LIMIT 1) as new_snippet, * " +
+            "FROM conversations " +
+            "LEFT JOIN message_category_cache ON message_category_cache.thread_id = conversations.thread_id " +
+            "WHERE archived = 0 AND message_category_cache.category = 1 " +
+            "ORDER BY conversations.date DESC"
+    )
+    fun getNonArchivedOtpWithLatestSnippet(): List<ConversationWithSnippetOverride>
+
+    fun getNonArchivedOtp(): List<Conversation> {
+        return getNonArchivedOtpWithLatestSnippet().map { it.toConversation() }
+    }
+
+    @Query(
+        "SELECT " +
+            "(SELECT body FROM messages " +
+            "LEFT OUTER JOIN recycle_bin_messages ON messages.id = recycle_bin_messages.id " +
+            "WHERE recycle_bin_messages.id IS NULL AND messages.thread_id = conversations.thread_id " +
+            "ORDER BY messages.date DESC LIMIT 1) as new_snippet, * " +
+            "FROM conversations " +
+            "LEFT JOIN message_category_cache ON message_category_cache.thread_id = conversations.thread_id " +
+            "WHERE archived = 0 AND message_category_cache.category = 2 AND message_category_cache.is_blocked = 1 " +
+            "ORDER BY conversations.date DESC"
+    )
+    fun getNonArchivedSpamWithLatestSnippet(): List<ConversationWithSnippetOverride>
+
+    fun getNonArchivedSpam(): List<Conversation> {
+        return getNonArchivedSpamWithLatestSnippet().map { it.toConversation() }
+    }
+
     @Query("SELECT (SELECT body FROM messages LEFT OUTER JOIN recycle_bin_messages ON messages.id = recycle_bin_messages.id WHERE recycle_bin_messages.id IS NULL AND messages.thread_id = conversations.thread_id ORDER BY messages.date DESC LIMIT 1) as new_snippet, * FROM conversations WHERE archived = 1")
     fun getAllArchivedWithLatestSnippet(): List<ConversationWithSnippetOverride>
 

@@ -161,6 +161,7 @@ object MessageCategorizer {
         body: String,
         isKnownContact: Boolean
     ): Boolean {
+        val isOtp = isOtpMessage(body)
         if (ReceiverUtils.isMessageFilteredOut(context, body)) {
             return true
         }
@@ -195,6 +196,12 @@ object MessageCategorizer {
                 if (rating == "NEGATIVE") {
                     return true
                 }
+            }
+        }
+        if (!isKnownContact && !isOtp && context.messagesConfig.aiSpamEnabled) {
+            val aiSpam = AiSpamClassifier.isSpam(context, body)
+            if (aiSpam == true) {
+                return true
             }
         }
         return false

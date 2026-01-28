@@ -57,11 +57,16 @@ const val SPAM_REPUTATION_AGGRESSIVE = 0
 const val SPAM_REPUTATION_BALANCED = 1
 const val SPAM_REPUTATION_CONSERVATIVE = 2
 const val SPAM_REPUTATION_VERY_CONSERVATIVE = 3
+const val AI_SPAM_ENABLED = "ai_spam_enabled"
+const val AI_SPAM_MODEL_URL = "ai_spam_model_url"
+const val AI_SPAM_MODEL_ETAG = "ai_spam_model_etag"
+const val AI_SPAM_MODEL_LAST_CHECK = "ai_spam_model_last_check"
 const val E2E_PUBLIC_KEY = "e2e_public_key"
 const val E2E_PRIVATE_KEY = "e2e_private_key"
 const val E2E_SHARED_SECRETS = "e2e_shared_secrets"
 const val E2E_ENCRYPTED_THREADS = "e2e_encrypted_threads"
 const val E2E_KEY_SENT_THREADS = "e2e_key_sent_threads"
+const val E2E_KEY_SET_TIMES = "e2e_key_set_times"
 const val E2E_KEY_MESSAGE_PREFIX = "E2EKEY1:"
 const val E2E_ENCRYPTED_MESSAGE_PREFIX = "E2E1:"
 

@@ -68,10 +68,12 @@ import org.fossify.messages.helpers.SPAM_REPUTATION_AGGRESSIVE
 import org.fossify.messages.helpers.SPAM_REPUTATION_BALANCED
 import org.fossify.messages.helpers.SPAM_REPUTATION_CONSERVATIVE
 import org.fossify.messages.helpers.SPAM_REPUTATION_VERY_CONSERVATIVE
+import org.fossify.messages.helpers.AiSpamModelManager
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.mesh.MeshConfig
 import org.fossify.mesh.MeshManager
 import org.fossify.mesh.MeshMode
+import org.fossify.mesh.rns.RnsNode
 import java.util.Locale
 import kotlin.system.exitProcess
 
@@ -86,6 +88,21 @@ class SettingsActivity : SimpleActivity() {
             }
         }
     }
+
+    private data class AiSpamModelOption(val id: Int, val nameRes: Int, val url: String)
+
+    private val aiSpamModelOptions = listOf(
+        AiSpamModelOption(
+            id = 0,
+            nameRes = R.string.ai_spam_model_mediapipe_average_word,
+            url = "https://storage.googleapis.com/mediapipe-models/text_classifier/average_word_classifier/float32/latest/average_word_classifier.tflite"
+        ),
+        AiSpamModelOption(
+            id = 1,
+            nameRes = R.string.ai_spam_model_mediapipe_bert,
+            url = "https://storage.googleapis.com/mediapipe-models/text_classifier/bert_classifier/float32/latest/bert_classifier.tflite"
+        )
+    )
 
     private var blockedNumbersAtPause = -1
     private var recycleBinMessages = 0
@@ -156,6 +173,7 @@ class SettingsActivity : SimpleActivity() {
         setupManageBlockedNumbers()
         setupManageBlockedKeywords()
         setupSpamReputationThreshold()
+        setupAiSpamSettings()
         setupManageSpeedDial()
         setupChangeDateTimeFormat()
         setupFontSize()
@@ -175,6 +193,7 @@ class SettingsActivity : SimpleActivity() {
         setupAlwaysShowFullscreen()
         setupMeshMode()
         setupMeshRouting()
+        setupMeshStatus()
         setupShowCharacterCounter()
         setupUseSimpleCharacters()
         setupSendOnEnter()
@@ -311,6 +330,63 @@ class SettingsActivity : SimpleActivity() {
             RadioGroupDialog(this@SettingsActivity, items, messagesConfig.spamReputationThreshold) {
                 messagesConfig.spamReputationThreshold = it as Int
                 settingsSpamReputationValue.text = getSpamReputationThresholdText()
+            }
+        }
+    }
+
+    private fun setupAiSpamSettings() = binding.apply {
+        settingsAiSpamEnabled.isChecked = messagesConfig.aiSpamEnabled
+        settingsAiSpamEnabledHolder.setOnClickListener {
+            settingsAiSpamEnabled.toggle()
+            messagesConfig.aiSpamEnabled = settingsAiSpamEnabled.isChecked
+            updateAiSpamSettingsUi()
+        }
+        settingsAiSpamModelSourceHolder.setOnClickListener {
+            showAiSpamModelSourceDialog()
+        }
+        settingsAiSpamModelUpdateHolder.setOnClickListener {
+            AiSpamModelManager.requestModelUpdate(this@SettingsActivity) { updated ->
+                if (updated) {
+                    toast(R.string.ai_spam_model_updated)
+                } else {
+                    toast(R.string.ai_spam_model_update_failed)
+                }
+                updateAiSpamSettingsUi()
+            }
+        }
+        updateAiSpamSettingsUi()
+    }
+
+    private fun updateAiSpamSettingsUi() = binding.apply {
+        settingsAiSpamModelSourceValue.text = getAiSpamModelSourceText()
+        settingsAiSpamModelUpdateValue.text = AiSpamModelManager.getModelStatusText(this@SettingsActivity)
+        val enabled = messagesConfig.aiSpamEnabled
+        settingsAiSpamModelSourceHolder.isEnabled = enabled
+        settingsAiSpamModelUpdateHolder.isEnabled = enabled
+        settingsAiSpamModelSourceValue.alpha = if (enabled) 1f else 0.4f
+        settingsAiSpamModelUpdateValue.alpha = if (enabled) 1f else 0.4f
+    }
+
+    private fun getAiSpamModelSourceText(): String {
+        val url = messagesConfig.aiSpamModelUrl.trim()
+        return if (url.isEmpty()) {
+            getString(R.string.ai_spam_model_not_set)
+        } else {
+            aiSpamModelOptions.firstOrNull { it.url == url }?.let { getString(it.nameRes) } ?: url
+        }
+    }
+
+    private fun showAiSpamModelSourceDialog() {
+        val items = aiSpamModelOptions.map {
+            RadioItem(it.id, getString(it.nameRes))
+        }
+        val selectedId = aiSpamModelOptions.firstOrNull { it.url == messagesConfig.aiSpamModelUrl }?.id ?: -1
+        RadioGroupDialog(this, ArrayList(items), selectedId) { selected ->
+            val option = aiSpamModelOptions.firstOrNull { it.id == selected }
+            if (option != null && option.url != messagesConfig.aiSpamModelUrl) {
+                messagesConfig.aiSpamModelUrl = option.url
+                AiSpamModelManager.resetModel(this)
+                updateAiSpamSettingsUi()
             }
         }
     }
@@ -750,11 +826,13 @@ class SettingsActivity : SimpleActivity() {
                 meshConfig.meshMode = it as Int
                 settingsMeshModeValue.text = getMeshModeLabel(meshConfig.getMeshMode())
                 updateMeshRoutingUi(meshConfig)
+                updateMeshStatus(meshConfig)
                 MeshManager.sync(this@SettingsActivity)
             }
         }
 
         updateMeshRoutingUi(meshConfig)
+        updateMeshStatus(meshConfig)
     }
 
     private fun setupMeshRouting() = binding.apply {
@@ -769,6 +847,7 @@ class SettingsActivity : SimpleActivity() {
                 settingsMeshModeValue.text = getMeshModeLabel(meshConfig.getMeshMode())
             }
             updateMeshRoutingUi(meshConfig)
+            updateMeshStatus(meshConfig)
             MeshManager.sync(this@SettingsActivity)
         }
     }
@@ -781,6 +860,20 @@ class SettingsActivity : SimpleActivity() {
             meshConfig.meshRoutingEnabled = false
             settingsMeshRouting.isChecked = false
         }
+    }
+
+    private fun setupMeshStatus() {
+        updateMeshStatus(MeshConfig.newInstance(this))
+    }
+
+    private fun updateMeshStatus(meshConfig: MeshConfig) = binding.apply {
+        val neighbors = RnsNode.getDirectNeighborCount()
+        val routingStatus = if (meshConfig.meshRoutingEnabled && RnsNode.hasRecentRoutingActivity()) {
+            getString(R.string.mesh_routing_in_use)
+        } else {
+            getString(R.string.mesh_routing_idle)
+        }
+        settingsMeshStatusValue.text = getString(R.string.mesh_service_status, neighbors, routingStatus)
     }
 
     private fun getMeshModeLabel(mode: MeshMode): String {

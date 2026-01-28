@@ -163,6 +163,67 @@
             </RelativeLayout>
 
             <RelativeLayout
+                android:id="@+id/settings_ai_spam_enabled_holder"
+                style="@style/SettingsHolderSwitchStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyMaterialSwitch
+                    android:id="@+id/settings_ai_spam_enabled"
+                    style="@style/SettingsSwitchStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/ai_spam_classification" />
+
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/settings_ai_spam_model_source_holder"
+                style="@style/SettingsHolderTextViewStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/settings_ai_spam_model_source_label"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/ai_spam_model_source" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/settings_ai_spam_model_source_value"
+                    style="@style/SettingsTextValueStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@+id/settings_ai_spam_model_source_label"
+                    tools:text="@string/ai_spam_model_not_set" />
+
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/settings_ai_spam_model_update_holder"
+                style="@style/SettingsHolderTextViewStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/settings_ai_spam_model_update_label"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/ai_spam_model_update" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/settings_ai_spam_model_update_value"
+                    style="@style/SettingsTextValueStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@+id/settings_ai_spam_model_update_label"
+                    tools:text="@string/ai_spam_model_not_downloaded" />
+
+            </RelativeLayout>
+
+            <RelativeLayout
                 android:id="@+id/settings_change_date_time_format_holder"
                 style="@style/SettingsHolderTextViewOneLinerStyle"
                 android:layout_width="match_parent"
@@ -441,6 +502,29 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/mesh_routing_enabled" />
+
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/settings_mesh_status_holder"
+                style="@style/SettingsHolderTextViewStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/settings_mesh_status_label"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mesh_status" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/settings_mesh_status_value"
+                    style="@style/SettingsTextValueStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@+id/settings_mesh_status_label"
+                    tools:text="@string/mesh_service_status" />
 
             </RelativeLayout>
 

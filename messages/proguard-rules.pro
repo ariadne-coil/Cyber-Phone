@@ -30,6 +30,7 @@
 }
 
 # Gson
+-keepattributes Signature
 -keep class org.fossify.commons.models.SimpleContact { *; }
 -keep class org.fossify.messages.models.Attachment { *; }
 -keep class org.fossify.messages.models.MessageAttachment { *; }

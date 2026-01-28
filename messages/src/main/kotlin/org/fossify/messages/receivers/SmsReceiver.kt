@@ -16,6 +16,7 @@ import org.fossify.messages.extensions.getThreadId
 import org.fossify.messages.extensions.insertNewSMS
 import org.fossify.messages.extensions.insertOrUpdateConversation
 import org.fossify.messages.extensions.messagesDB
+import org.fossify.messages.extensions.messageCategoryCacheDB
 import org.fossify.messages.extensions.shouldUnarchive
 import org.fossify.messages.extensions.showReceivedMessageNotification
 import org.fossify.messages.extensions.updateConversationArchivedStatus
@@ -24,6 +25,7 @@ import org.fossify.messages.helpers.MessageCategorizer
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
 import org.fossify.messages.models.Message
+import org.fossify.messages.models.MessageCategoryCache
 
 class SmsReceiver : BroadcastReceiver() {
 
@@ -52,6 +54,7 @@ class SmsReceiver : BroadcastReceiver() {
                     threadId = threadId,
                     address = address,
                     text = body,
+                    receivedAtMillis = date,
                     subscriptionId = subscriptionId
                 )
 
@@ -89,7 +92,8 @@ class SmsReceiver : BroadcastReceiver() {
             context.getNameFromAddress(address, it)
         }
         val isKnownContact = senderName != address
-        val displayBody = E2eManager.getDisplayBody(context, threadId, body)
+        val displayResult = E2eManager.getDisplayResult(context, threadId, body, date / 1000L)
+        val displayBody = displayResult.body
         val isBlocked = MessageCategorizer.isBlockedMessage(context, address, displayBody, isKnownContact)
         val readFlag = if (isBlocked) 1 else 0
 
@@ -136,6 +140,9 @@ class SmsReceiver : BroadcastReceiver() {
         )
 
         context.messagesDB.insertOrUpdate(message)
+        if (displayResult.shouldPersist && displayBody != body) {
+            context.messagesDB.updateBody(newMessageId, displayBody)
+        }
 
         if (context.shouldUnarchive()) {
             context.updateConversationArchivedStatus(threadId, false)
@@ -144,6 +151,23 @@ class SmsReceiver : BroadcastReceiver() {
         refreshMessages()
         refreshConversations()
         val category = MessageCategorizer.categorizeMessage(displayBody, isKnownContact, isBlocked)
+        ensureBackgroundThread {
+            val categoryId = when (category) {
+                org.fossify.messages.helpers.MessageCategory.MAIN -> 0
+                org.fossify.messages.helpers.MessageCategory.OTP -> 1
+                org.fossify.messages.helpers.MessageCategory.SPAM -> 2
+            }
+            val entry = MessageCategoryCache(
+                threadId = threadId,
+                category = categoryId,
+                isBlocked = if (isBlocked) 1 else 0,
+                updatedAt = System.currentTimeMillis()
+            )
+            try {
+                context.messageCategoryCacheDB.insert(entry)
+            } catch (_: Exception) {
+            }
+        }
         if (!isBlocked && category != org.fossify.messages.helpers.MessageCategory.SPAM) {
             context.showReceivedMessageNotification(
                 messageId = newMessageId,
