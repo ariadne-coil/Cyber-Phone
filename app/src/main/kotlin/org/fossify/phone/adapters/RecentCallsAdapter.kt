@@ -38,6 +38,7 @@ import org.fossify.commons.extensions.getProperTextColor
 import org.fossify.commons.extensions.getTextSize
 import org.fossify.commons.extensions.highlightTextPart
 import org.fossify.commons.extensions.launchSendSMSIntent
+import org.fossify.commons.extensions.normalizePhoneNumber
 import org.fossify.commons.extensions.setupViewBackground
 import org.fossify.commons.helpers.PERMISSION_WRITE_CALL_LOG
 import org.fossify.commons.helpers.SimpleContactsHelper
@@ -62,6 +63,8 @@ import org.fossify.phone.helpers.RecentsHelper
 import org.fossify.phone.interfaces.RefreshItemsListener
 import org.fossify.phone.models.CallLogItem
 import org.fossify.phone.models.RecentCall
+import org.fossify.messages.extensions.config as messagesConfig
+import org.fossify.messages.helpers.MessageCategorizer
 import org.joda.time.DateTime
 import java.util.Locale
 
@@ -108,7 +111,7 @@ class RecentCallsAdapter(
             findItem(R.id.cab_call_sim_2).isVisible = hasMultipleSIMs && isOneItemSelected
             findItem(R.id.cab_remove_default_sim).isVisible = isOneItemSelected && (activity.config.getCustomSIM(selectedNumber) ?: "") != ""
 
-            findItem(R.id.cab_block_number).title = activity.getString(R.string.block_number)
+            findItem(R.id.cab_block_number).title = activity.getString(R.string.mark_as_spam_block)
             findItem(R.id.cab_block_number).isVisible = isNougatPlus()
             findItem(R.id.cab_add_number).isVisible = isOneItemSelected
             findItem(R.id.cab_copy_number).isVisible = isOneItemSelected
@@ -255,6 +258,14 @@ class RecentCallsAdapter(
         val callsToBlock = getSelectedItems()
         ensureBackgroundThread {
             callsToBlock.map { it.phoneNumber }.forEach { number ->
+                val normalized = number.normalizePhoneNumber().trim()
+                if (normalized.isNotEmpty()) {
+                    activity.messagesConfig.removeSafeNumber(normalized)
+                    if (!activity.messagesConfig.spamRatedNumbers.contains(normalized)) {
+                        MessageCategorizer.submitCommunityRating(activity, normalized, positive = false)
+                        activity.messagesConfig.addSpamRatedNumber(normalized)
+                    }
+                }
                 activity.addBlockedNumber(number)
             }
 
@@ -371,7 +382,7 @@ class RecentCallsAdapter(
                 findItem(R.id.cab_add_number).isVisible = !call.isUnknownNumber
                 findItem(R.id.cab_copy_number).isVisible = !call.isUnknownNumber
                 findItem(R.id.cab_show_call_details).isVisible = !call.isUnknownNumber
-                findItem(R.id.cab_block_number).title = activity.getString(R.string.block_number)
+                findItem(R.id.cab_block_number).title = activity.getString(R.string.mark_as_spam_block)
                 findItem(R.id.cab_block_number).isVisible = isNougatPlus() && !call.isUnknownNumber
                 findItem(R.id.cab_remove_default_sim).isVisible = (activity.config.getCustomSIM(selectedNumber) ?: "") != "" && !call.isUnknownNumber
             }

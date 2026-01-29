@@ -145,6 +145,8 @@
     <string name="messages_category_main">Main</string>
     <string name="messages_category_otp">OTP</string>
     <string name="messages_category_spam">Spam</string>
+    <string name="mark_as_spam_block">Mark as Spam &amp; Block</string>
+    <string name="mark_as_not_spam">Mark as not spam</string>
     <string name="copy_otp">Copy OTP</string>
     <string name="lock_screen_visibility">Lock screen notification visibility</string>
     <string name="sender_and_message">Sender and message</string>

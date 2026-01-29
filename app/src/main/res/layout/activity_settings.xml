@@ -163,6 +163,29 @@
             </RelativeLayout>
 
             <RelativeLayout
+                android:id="@+id/settings_short_code_filter_holder"
+                style="@style/SettingsHolderTextViewStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/settings_short_code_filter_label"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/short_code_filtering" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/settings_short_code_filter_value"
+                    style="@style/SettingsTextValueStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@+id/settings_short_code_filter_label"
+                    tools:text="@string/short_code_filter_never_spam" />
+
+            </RelativeLayout>
+
+            <RelativeLayout
                 android:id="@+id/settings_ai_spam_enabled_holder"
                 style="@style/SettingsHolderSwitchStyle"
                 android:layout_width="match_parent"

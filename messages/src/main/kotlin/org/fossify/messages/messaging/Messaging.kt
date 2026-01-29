@@ -124,3 +124,20 @@ fun isShortCodeWithLetters(address: String): Boolean {
 
     return address.any { it.isLetter() }
 }
+
+fun isShortCode(address: String): Boolean {
+    if (isShortCodeWithLetters(address)) {
+        return true
+    }
+    if (LxmfAddress.isMeshAddress(address)) {
+        return false
+    }
+    if (Patterns.EMAIL_ADDRESS.matcher(address).matches()) {
+        return false
+    }
+    val trimmed = address.trim()
+    if (trimmed.isEmpty() || trimmed.any { !it.isDigit() }) {
+        return false
+    }
+    return trimmed.length in 3..6
+}

@@ -7,6 +7,7 @@ import org.fossify.commons.extensions.isNumberBlocked
 import org.fossify.commons.extensions.normalizePhoneNumber
 import org.fossify.messages.extensions.config as messagesConfig
 import org.fossify.messages.models.Conversation
+import org.fossify.messages.messaging.isShortCode
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -52,6 +53,8 @@ object MessageCategorizer {
     private var yacbInit: java.lang.reflect.Method? = null
     private var yacbGetRating: java.lang.reflect.Method? = null
     private var yacbGetRatingCounts: java.lang.reflect.Method? = null
+    private var yacbSubmitRating: java.lang.reflect.Method? = null
+    private var yacbRatingEnumClass: Class<*>? = null
 
     fun extractOtp(body: String): String? {
         val match = otpCodeRegex.find(body) ?: otpSpacedCodeRegex.find(body) ?: return null
@@ -77,6 +80,8 @@ object MessageCategorizer {
     }
 
     fun categorizeMessage(
+        context: Context,
+        address: String,
         body: String,
         isKnownContact: Boolean,
         isBlocked: Boolean
@@ -87,7 +92,15 @@ object MessageCategorizer {
         if (isBlocked) {
             return MessageCategory.SPAM
         }
+        if (isSafeNumber(context, address)) {
+            return MessageCategory.MAIN
+        }
         if (body.isBlank()) {
+            return MessageCategory.MAIN
+        }
+        val isShortCodeMessage = isShortCode(address)
+        val shortCodeMode = context.messagesConfig.shortCodeFilterMode
+        if (isShortCodeMessage && shortCodeMode == SHORT_CODE_FILTER_NEVER_SPAM) {
             return MessageCategory.MAIN
         }
         return if (isSpamHeuristic(body, isKnownContact)) {
@@ -108,11 +121,19 @@ object MessageCategorizer {
                         yacbGetRating = clazz.getMethod("getRating", String::class.java)
                         yacbGetRatingCounts =
                             runCatching { clazz.getMethod("getRatingCounts", String::class.java) }.getOrNull()
+                        yacbRatingEnumClass =
+                            runCatching { Class.forName("org.fossify.phone.blocking.YacbSiaManager\$Rating") }.getOrNull()
+                        yacbSubmitRating = runCatching {
+                            val ratingClass = yacbRatingEnumClass ?: return@runCatching null
+                            clazz.getMethod("submitRating", String::class.java, ratingClass)
+                        }.getOrNull()
                     } catch (_: Exception) {
                         yacbInstance = null
                         yacbInit = null
                         yacbGetRating = null
                         yacbGetRatingCounts = null
+                        yacbSubmitRating = null
+                        yacbRatingEnumClass = null
                     } finally {
                         yacbLoaded.set(true)
                     }
@@ -162,20 +183,29 @@ object MessageCategorizer {
         isKnownContact: Boolean
     ): Boolean {
         val isOtp = isOtpMessage(body)
+        val isShortCodeMessage = isShortCode(address)
+        val shortCodeMode = context.messagesConfig.shortCodeFilterMode
         if (ReceiverUtils.isMessageFilteredOut(context, body)) {
             return true
         }
         if (context.isNumberBlocked(address)) {
             return true
         }
+        if (isSafeNumber(context, address)) {
+            return false
+        }
+        if (isShortCodeMessage && shortCodeMode == SHORT_CODE_FILTER_ALWAYS_SPAM) {
+            return true
+        }
         if (context.baseConfig.blockUnknownNumbers && !isKnownContact) {
             return true
         }
-        if (!isKnownContact && isSpamHeuristic(body, isKnownContact)) {
+        val allowSpamChecks = !isShortCodeMessage || shortCodeMode == SHORT_CODE_FILTER_STANDARD
+        if (!isKnownContact && allowSpamChecks && isSpamHeuristic(body, isKnownContact)) {
             return true
         }
         val normalizedNumber = address.normalizePhoneNumber().trim()
-        if (!isKnownContact && normalizedNumber.isNotEmpty()) {
+        if (!isKnownContact && allowSpamChecks && normalizedNumber.isNotEmpty()) {
             val counts = getYacbRatingCounts(context, normalizedNumber)
             if (counts != null && counts.size >= 3) {
                 val negative = counts[0]
@@ -198,13 +228,21 @@ object MessageCategorizer {
                 }
             }
         }
-        if (!isKnownContact && !isOtp && context.messagesConfig.aiSpamEnabled) {
+        if (!isKnownContact && allowSpamChecks && !isOtp && context.messagesConfig.aiSpamEnabled) {
             val aiSpam = AiSpamClassifier.isSpam(context, body)
             if (aiSpam == true) {
                 return true
             }
         }
         return false
+    }
+
+    private fun isSafeNumber(context: Context, address: String): Boolean {
+        val normalized = address.normalizePhoneNumber().trim()
+        if (normalized.isEmpty()) {
+            return false
+        }
+        return context.messagesConfig.safeNumbers.contains(normalized)
     }
 
     fun classifyMessage(
@@ -214,8 +252,26 @@ object MessageCategorizer {
         isKnownContact: Boolean
     ): MessageClassification {
         val isBlocked = isBlockedMessage(context, address, body, isKnownContact)
-        val category = categorizeMessage(body, isKnownContact, isBlocked)
+        val category = categorizeMessage(context, address, body, isKnownContact, isBlocked)
         return MessageClassification(category, isBlocked)
+    }
+
+    fun submitCommunityRating(context: Context, number: String, positive: Boolean) {
+        if (!yacbLoaded.get()) {
+            getYacbRating(context, number)
+        }
+        val instance = yacbInstance ?: return
+        val submitMethod = yacbSubmitRating ?: return
+        val ratingClass = yacbRatingEnumClass ?: return
+        try {
+            yacbInit?.invoke(instance, context.applicationContext)
+            val ratingValue = java.lang.Enum.valueOf(
+                ratingClass as Class<out Enum<*>>,
+                if (positive) "POSITIVE" else "NEGATIVE"
+            )
+            submitMethod.invoke(instance, number, ratingValue)
+        } catch (_: Exception) {
+        }
     }
 
     fun classifyConversation(

@@ -42,6 +42,7 @@ object YacbSiaManager {
     private lateinit var featuredDatabase: FeaturedDatabase
     private lateinit var siaMetadata: SiaMetadata
     private lateinit var dbManager: DbManager
+    private var webService: WebService? = null
 
     fun init(context: Context) {
         if (initialized) {
@@ -108,6 +109,7 @@ object YacbSiaManager {
             }
 
             val webService = WebService(wsParameterProvider, okHttpClientFactory)
+            this.webService = webService
             dbManager = DbManager(
                 storage,
                 SIA_PATH_PREFIX,
@@ -133,6 +135,57 @@ object YacbSiaManager {
         }
 
         return calculateRating(communityItem)
+    }
+
+    @Keep
+    fun submitRating(number: String, rating: Rating) {
+        if (!initialized) {
+            return
+        }
+        val ws = webService ?: return
+        val candidates = listOf(
+            "submitRating",
+            "sendRating",
+            "postRating",
+            "rateNumber",
+            "submitCommunityRating",
+            "sendCommunityRating"
+        )
+        val methods = ws.javaClass.methods.filter { it.name in candidates && it.parameterTypes.size == 2 }
+        if (methods.isEmpty()) {
+            return
+        }
+        val ratingInt = when (rating) {
+            Rating.POSITIVE -> 1
+            Rating.NEGATIVE -> -1
+            Rating.NEUTRAL -> 0
+        }
+
+        for (method in methods) {
+            val params = method.parameterTypes
+            if (params[0] == String::class.java) {
+                val ratingParam = params[1]
+                try {
+                    when {
+                        ratingParam == Int::class.javaPrimitiveType || ratingParam == Integer::class.java ->
+                            method.invoke(ws, number, ratingInt)
+
+                        ratingParam == String::class.java ->
+                            method.invoke(ws, number, rating.name)
+
+                        ratingParam.isEnum -> {
+                            val enumValue = java.lang.Enum.valueOf(
+                                ratingParam as Class<out Enum<*>>,
+                                rating.name
+                            )
+                            method.invoke(ws, number, enumValue)
+                        }
+                    }
+                    return
+                } catch (_: Exception) {
+                }
+            }
+        }
     }
 
     fun getFeaturedName(number: String): String? {

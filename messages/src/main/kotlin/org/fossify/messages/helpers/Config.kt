@@ -157,6 +157,10 @@ class Config(context: Context) : BaseConfig(context) {
         get() = prefs.getInt(SPAM_REPUTATION_THRESHOLD, SPAM_REPUTATION_BALANCED)
         set(value) = prefs.edit().putInt(SPAM_REPUTATION_THRESHOLD, value).apply()
 
+    var shortCodeFilterMode: Int
+        get() = prefs.getInt(SHORT_CODE_FILTER_MODE, SHORT_CODE_FILTER_NEVER_SPAM)
+        set(value) = prefs.edit().putInt(SHORT_CODE_FILTER_MODE, value).apply()
+
     var aiSpamEnabled: Boolean
         get() = prefs.getBoolean(AI_SPAM_ENABLED, false)
         set(value) = prefs.edit().putBoolean(AI_SPAM_ENABLED, value).apply()
@@ -172,6 +176,34 @@ class Config(context: Context) : BaseConfig(context) {
     var aiSpamModelLastCheck: Long
         get() = prefs.getLong(AI_SPAM_MODEL_LAST_CHECK, 0L)
         set(value) = prefs.edit().putLong(AI_SPAM_MODEL_LAST_CHECK, value).apply()
+
+    var safeNumbers: Set<String>
+        get() = prefs.getStringSet(SAFE_NUMBERS, HashSet()) ?: HashSet()
+        set(value) = prefs.edit().putStringSet(SAFE_NUMBERS, value).apply()
+
+    fun addSafeNumber(number: String) {
+        safeNumbers = safeNumbers.plus(number)
+    }
+
+    fun removeSafeNumber(number: String) {
+        safeNumbers = safeNumbers.minus(number)
+    }
+
+    var spamRatedNumbers: Set<String>
+        get() = prefs.getStringSet(SPAM_RATED_NUMBERS, HashSet()) ?: HashSet()
+        set(value) = prefs.edit().putStringSet(SPAM_RATED_NUMBERS, value).apply()
+
+    var notSpamRatedNumbers: Set<String>
+        get() = prefs.getStringSet(NOT_SPAM_RATED_NUMBERS, HashSet()) ?: HashSet()
+        set(value) = prefs.edit().putStringSet(NOT_SPAM_RATED_NUMBERS, value).apply()
+
+    fun addSpamRatedNumber(number: String) {
+        spamRatedNumbers = spamRatedNumbers.plus(number)
+    }
+
+    fun addNotSpamRatedNumber(number: String) {
+        notSpamRatedNumbers = notSpamRatedNumbers.plus(number)
+    }
 
     var e2ePublicKey: String
         get() = prefs.getString(E2E_PUBLIC_KEY, "") ?: ""

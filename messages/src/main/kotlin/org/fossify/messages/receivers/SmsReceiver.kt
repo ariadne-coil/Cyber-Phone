@@ -150,7 +150,7 @@ class SmsReceiver : BroadcastReceiver() {
 
         refreshMessages()
         refreshConversations()
-        val category = MessageCategorizer.categorizeMessage(displayBody, isKnownContact, isBlocked)
+        val category = MessageCategorizer.categorizeMessage(context, address, displayBody, isKnownContact, isBlocked)
         ensureBackgroundThread {
             val categoryId = when (category) {
                 org.fossify.messages.helpers.MessageCategory.MAIN -> 0

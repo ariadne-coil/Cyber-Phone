@@ -94,6 +94,11 @@
     <string name="spam_reputation_balanced">Balanced (&gt;=55% negative, &gt;=5 votes)</string>
     <string name="spam_reputation_conservative">Conservative (&gt;=70% negative, &gt;=5 votes)</string>
     <string name="spam_reputation_very_conservative">Very conservative (&gt;=85% negative, &gt;=10 votes)</string>
+    <string name="mark_as_spam_block">Mark as Spam &amp; Block</string>
+    <string name="short_code_filtering">Short number filtering</string>
+    <string name="short_code_filter_never_spam">Never spam short numbers</string>
+    <string name="short_code_filter_standard">Standard classification</string>
+    <string name="short_code_filter_always_spam">Always spam short numbers</string>
     <string name="call_rating_positive">Community rating: Positive</string>
     <string name="call_rating_neutral">Community rating: Neutral</string>
     <string name="call_rating_negative">Community rating: Negative</string>

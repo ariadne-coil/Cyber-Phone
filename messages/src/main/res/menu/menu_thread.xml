@@ -68,7 +68,12 @@
     <item
         android:id="@+id/block_number"
         android:showAsAction="never"
-        android:title="@string/block_number"
+        android:title="@string/mark_as_spam_block"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/mark_as_not_spam"
+        android:showAsAction="never"
+        android:title="@string/mark_as_not_spam"
         app:showAsAction="never" />
     <item
         android:id="@+id/delete"

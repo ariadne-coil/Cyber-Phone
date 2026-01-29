@@ -53,6 +53,8 @@ import org.fossify.messages.dialogs.ExportMessagesDialog
 import org.fossify.messages.extensions.config as messagesConfig
 import org.fossify.messages.extensions.emptyMessagesRecycleBin
 import org.fossify.messages.extensions.messagesDB
+import org.fossify.messages.extensions.rebuildMessageCategoryCache
+import org.fossify.messages.extensions.rebuildShortCodeCategoryCache
 import org.fossify.messages.helpers.FILE_SIZE_100_KB
 import org.fossify.messages.helpers.FILE_SIZE_1_MB
 import org.fossify.messages.helpers.FILE_SIZE_200_KB
@@ -68,6 +70,9 @@ import org.fossify.messages.helpers.SPAM_REPUTATION_AGGRESSIVE
 import org.fossify.messages.helpers.SPAM_REPUTATION_BALANCED
 import org.fossify.messages.helpers.SPAM_REPUTATION_CONSERVATIVE
 import org.fossify.messages.helpers.SPAM_REPUTATION_VERY_CONSERVATIVE
+import org.fossify.messages.helpers.SHORT_CODE_FILTER_ALWAYS_SPAM
+import org.fossify.messages.helpers.SHORT_CODE_FILTER_NEVER_SPAM
+import org.fossify.messages.helpers.SHORT_CODE_FILTER_STANDARD
 import org.fossify.messages.helpers.AiSpamModelManager
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.mesh.MeshConfig
@@ -173,6 +178,7 @@ class SettingsActivity : SimpleActivity() {
         setupManageBlockedNumbers()
         setupManageBlockedKeywords()
         setupSpamReputationThreshold()
+        setupShortCodeFilter()
         setupAiSpamSettings()
         setupManageSpeedDial()
         setupChangeDateTimeFormat()
@@ -330,6 +336,24 @@ class SettingsActivity : SimpleActivity() {
             RadioGroupDialog(this@SettingsActivity, items, messagesConfig.spamReputationThreshold) {
                 messagesConfig.spamReputationThreshold = it as Int
                 settingsSpamReputationValue.text = getSpamReputationThresholdText()
+                rebuildMessageCategoryCache()
+            }
+        }
+    }
+
+    private fun setupShortCodeFilter() = binding.apply {
+        settingsShortCodeFilterValue.text = getShortCodeFilterText()
+        settingsShortCodeFilterHolder.setOnClickListener {
+            val items = arrayListOf(
+                RadioItem(SHORT_CODE_FILTER_NEVER_SPAM, getString(R.string.short_code_filter_never_spam)),
+                RadioItem(SHORT_CODE_FILTER_STANDARD, getString(R.string.short_code_filter_standard)),
+                RadioItem(SHORT_CODE_FILTER_ALWAYS_SPAM, getString(R.string.short_code_filter_always_spam)),
+            )
+
+            RadioGroupDialog(this@SettingsActivity, items, messagesConfig.shortCodeFilterMode) {
+                messagesConfig.shortCodeFilterMode = it as Int
+                settingsShortCodeFilterValue.text = getShortCodeFilterText()
+                rebuildShortCodeCategoryCache()
             }
         }
     }
@@ -340,6 +364,7 @@ class SettingsActivity : SimpleActivity() {
             settingsAiSpamEnabled.toggle()
             messagesConfig.aiSpamEnabled = settingsAiSpamEnabled.isChecked
             updateAiSpamSettingsUi()
+            rebuildMessageCategoryCache()
         }
         settingsAiSpamModelSourceHolder.setOnClickListener {
             showAiSpamModelSourceDialog()
@@ -397,6 +422,14 @@ class SettingsActivity : SimpleActivity() {
             SPAM_REPUTATION_CONSERVATIVE -> R.string.spam_reputation_conservative
             SPAM_REPUTATION_VERY_CONSERVATIVE -> R.string.spam_reputation_very_conservative
             else -> R.string.spam_reputation_balanced
+        }
+    )
+
+    private fun getShortCodeFilterText() = getString(
+        when (messagesConfig.shortCodeFilterMode) {
+            SHORT_CODE_FILTER_ALWAYS_SPAM -> R.string.short_code_filter_always_spam
+            SHORT_CODE_FILTER_STANDARD -> R.string.short_code_filter_standard
+            else -> R.string.short_code_filter_never_spam
         }
     )
 

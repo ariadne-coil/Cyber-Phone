@@ -13,6 +13,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.ContactsContract.PhoneLookup
 import android.provider.OpenableColumns
+import android.provider.BlockedNumberContract
 import android.provider.Telephony.Mms
 import android.provider.Telephony.MmsSms
 import android.provider.Telephony.Sms
@@ -34,6 +35,7 @@ import org.fossify.commons.extensions.getMyContactsCursor
 import org.fossify.commons.extensions.getStringValue
 import org.fossify.commons.extensions.hasPermission
 import org.fossify.commons.extensions.isNumberBlocked
+import org.fossify.commons.extensions.normalizePhoneNumber
 import org.fossify.commons.extensions.normalizeString
 import org.fossify.commons.extensions.notificationManager
 import org.fossify.commons.extensions.queryCursor
@@ -46,6 +48,7 @@ import org.fossify.commons.helpers.MyContactsContentProvider
 import org.fossify.commons.helpers.PERMISSION_READ_CONTACTS
 import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.commons.helpers.ensureBackgroundThread
+import org.fossify.commons.helpers.isNougatPlus
 import org.fossify.commons.helpers.isQPlus
 import org.fossify.commons.models.PhoneNumber
 import org.fossify.commons.models.SimpleContact
@@ -60,6 +63,8 @@ import org.fossify.messages.helpers.MESSAGES_LIMIT
 import org.fossify.messages.helpers.MessagingCache
 import org.fossify.messages.helpers.NotificationHelper
 import org.fossify.messages.helpers.ShortcutHelper
+import org.fossify.messages.helpers.MessageCategorizer
+import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.generateRandomId
 import org.fossify.messages.interfaces.AttachmentsDao
 import org.fossify.messages.interfaces.ConversationsDao
@@ -75,6 +80,7 @@ import org.fossify.messages.models.Conversation
 import org.fossify.messages.models.Draft
 import org.fossify.messages.models.Message
 import org.fossify.messages.models.MessageAttachment
+import org.fossify.messages.models.MessageCategoryCache
 import org.fossify.messages.models.NamePhoto
 import org.fossify.messages.models.RecycleBinMessage
 import org.fossify.mesh.MeshContactHelper
@@ -116,6 +122,108 @@ val Context.smsSender
     get() = SmsSender.getInstance(applicationContext as Application)
 
 val Context.shortcutHelper get() = ShortcutHelper(this)
+
+fun Context.removeBlockedNumberCompat(number: String) {
+    if (!isNougatPlus()) {
+        return
+    }
+    val normalized = number.normalizePhoneNumber().trim()
+    if (normalized.isEmpty()) {
+        return
+    }
+    try {
+        contentResolver.delete(
+            BlockedNumberContract.BlockedNumbers.CONTENT_URI,
+            "${BlockedNumberContract.BlockedNumbers.COLUMN_ORIGINAL_NUMBER}=?",
+            arrayOf(normalized)
+        )
+        contentResolver.delete(
+            BlockedNumberContract.BlockedNumbers.CONTENT_URI,
+            "${BlockedNumberContract.BlockedNumbers.COLUMN_E164_NUMBER}=?",
+            arrayOf(normalized)
+        )
+    } catch (_: Exception) {
+    }
+}
+
+fun Context.rebuildMessageCategoryCache() {
+    val appContext = applicationContext
+    ensureBackgroundThread {
+        val conversations = try {
+            appContext.conversationsDB.getNonArchived() + appContext.conversationsDB.getAllArchived()
+        } catch (_: Exception) {
+            emptyList()
+        }
+        val now = System.currentTimeMillis()
+        val entries = conversations.map { conversation ->
+            val classification = MessageCategorizer.classifyConversation(appContext, conversation)
+            val categoryId = when (classification.category) {
+                org.fossify.messages.helpers.MessageCategory.MAIN -> 0
+                org.fossify.messages.helpers.MessageCategory.OTP -> 1
+                org.fossify.messages.helpers.MessageCategory.SPAM -> 2
+            }
+            MessageCategoryCache(
+                threadId = conversation.threadId,
+                category = categoryId,
+                isBlocked = if (classification.isBlocked) 1 else 0,
+                updatedAt = now
+            )
+        }
+        try {
+            appContext.messageCategoryCacheDB.deleteAll()
+            if (entries.isNotEmpty()) {
+                appContext.messageCategoryCacheDB.insertAll(entries)
+            }
+        } catch (_: Exception) {
+        }
+        Handler(Looper.getMainLooper()).post {
+            refreshConversations()
+        }
+    }
+}
+
+fun Context.rebuildShortCodeCategoryCache() {
+    val appContext = applicationContext
+    ensureBackgroundThread {
+        val conversations = try {
+            appContext.conversationsDB.getNonArchived() + appContext.conversationsDB.getAllArchived()
+        } catch (_: Exception) {
+            emptyList()
+        }
+        if (conversations.isEmpty()) {
+            return@ensureBackgroundThread
+        }
+        val now = System.currentTimeMillis()
+        val updates = ArrayList<MessageCategoryCache>()
+        conversations.forEach { conversation ->
+            if (org.fossify.messages.messaging.isShortCode(conversation.phoneNumber)) {
+                val classification = MessageCategorizer.classifyConversation(appContext, conversation)
+                val categoryId = when (classification.category) {
+                    org.fossify.messages.helpers.MessageCategory.MAIN -> 0
+                    org.fossify.messages.helpers.MessageCategory.OTP -> 1
+                    org.fossify.messages.helpers.MessageCategory.SPAM -> 2
+                }
+                updates.add(
+                    MessageCategoryCache(
+                        threadId = conversation.threadId,
+                        category = categoryId,
+                        isBlocked = if (classification.isBlocked) 1 else 0,
+                        updatedAt = now
+                    )
+                )
+            }
+        }
+        try {
+            if (updates.isNotEmpty()) {
+                appContext.messageCategoryCacheDB.insertAll(updates)
+            }
+        } catch (_: Exception) {
+        }
+        Handler(Looper.getMainLooper()).post {
+            refreshConversations()
+        }
+    }
+}
 
 fun Context.getMessages(
     threadId: Long,

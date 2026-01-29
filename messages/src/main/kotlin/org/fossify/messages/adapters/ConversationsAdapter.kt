@@ -22,9 +22,14 @@ import org.fossify.messages.extensions.markThreadMessagesRead
 import org.fossify.messages.extensions.markThreadMessagesUnread
 import org.fossify.messages.extensions.renameConversation
 import org.fossify.messages.extensions.updateConversationArchivedStatus
+import org.fossify.messages.extensions.messageCategoryCacheDB
+import org.fossify.messages.extensions.removeBlockedNumberCompat
+import org.fossify.commons.extensions.normalizePhoneNumber
 import org.fossify.messages.helpers.refreshConversations
+import org.fossify.messages.helpers.MessageCategorizer
 import org.fossify.messages.messaging.isShortCodeWithLetters
 import org.fossify.messages.models.Conversation
+import org.fossify.messages.models.MessageCategoryCache
 
 class ConversationsAdapter(
     activity: SimpleActivity,
@@ -43,7 +48,9 @@ class ConversationsAdapter(
 
         menu.apply {
             findItem(R.id.cab_block_number).title =
-                activity.getString(org.fossify.commons.R.string.block_number)
+                activity.getString(R.string.mark_as_spam_block)
+            findItem(R.id.cab_block_number).isVisible = false
+            findItem(R.id.cab_mark_as_not_spam).isVisible = false
             findItem(R.id.cab_add_number_to_contact).isVisible =
                 isSingleSelection && !isGroupConversation
             findItem(R.id.cab_dial_number).isVisible =
@@ -58,6 +65,7 @@ class ConversationsAdapter(
             findItem(R.id.cab_archive).isVisible = archiveAvailable
             checkPinBtnVisibility(this)
         }
+        updateSpamActionVisibility(menu)
     }
 
     override fun actionItemPressed(id: Int) {
@@ -68,6 +76,7 @@ class ConversationsAdapter(
         when (id) {
             R.id.cab_add_number_to_contact -> addNumberToContact()
             R.id.cab_block_number -> tryBlocking()
+            R.id.cab_mark_as_not_spam -> markAsNotSpam()
             R.id.cab_dial_number -> dialNumber()
             R.id.cab_copy_number -> copyNumberToClipboard()
             R.id.cab_delete -> askConfirmDelete()
@@ -111,12 +120,89 @@ class ConversationsAdapter(
 
         ensureBackgroundThread {
             numbersToBlock.map { it.phoneNumber }.forEach { number ->
+                val normalized = number.normalizePhoneNumber().trim()
+                if (normalized.isNotEmpty()) {
+                    activity.config.removeSafeNumber(normalized)
+                    if (!activity.config.spamRatedNumbers.contains(normalized)) {
+                        MessageCategorizer.submitCommunityRating(activity, normalized, positive = false)
+                        activity.config.addSpamRatedNumber(normalized)
+                    }
+                }
                 activity.addBlockedNumber(number)
+            }
+            numbersToBlock.forEach { conversation ->
+                activity.messageCategoryCacheDB.insert(
+                    MessageCategoryCache(
+                        threadId = conversation.threadId,
+                        category = 2,
+                        isBlocked = 1,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
             }
 
             activity.runOnUiThread {
                 submitList(newList)
                 finishActMode()
+            }
+        }
+    }
+
+    private fun updateSpamActionVisibility(menu: Menu) {
+        if (selectedKeys.isEmpty()) {
+            return
+        }
+        val selected = getSelectedItems()
+        val threadIds = selected.map { it.threadId }
+        ensureBackgroundThread {
+            val cached = try {
+                activity.messageCategoryCacheDB.getByThreadIds(threadIds)
+            } catch (_: Exception) {
+                emptyList()
+            }
+            val spamThreadIds = cached.filter { it.category == 2 && it.isBlocked == 1 }.map { it.threadId }.toSet()
+            val hasSpam = selected.any { spamThreadIds.contains(it.threadId) }
+            val hasNonSpam = selected.any { !spamThreadIds.contains(it.threadId) }
+            activity.runOnUiThread {
+                menu.findItem(R.id.cab_block_number)?.isVisible = hasNonSpam
+                menu.findItem(R.id.cab_mark_as_not_spam)?.isVisible = hasSpam
+            }
+        }
+    }
+
+    private fun markAsNotSpam() {
+        if (selectedKeys.isEmpty()) {
+            return
+        }
+
+        val selected = getSelectedItems()
+        val newList = currentList.toMutableList().apply { removeAll(selected) }
+        ensureBackgroundThread {
+            selected.map { it.phoneNumber }.forEach { number ->
+                val normalized = number.normalizePhoneNumber().trim()
+                if (normalized.isNotEmpty()) {
+                    activity.config.addSafeNumber(normalized)
+                    if (!activity.config.notSpamRatedNumbers.contains(normalized)) {
+                        MessageCategorizer.submitCommunityRating(activity, normalized, positive = true)
+                        activity.config.addNotSpamRatedNumber(normalized)
+                    }
+                }
+                activity.removeBlockedNumberCompat(number)
+            }
+            selected.forEach { conversation ->
+                activity.messageCategoryCacheDB.insert(
+                    MessageCategoryCache(
+                        threadId = conversation.threadId,
+                        category = 0,
+                        isBlocked = 0,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+            }
+            activity.runOnUiThread {
+                submitList(newList)
+                finishActMode()
+                refreshConversations()
             }
         }
     }

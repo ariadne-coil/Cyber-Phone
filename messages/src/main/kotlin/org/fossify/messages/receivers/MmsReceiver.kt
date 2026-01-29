@@ -74,7 +74,7 @@ class MmsReceiver : MmsReceivedReceiver() {
         val displayBody = displayResult.body
         val isKnownContact = senderName != address
         val isBlocked = MessageCategorizer.isBlockedMessage(context, address, displayBody, isKnownContact)
-        val category = MessageCategorizer.categorizeMessage(displayBody, isKnownContact, isBlocked)
+        val category = MessageCategorizer.categorizeMessage(context, address, displayBody, isKnownContact, isBlocked)
         if (!isBlocked && category != org.fossify.messages.helpers.MessageCategory.SPAM) {
             context.showReceivedMessageNotification(
                 messageId = mms.id,

@@ -139,15 +139,18 @@ import org.fossify.messages.extensions.launchConversationDetails
 import org.fossify.messages.extensions.markMessageRead
 import org.fossify.messages.extensions.markThreadMessagesRead
 import org.fossify.messages.extensions.markThreadMessagesUnread
+import org.fossify.messages.extensions.messageCategoryCacheDB
 import org.fossify.messages.extensions.messagesDB
 import org.fossify.messages.extensions.moveMessageToRecycleBin
 import org.fossify.messages.extensions.onScroll
 import org.fossify.messages.extensions.removeDiacriticsIfNeeded
+import org.fossify.messages.extensions.removeBlockedNumberCompat
 import org.fossify.messages.extensions.renameConversation
 import org.fossify.messages.extensions.restoreAllMessagesFromRecycleBinForConversation
 import org.fossify.messages.extensions.restoreMessageFromRecycleBin
 import org.fossify.messages.extensions.saveSmsDraft
 import org.fossify.messages.extensions.shouldUnarchive
+import org.fossify.commons.extensions.normalizePhoneNumber
 import org.fossify.messages.extensions.showWithAnimation
 import org.fossify.messages.extensions.subscriptionManagerCompat
 import org.fossify.messages.extensions.toArrayList
@@ -175,6 +178,7 @@ import org.fossify.messages.helpers.THREAD_ID
 import org.fossify.messages.helpers.THREAD_NUMBER
 import org.fossify.messages.helpers.THREAD_TEXT
 import org.fossify.messages.helpers.THREAD_TITLE
+import org.fossify.messages.helpers.MessageCategorizer
 import org.fossify.messages.helpers.generateRandomId
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
@@ -189,6 +193,7 @@ import org.fossify.messages.models.Conversation
 import org.fossify.messages.models.Events
 import org.fossify.messages.models.Message
 import org.fossify.messages.models.MessageAttachment
+import org.fossify.messages.models.MessageCategoryCache
 import org.fossify.messages.models.SIMCard
 import org.fossify.messages.models.ThreadItem
 import org.fossify.messages.models.ThreadItem.ThreadDateTime
@@ -227,6 +232,7 @@ class ThreadActivity : SimpleActivity() {
     private var isRecycleBin = false
     private var isLaunchedFromShortcut = false
     private var hasDeferredThreadRefresh = false
+    private var isSpamThread = false
 
     private var isScheduledMessage: Boolean = false
     private var messageToResend: Long? = null
@@ -375,8 +381,9 @@ class ThreadActivity : SimpleActivity() {
                 participants.size > 1 && conversation != null && !isRecycleBin
             findItem(R.id.conversation_details).isVisible = conversation != null && !isRecycleBin
             findItem(R.id.block_number).title =
-                getString(org.fossify.commons.R.string.block_number)
-            findItem(R.id.block_number).isVisible = !isRecycleBin
+                getString(R.string.mark_as_spam_block)
+            findItem(R.id.block_number).isVisible = !isRecycleBin && !isSpamThread
+            findItem(R.id.mark_as_not_spam).isVisible = !isRecycleBin && isSpamThread
             findItem(R.id.dial_number).isVisible =
                 participants.size == 1 && !isSpecialNumber() && !isRecycleBin
             findItem(R.id.manage_people).isVisible = !isSpecialNumber() && !isRecycleBin
@@ -394,6 +401,23 @@ class ThreadActivity : SimpleActivity() {
             findItem(R.id.encrypt_messages).isChecked =
                 hasSharedSecret && E2eManager.isThreadEncrypted(this@ThreadActivity, threadId)
             findItem(R.id.edit_contact_key).isVisible = canEditContactKey
+        }
+        updateSpamThreadStatus()
+    }
+
+    private fun updateSpamThreadStatus() {
+        if (threadId <= 0L) {
+            return
+        }
+        val menu = binding.threadToolbar.menu
+        ensureBackgroundThread {
+            val cached = messageCategoryCacheDB.getByThreadIds(listOf(threadId)).firstOrNull()
+            val isSpam = cached?.category == 2 && cached.isBlocked == 1
+            runOnUiThread {
+                isSpamThread = isSpam
+                menu.findItem(R.id.block_number)?.isVisible = !isRecycleBin && !isSpamThread
+                menu.findItem(R.id.mark_as_not_spam)?.isVisible = !isRecycleBin && isSpamThread
+            }
         }
     }
 
@@ -416,6 +440,7 @@ class ThreadActivity : SimpleActivity() {
             R.id.exchange_keys -> sendKeyExchange()
             R.id.encrypt_messages -> toggleEncryption(menuItem)
             R.id.edit_contact_key -> editContactKey()
+            R.id.mark_as_not_spam -> markAsNotSpam()
             R.id.add_number_to_contact -> addNumberToContact()
             R.id.copy_number -> copyNumberToClipboard()
             R.id.dial_number -> dialNumber()
@@ -1251,10 +1276,66 @@ class ThreadActivity : SimpleActivity() {
         )
 
         ConfirmationDialog(this, question) {
-            ensureBackgroundThread {
-                numbers.forEach {
-                    addBlockedNumber(it)
+            markAsSpamAndBlock(numbers, finishThread = true)
+        }
+    }
+
+    private fun markAsSpamAndBlock(numbers: List<String>, finishThread: Boolean) {
+        if (numbers.isEmpty()) {
+            return
+        }
+        ensureBackgroundThread {
+            numbers.forEach { number ->
+                val normalized = number.normalizePhoneNumber().trim()
+                if (normalized.isNotEmpty()) {
+                    config.removeSafeNumber(normalized)
+                    if (!config.spamRatedNumbers.contains(normalized)) {
+                        MessageCategorizer.submitCommunityRating(this, normalized, positive = false)
+                        config.addSpamRatedNumber(normalized)
+                    }
                 }
+                addBlockedNumber(number)
+            }
+            messageCategoryCacheDB.insert(
+                MessageCategoryCache(
+                    threadId = threadId,
+                    category = 2,
+                    isBlocked = 1,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+            refreshConversations()
+            if (finishThread) {
+                finish()
+            }
+        }
+    }
+
+    private fun markAsNotSpam() {
+        val numbers = participants.getAddresses()
+        ensureBackgroundThread {
+            numbers.forEach { number ->
+                val normalized = number.normalizePhoneNumber().trim()
+                if (normalized.isNotEmpty()) {
+                    config.addSafeNumber(normalized)
+                    if (!config.notSpamRatedNumbers.contains(normalized)) {
+                        MessageCategorizer.submitCommunityRating(this, normalized, positive = true)
+                        config.addNotSpamRatedNumber(normalized)
+                    }
+                }
+                removeBlockedNumberCompat(number)
+            }
+            messageCategoryCacheDB.insert(
+                MessageCategoryCache(
+                    threadId = threadId,
+                    category = 0,
+                    isBlocked = 0,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+            isSpamThread = false
+            runOnUiThread {
+                binding.threadToolbar.menu.findItem(R.id.mark_as_not_spam)?.isVisible = false
                 refreshConversations()
                 finish()
             }
@@ -1793,6 +1874,9 @@ class ThreadActivity : SimpleActivity() {
                 }
             }
             clearCurrentMessage()
+            if (text.trim().equals("stop", ignoreCase = true)) {
+                markAsSpamAndBlock(addresses, finishThread = false)
+            }
 
         } catch (e: Exception) {
             showErrorToast(e)
