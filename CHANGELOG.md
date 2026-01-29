@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased (since f16ee3b1)
+## v0.1.1 (2026-01-29)
+- Added short-number filtering modes and a targeted short-code-only reclassification path.
+- Added spam/not-spam actions with safe-number overrides, dynamic menu visibility, and STOP=spam+block handling.
+- Added first-time YACB community rating submissions for spam/not-spam actions, including call-block flow.
+
+## v0.1.0 (2026-01-28)
 - Migrated Messages list to DB-driven category filtering (Main/OTP/Spam) and SQL sorting to avoid in-memory filtering.
 - Added AI spam classifier framework with model manager (Edge/HF sources), settings toggles, and update flow.
 - Implemented persistent message category cache (Room table + DAO) with cleanup and message-arrival updates.
@@ -10,6 +15,3 @@
 - Enhanced E2E encryption flow: key-set timestamps, selective decryption after key exchange, and persistent decrypted storage.
 - Stabilized thread loading: limited initial message load, cooldown for full thread refresh, and layout manager reset.
 - Updated Proguard rules to preserve Gson generic signatures and message attachment models (release crash fix).
-- Added short-number filtering modes and a targeted short-code-only reclassification path.
-- Added spam/not-spam actions with safe-number overrides, dynamic menu visibility, and STOP=spam+block handling.
-- Added first-time YACB community rating submissions for spam/not-spam actions, including call-block flow.
