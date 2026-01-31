@@ -64,6 +64,8 @@ import org.fossify.messages.helpers.MessagingCache
 import org.fossify.messages.helpers.NotificationHelper
 import org.fossify.messages.helpers.ShortcutHelper
 import org.fossify.messages.helpers.MessageCategorizer
+import org.fossify.messages.helpers.ReactionHelper
+import org.fossify.messages.helpers.PendingTapback
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.generateRandomId
 import org.fossify.messages.interfaces.AttachmentsDao
@@ -71,6 +73,7 @@ import org.fossify.messages.interfaces.ConversationsDao
 import org.fossify.messages.interfaces.DraftsDao
 import org.fossify.messages.interfaces.MessageCategoryCacheDao
 import org.fossify.messages.interfaces.MessageAttachmentsDao
+import org.fossify.messages.interfaces.MessageReactionsDao
 import org.fossify.messages.interfaces.MessagesDao
 import org.fossify.messages.messaging.MessagingUtils
 import org.fossify.messages.messaging.MessagingUtils.Companion.ADDRESS_SEPARATOR
@@ -81,6 +84,7 @@ import org.fossify.messages.models.Draft
 import org.fossify.messages.models.Message
 import org.fossify.messages.models.MessageAttachment
 import org.fossify.messages.models.MessageCategoryCache
+import org.fossify.messages.models.MessageReaction
 import org.fossify.messages.models.NamePhoto
 import org.fossify.messages.models.RecycleBinMessage
 import org.fossify.mesh.MeshContactHelper
@@ -112,6 +116,8 @@ val Context.draftsDB: DraftsDao
 val Context.messageCategoryCacheDB: MessageCategoryCacheDao
     get() = getMessagesDB().MessageCategoryCacheDao()
 
+val Context.messageReactionsDB: MessageReactionsDao
+    get() = getMessagesDB().MessageReactionsDao()
 val Context.notificationHelper
     get() = NotificationHelper(this)
 
@@ -263,6 +269,7 @@ fun Context.getMessages(
     val sortOrder = "${Sms.DATE} DESC LIMIT $limit"
 
     var messages = ArrayList<Message>()
+    val pendingTapbacks = ArrayList<PendingTapback>()
     queryCursor(uri, projection, selection, selectionArgs, sortOrder, showErrors = true) { cursor ->
         val senderNumber = cursor.getStringValue(Sms.ADDRESS) ?: return@queryCursor
 
@@ -296,6 +303,13 @@ fun Context.getMessages(
         }
         val isMMS = false
         val displayBody = body?.let { E2eManager.getDisplayBody(this, thread, it, date.toLong()) } ?: ""
+        val tapback = ReactionHelper.parseTapback(displayBody)
+        if (tapback != null) {
+            val isMine = type != Sms.MESSAGE_TYPE_INBOX
+            val sender = if (isMine) ReactionHelper.SENDER_ME else senderNumber
+            pendingTapbacks.add(PendingTapback(tapback, isMine, sender))
+            return@queryCursor
+        }
         val message =
             Message(
                 id = id,
@@ -316,7 +330,7 @@ fun Context.getMessages(
         messages.add(message)
     }
 
-    messages.addAll(getMMS(threadId, sortOrder, dateFrom))
+    messages.addAll(getMMS(threadId, sortOrder, dateFrom, pendingTapbacks))
 
     if (includeScheduledMessages) {
         try {
@@ -334,6 +348,26 @@ fun Context.getMessages(
         .takeLast(limit)
         .toMutableList() as ArrayList<Message>
 
+    if (pendingTapbacks.isNotEmpty()) {
+        ensureBackgroundThread {
+            pendingTapbacks.forEach { pending ->
+                val shouldBeReceived = pending.isMine
+                val target = ReactionHelper.findTargetMessage(messages, pending.tapback.targetText, shouldBeReceived)
+                if (target != null) {
+                    ReactionHelper.applyTapback(
+                        context = this,
+                        targetMessageId = target.id,
+                        threadId = target.threadId,
+                        sender = pending.sender,
+                        isMine = pending.isMine,
+                        type = pending.tapback.type,
+                        isRemoval = pending.tapback.isRemoval
+                    )
+                }
+            }
+        }
+    }
+
     return messages
 }
 
@@ -342,6 +376,7 @@ fun Context.getMMS(
     threadId: Long? = null,
     sortOrder: String? = null,
     dateFrom: Int = -1,
+    pendingTapbacks: MutableList<PendingTapback>? = null,
 ): ArrayList<Message> {
     val uri = Mms.CONTENT_URI
     val projection = arrayOf(
@@ -393,6 +428,20 @@ fun Context.getMMS(
             val namePhoto = getNameAndPhotoFromPhoneNumber(senderNumber)
             senderName = namePhoto.name
             senderPhotoUri = namePhoto.photoUri ?: ""
+        }
+
+        val tapback = ReactionHelper.parseTapback(displayBody)
+        if (tapback != null && pendingTapbacks != null) {
+            val isMine = type == Mms.MESSAGE_BOX_SENT || type == Mms.MESSAGE_BOX_FAILED
+            val sender = if (isMine) ReactionHelper.SENDER_ME else senderNumber
+            pendingTapbacks.add(
+                PendingTapback(
+                    tapback = tapback,
+                    isMine = isMine,
+                    sender = sender
+                )
+            )
+            return@queryCursor
         }
 
         val message =

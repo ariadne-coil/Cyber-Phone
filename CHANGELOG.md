@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.2 (2026-01-31)
+- Added Tapback-compatible message reactions (send + receive) with per-message emoji rendering.
+- Added compact reaction picker (single-row emoji bar) for received messages only.
+- Stored reactions in a dedicated Room table with migration and filtered Tapback system messages.
+
 ## v0.1.1 (2026-01-29)
 - Added short-number filtering modes and a targeted short-code-only reclassification path.
 - Added spam/not-spam actions with safe-number overrides, dynamic menu visibility, and STOP=spam+block handling.

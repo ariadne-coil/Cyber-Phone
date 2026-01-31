@@ -14,6 +14,7 @@ import org.fossify.messages.interfaces.ConversationsDao
 import org.fossify.messages.interfaces.DraftsDao
 import org.fossify.messages.interfaces.MessageCategoryCacheDao
 import org.fossify.messages.interfaces.MessageAttachmentsDao
+import org.fossify.messages.interfaces.MessageReactionsDao
 import org.fossify.messages.interfaces.MessagesDao
 import org.fossify.messages.models.Attachment
 import org.fossify.messages.models.Conversation
@@ -21,6 +22,7 @@ import org.fossify.messages.models.Draft
 import org.fossify.messages.models.Message
 import org.fossify.messages.models.MessageCategoryCache
 import org.fossify.messages.models.MessageAttachment
+import org.fossify.messages.models.MessageReaction
 import org.fossify.messages.models.RecycleBinMessage
 
 @Database(
@@ -31,9 +33,10 @@ import org.fossify.messages.models.RecycleBinMessage
         Message::class,
         RecycleBinMessage::class,
         Draft::class,
-        MessageCategoryCache::class
+        MessageCategoryCache::class,
+        MessageReaction::class
     ],
-    version = 11
+    version = 12
 )
 @TypeConverters(Converters::class)
 abstract class MessagesDatabase : RoomDatabase() {
@@ -49,6 +52,8 @@ abstract class MessagesDatabase : RoomDatabase() {
     abstract fun DraftsDao(): DraftsDao
 
     abstract fun MessageCategoryCacheDao(): MessageCategoryCacheDao
+
+    abstract fun MessageReactionsDao(): MessageReactionsDao
 
     companion object {
         private var db: MessagesDatabase? = null
@@ -72,6 +77,7 @@ abstract class MessagesDatabase : RoomDatabase() {
                             .addMigrations(MIGRATION_8_9)
                             .addMigrations(MIGRATION_9_10)
                             .addMigrations(MIGRATION_10_11)
+                            .addMigrations(MIGRATION_11_12)
                             .build()
                     }
                 }
@@ -179,6 +185,22 @@ abstract class MessagesDatabase : RoomDatabase() {
                         "`is_blocked` INTEGER NOT NULL, " +
                         "`updated_at` INTEGER NOT NULL, " +
                         "PRIMARY KEY(`thread_id`)" +
+                        ")"
+                )
+            }
+        }
+
+        private val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `message_reactions` (" +
+                        "`message_id` INTEGER NOT NULL, " +
+                        "`thread_id` INTEGER NOT NULL, " +
+                        "`sender` TEXT NOT NULL, " +
+                        "`emoji` TEXT NOT NULL, " +
+                        "`is_mine` INTEGER NOT NULL, " +
+                        "`updated_at` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`message_id`, `sender`)" +
                         ")"
                 )
             }

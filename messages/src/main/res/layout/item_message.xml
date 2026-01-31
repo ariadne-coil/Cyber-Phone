@@ -65,5 +65,20 @@
             android:textSize="@dimen/normal_text_size"
             tools:drawableEndCompat="@drawable/scheduled_message_icon"
             tools:text="Message content" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/thread_message_reaction"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignBottom="@+id/thread_message_body"
+            android:layout_alignEnd="@+id/thread_message_body"
+            android:layout_marginEnd="@dimen/tiny_margin"
+            android:layout_marginBottom="@dimen/tiny_margin"
+            android:background="@drawable/item_reaction_background"
+            android:paddingHorizontal="@dimen/tiny_margin"
+            android:paddingVertical="@dimen/tiny_margin"
+            android:textSize="@dimen/normal_text_size"
+            android:visibility="gone"
+            tools:text="👍" />
     </RelativeLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

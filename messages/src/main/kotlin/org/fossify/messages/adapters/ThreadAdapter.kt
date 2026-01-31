@@ -94,6 +94,7 @@ class ThreadAdapter(
     val deleteMessages: (messages: List<Message>, toRecycleBin: Boolean, fromRecycleBin: Boolean) -> Unit
 ) : MyRecyclerViewListAdapter<ThreadItem>(activity, recyclerView, ThreadItemDiffCallback(), itemClick) {
     private var fontSize = activity.getTextSize()
+    private var reactionsByMessageId: Map<Long, String> = emptyMap()
 
     @SuppressLint("MissingPermission")
     private val hasMultipleSIMCards = (activity.subscriptionManagerCompat().activeSubscriptionInfoList?.size ?: 0) > 1
@@ -109,6 +110,11 @@ class ThreadAdapter(
         setupDragListener(true)
         setHasStableIds(false)
         (recyclerView.itemAnimator as? SimpleItemAnimator)?.supportsChangeAnimations = false
+    }
+
+    fun setReactions(map: Map<Long, String>) {
+        reactionsByMessageId = map
+        notifyDataSetChanged()
     }
 
     override fun getActionMenuId() = R.menu.cab_thread
@@ -359,14 +365,21 @@ class ThreadAdapter(
                 text = message.body
                 setTextSize(TypedValue.COMPLEX_UNIT_PX, fontSize)
                 beVisibleIf(message.body.isNotEmpty())
-                setOnLongClickListener {
-                    holder.viewLongClicked()
-                    true
-                }
+            }
 
-                setOnClickListener {
-                    holder.viewClicked(message)
+            threadMessageWrapper.setOnLongClickListener {
+                (activity as? ThreadActivity)?.dismissReactionPicker()
+                holder.viewLongClicked()
+                true
+            }
+
+            threadMessageWrapper.setOnClickListener {
+                if (selectedKeys.isEmpty() && message.isReceivedMessage()) {
+                    (activity as? ThreadActivity)?.showReactionPicker(message, threadMessageBody)
+                } else {
+                    (activity as? ThreadActivity)?.dismissReactionPicker()
                 }
+                holder.viewClicked(message)
             }
 
             if (message.isReceivedMessage()) {
@@ -392,6 +405,22 @@ class ThreadAdapter(
                 threadMessageAttachmentsHolder.beGone()
                 threadMessagePlayOutline.beGone()
             }
+
+            val reactionAnchor = if (message.body.isNotEmpty()) {
+                threadMessageBody.id
+            } else {
+                threadMessageAttachmentsHolder.id
+            }
+            threadMessageReaction.updateLayoutParams<RelativeLayout.LayoutParams> {
+                removeRule(RelativeLayout.ALIGN_BOTTOM)
+                removeRule(RelativeLayout.BELOW)
+                addRule(RelativeLayout.BELOW, reactionAnchor)
+                topMargin = resources.getDimensionPixelSize(R.dimen.tiny_margin)
+            }
+
+            val reactionText = reactionsByMessageId[message.id].orEmpty()
+            threadMessageReaction.text = reactionText
+            threadMessageReaction.beVisibleIf(reactionText.isNotBlank())
         }
     }
 
@@ -419,6 +448,13 @@ class ThreadAdapter(
                 setTextColor(textColor)
                 setLinkTextColor(activity.getProperPrimaryColor())
             }
+
+            threadMessageReaction.updateLayoutParams<RelativeLayout.LayoutParams> {
+                removeRule(RelativeLayout.ALIGN_PARENT_END)
+                addRule(RelativeLayout.ALIGN_END, threadMessageBody.id)
+            }
+            threadMessageReaction.background =
+                AppCompatResources.getDrawable(activity, R.drawable.item_reaction_background)
 
             if (!activity.isFinishing && !activity.isDestroyed) {
                 val contactLetterIcon = SimpleContactsHelper(activity).getContactLetterIcon(message.senderName)
@@ -476,6 +512,12 @@ class ThreadAdapter(
                     setCompoundDrawables(null, null, null, null)
                 }
             }
+
+            threadMessageReaction.updateLayoutParams<RelativeLayout.LayoutParams> {
+                removeRule(RelativeLayout.ALIGN_PARENT_START)
+                addRule(RelativeLayout.ALIGN_START, threadMessageBody.id)
+            }
+            threadMessageReaction.setBackgroundColor(Color.TRANSPARENT)
         }
     }
 

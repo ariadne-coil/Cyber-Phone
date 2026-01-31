@@ -10,6 +10,7 @@ import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.models.PhoneNumber
 import org.fossify.commons.models.SimpleContact
 import org.fossify.messages.extensions.getConversations
+import org.fossify.messages.extensions.getMessages
 import org.fossify.messages.extensions.getNameFromAddress
 import org.fossify.messages.extensions.getNotificationBitmap
 import org.fossify.messages.extensions.getThreadId
@@ -22,6 +23,7 @@ import org.fossify.messages.extensions.showReceivedMessageNotification
 import org.fossify.messages.extensions.updateConversationArchivedStatus
 import org.fossify.messages.helpers.E2eManager
 import org.fossify.messages.helpers.MessageCategorizer
+import org.fossify.messages.helpers.ReactionHelper
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
 import org.fossify.messages.models.Message
@@ -94,6 +96,35 @@ class SmsReceiver : BroadcastReceiver() {
         val isKnownContact = senderName != address
         val displayResult = E2eManager.getDisplayResult(context, threadId, body, date / 1000L)
         val displayBody = displayResult.body
+        val tapback = ReactionHelper.parseTapback(displayBody)
+        if (tapback != null) {
+            val sender = address
+            val target = ReactionHelper.findTargetMessage(context.getMessages(threadId), tapback.targetText, false)
+            if (target != null) {
+                ReactionHelper.applyTapback(
+                    context = context,
+                    targetMessageId = target.id,
+                    threadId = target.threadId,
+                    sender = sender,
+                    isMine = false,
+                    type = tapback.type,
+                    isRemoval = tapback.isRemoval
+                )
+            }
+            context.insertNewSMS(
+                address = address,
+                subject = subject,
+                body = body,
+                date = date,
+                read = 1,
+                threadId = threadId,
+                type = type,
+                subscriptionId = subscriptionId
+            )
+            refreshMessages()
+            refreshConversations()
+            return
+        }
         val isBlocked = MessageCategorizer.isBlockedMessage(context, address, displayBody, isKnownContact)
         val readFlag = if (isBlocked) 1 else 0
 

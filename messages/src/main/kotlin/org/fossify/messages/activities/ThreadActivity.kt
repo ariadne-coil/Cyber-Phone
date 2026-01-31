@@ -31,11 +31,13 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MenuItem
 import android.view.View
+import android.widget.LinearLayout
+import android.widget.PopupWindow
+import android.widget.TextView
+import androidx.core.view.setPadding
 import android.view.WindowManager
 import android.view.animation.OvershootInterpolator
 import android.view.inputmethod.EditorInfo
-import android.widget.LinearLayout
-import android.widget.LinearLayout.LayoutParams
 import android.widget.RelativeLayout
 import android.widget.Toast
 import androidx.annotation.StringRes
@@ -140,6 +142,7 @@ import org.fossify.messages.extensions.markMessageRead
 import org.fossify.messages.extensions.markThreadMessagesRead
 import org.fossify.messages.extensions.markThreadMessagesUnread
 import org.fossify.messages.extensions.messageCategoryCacheDB
+import org.fossify.messages.extensions.messageReactionsDB
 import org.fossify.messages.extensions.messagesDB
 import org.fossify.messages.extensions.moveMessageToRecycleBin
 import org.fossify.messages.extensions.onScroll
@@ -179,6 +182,8 @@ import org.fossify.messages.helpers.THREAD_NUMBER
 import org.fossify.messages.helpers.THREAD_TEXT
 import org.fossify.messages.helpers.THREAD_TITLE
 import org.fossify.messages.helpers.MessageCategorizer
+import org.fossify.messages.helpers.ReactionHelper
+import org.fossify.messages.helpers.ReactionType
 import org.fossify.messages.helpers.generateRandomId
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
@@ -194,6 +199,7 @@ import org.fossify.messages.models.Events
 import org.fossify.messages.models.Message
 import org.fossify.messages.models.MessageAttachment
 import org.fossify.messages.models.MessageCategoryCache
+import org.fossify.messages.models.MessageReaction
 import org.fossify.messages.models.SIMCard
 import org.fossify.messages.models.ThreadItem
 import org.fossify.messages.models.ThreadItem.ThreadDateTime
@@ -233,6 +239,8 @@ class ThreadActivity : SimpleActivity() {
     private var isLaunchedFromShortcut = false
     private var hasDeferredThreadRefresh = false
     private var isSpamThread = false
+    private var reactionPopup: PopupWindow? = null
+    private var suppressReactionDismissForClick = false
 
     private var isScheduledMessage: Boolean = false
     private var messageToResend: Long? = null
@@ -425,6 +433,89 @@ class ThreadActivity : SimpleActivity() {
         binding.threadToolbar.setOnMenuItemClickListener { menuItem ->
             if (participants.isEmpty()) return@setOnMenuItemClickListener true
             return@setOnMenuItemClickListener handleMenuItemAction(menuItem)
+        }
+    }
+
+    fun showReactionPicker(message: Message, anchor: View) {
+        if (isRecycleBin || message.body.isBlank()) {
+            return
+        }
+        dismissReactionPicker()
+        suppressReactionDismissForClick = true
+        val reactions = listOf(
+            ReactionType.LIKE,
+            ReactionType.LOVE,
+            ReactionType.LAUGH,
+            ReactionType.EMPHASIZE,
+            ReactionType.QUESTION,
+            ReactionType.DISLIKE
+        )
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setBackgroundResource(R.drawable.reaction_picker_background)
+            setPadding(resources.getDimensionPixelSize(R.dimen.tiny_margin))
+        }
+
+        reactions.forEach { type ->
+            val emojiView = TextView(this).apply {
+                text = ReactionHelper.emojiFor(type)
+                textSize = 18f
+                setPadding(resources.getDimensionPixelSize(R.dimen.tiny_margin))
+                setOnClickListener {
+                    sendReaction(message, type)
+                    dismissReactionPicker()
+                }
+            }
+            container.addView(emojiView)
+        }
+
+        val popup = PopupWindow(
+            container,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            true
+        ).apply {
+            isOutsideTouchable = true
+            setOnDismissListener {
+                reactionPopup = null
+                suppressReactionDismissForClick = false
+            }
+        }
+        reactionPopup = popup
+        popup.showAsDropDown(anchor, 0, -anchor.height)
+    }
+
+    fun dismissReactionPicker() {
+        reactionPopup?.dismiss()
+        reactionPopup = null
+        suppressReactionDismissForClick = false
+    }
+
+    private fun sendReaction(message: Message, reactionType: ReactionType) {
+        val text = message.body.trim()
+        if (text.isEmpty()) {
+            return
+        }
+        val addresses = participants.getAddresses()
+        val subscriptionId = availableSIMCards.getOrNull(currentSIMCardIndex)?.subscriptionId
+            ?: SmsManager.getDefaultSmsSubscriptionId()
+        val reactionMessage = ReactionHelper.buildTapback(reactionType, text)
+        sendMessageCompat(reactionMessage, addresses, subscriptionId, emptyList())
+        ensureBackgroundThread {
+            val sender = ReactionHelper.SENDER_ME
+            ReactionHelper.applyTapback(
+                context = this,
+                targetMessageId = message.id,
+                threadId = message.threadId,
+                sender = sender,
+                isMine = true,
+                type = reactionType,
+                isRemoval = false
+            )
+            runOnUiThread {
+                updateReactionMap(getOrCreateThreadAdapter())
+            }
         }
     }
 
@@ -733,6 +824,7 @@ class ThreadActivity : SimpleActivity() {
             binding.threadMessagesList.adapter = null
             binding.threadMessagesList.setRecycledViewPool(RecyclerView.RecycledViewPool())
             binding.threadMessagesList.swapAdapter(adapter, true)
+            updateReactionMap(adapter)
             adapter.updateMessages(threadItems, if (shouldScrollToBottom) lastPosition else -1)
         }
 
@@ -803,6 +895,12 @@ class ThreadActivity : SimpleActivity() {
     }
 
     private fun handleItemClick(any: Any) {
+        if (any is Message && suppressReactionDismissForClick) {
+            suppressReactionDismissForClick = false
+            return
+        }
+        suppressReactionDismissForClick = false
+        dismissReactionPicker()
         when {
             any is Message && any.isScheduled -> showScheduledMessageInfo(any)
             any is ThreadError -> {
@@ -826,6 +924,7 @@ class ThreadActivity : SimpleActivity() {
                 finish()
             } else {
                 getOrCreateThreadAdapter().apply {
+                    updateReactionMap(this)
                     updateMessages(threadItems, scrollPosition = deletePosition)
                     finishActMode()
                 }
@@ -887,7 +986,9 @@ class ThreadActivity : SimpleActivity() {
             runOnUiThread {
                 loadingOlderMessages = false
                 val index = threadItems.indexOfFirst { (it as? Message)?.id == messageId }
-                getOrCreateThreadAdapter().updateMessages(
+                getOrCreateThreadAdapter().apply {
+                    updateReactionMap(this)
+                }.updateMessages(
                     newMessages = threadItems, scrollPosition = index, smoothScroll = true
                 )
                 isJumpingToMessage = false
@@ -912,7 +1013,9 @@ class ThreadActivity : SimpleActivity() {
             threadItems = getThreadItems()
             runOnUiThread {
                 loadingOlderMessages = false
-                getOrCreateThreadAdapter().updateMessages(threadItems)
+                getOrCreateThreadAdapter().apply {
+                    updateReactionMap(this)
+                }.updateMessages(threadItems)
             }
         }
     }
@@ -1553,6 +1656,29 @@ class ThreadActivity : SimpleActivity() {
         return items
     }
 
+    private fun updateReactionMap(adapter: ThreadAdapter) {
+        val messageIds = messages.map { it.id }
+        if (messageIds.isEmpty()) {
+            adapter.setReactions(emptyMap())
+            return
+        }
+        ensureBackgroundThread {
+            val reactions = try {
+                messageReactionsDB.getByMessageIds(messageIds)
+            } catch (_: Exception) {
+                emptyList()
+            }
+            val map = reactions
+                .groupBy { it.messageId }
+                .mapValues { entry ->
+                    entry.value.map { it.emoji }.distinct().joinToString(" ")
+                }
+            runOnUiThread {
+                adapter.setReactions(map)
+            }
+        }
+    }
+
     private fun launchActivityForResult(
         intent: Intent,
         requestCode: Int,
@@ -1903,7 +2029,9 @@ class ThreadActivity : SimpleActivity() {
 
         val newItems = getThreadItems()
         runOnUiThread {
-            getOrCreateThreadAdapter().updateMessages(newItems, newItems.lastIndex)
+            getOrCreateThreadAdapter().apply {
+                updateReactionMap(this)
+            }.updateMessages(newItems, newItems.lastIndex)
             if (!refreshedSinceSent) {
                 refreshMessages()
             }
@@ -1921,7 +2049,7 @@ class ThreadActivity : SimpleActivity() {
         binding.selectedContacts.removeAllViews()
         var newLinearLayout = LinearLayout(this)
         newLinearLayout.layoutParams =
-            LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         newLinearLayout.orientation = LinearLayout.HORIZONTAL
 
         val sideMargin =
@@ -1938,10 +2066,12 @@ class ThreadActivity : SimpleActivity() {
             val layout = LinearLayout(this)
             layout.orientation = LinearLayout.HORIZONTAL
             layout.gravity = Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM
-            layout.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
+            layout.layoutParams =
+                LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             views[i].measure(0, 0)
 
-            var params = LayoutParams(views[i].measuredWidth, LayoutParams.WRAP_CONTENT)
+            var params =
+                LinearLayout.LayoutParams(views[i].measuredWidth, LinearLayout.LayoutParams.WRAP_CONTENT)
             params.setMargins(0, 0, mediumMargin, 0)
             layout.addView(views[i], params)
             layout.measure(0, 0)
@@ -1953,15 +2083,15 @@ class ThreadActivity : SimpleActivity() {
                 binding.selectedContacts.addView(newLinearLayout)
                 newLinearLayout = LinearLayout(this)
                 newLinearLayout.layoutParams =
-                    LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+                    LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
                 newLinearLayout.orientation = LinearLayout.HORIZONTAL
-                params = LayoutParams(layout.measuredWidth, layout.measuredHeight)
+                params = LinearLayout.LayoutParams(layout.measuredWidth, layout.measuredHeight)
                 params.topMargin = mediumMargin
                 newLinearLayout.addView(layout, params)
                 widthSoFar = layout.measuredWidth
             } else {
                 if (!isFirstRow) {
-                    (layout.layoutParams as LayoutParams).topMargin = mediumMargin
+                    (layout.layoutParams as LinearLayout.LayoutParams).topMargin = mediumMargin
                 }
                 newLinearLayout.addView(layout)
             }

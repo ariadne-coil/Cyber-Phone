@@ -10,6 +10,7 @@ import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.messages.R
 import org.fossify.messages.extensions.getConversations
 import org.fossify.messages.extensions.getLatestMMS
+import org.fossify.messages.extensions.getMessages
 import org.fossify.messages.extensions.getNameFromAddress
 import org.fossify.messages.extensions.insertOrUpdateConversation
 import org.fossify.messages.extensions.markMessageRead
@@ -20,6 +21,7 @@ import org.fossify.messages.extensions.showReceivedMessageNotification
 import org.fossify.messages.extensions.updateConversationArchivedStatus
 import org.fossify.messages.helpers.E2eManager
 import org.fossify.messages.helpers.MessageCategorizer
+import org.fossify.messages.helpers.ReactionHelper
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
 import org.fossify.messages.models.Message
@@ -72,6 +74,26 @@ class MmsReceiver : MmsReceivedReceiver() {
 
         val displayResult = E2eManager.getDisplayResult(context, mms.threadId, mms.body, mms.date.toLong())
         val displayBody = displayResult.body
+        val tapback = ReactionHelper.parseTapback(displayBody)
+        if (tapback != null) {
+            val sender = address
+            val target = ReactionHelper.findTargetMessage(context.getMessages(mms.threadId), tapback.targetText, false)
+            if (target != null) {
+                ReactionHelper.applyTapback(
+                    context = context,
+                    targetMessageId = target.id,
+                    threadId = target.threadId,
+                    sender = sender,
+                    isMine = false,
+                    type = tapback.type,
+                    isRemoval = tapback.isRemoval
+                )
+            }
+            context.markMessageRead(mms.id, isMMS = true)
+            refreshMessages()
+            refreshConversations()
+            return
+        }
         val isKnownContact = senderName != address
         val isBlocked = MessageCategorizer.isBlockedMessage(context, address, displayBody, isKnownContact)
         val category = MessageCategorizer.categorizeMessage(context, address, displayBody, isKnownContact, isBlocked)
