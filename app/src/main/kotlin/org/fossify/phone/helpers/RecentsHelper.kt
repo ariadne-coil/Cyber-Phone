@@ -6,12 +6,12 @@ import android.content.Context
 import android.provider.CallLog.Calls
 import android.provider.CallLog.Calls.PRESENTATION_UNAVAILABLE
 import android.provider.CallLog.Calls.PRESENTATION_UNKNOWN
-import android.telephony.PhoneNumberUtils
 import org.fossify.commons.extensions.*
 import org.fossify.commons.helpers.*
 import org.fossify.commons.models.contacts.Contact
 import org.fossify.phone.R
 import org.fossify.phone.activities.SimpleActivity
+import org.fossify.phone.extensions.arePhoneNumbersEquivalent
 import org.fossify.phone.extensions.getAvailableSIMCardLabels
 import org.fossify.phone.models.RecentCall
 import org.fossify.phone.models.SIMAccount
@@ -97,8 +97,11 @@ class RecentsHelper(private val context: Context) {
 
         if (differentSim || differentDay || namesAreBothRealAndDifferent) return false
 
-        @Suppress("DEPRECATION")
-        return PhoneNumberUtils.compare(callA.phoneNumber, callB.phoneNumber)
+        return arePhoneNumbersEquivalent(
+            callA.phoneNumber,
+            callB.phoneNumber,
+            comparableLength = COMPARABLE_PHONE_NUMBER_LENGTH
+        )
     }
 
     private fun groupSubsequentCalls(calls: List<RecentCall>): List<RecentCall> {

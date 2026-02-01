@@ -31,6 +31,7 @@ fun Context.getSendMessageSettings(): Settings {
     return settings
 }
 
+@Suppress("DEPRECATION")
 fun Context.isLongMmsMessage(text: String, settings: Settings = getSendMessageSettings()): Boolean {
     val data = SmsMessage.calculateLength(text, false)
     val numPages = data.first()
@@ -38,6 +39,7 @@ fun Context.isLongMmsMessage(text: String, settings: Settings = getSendMessageSe
 }
 
 /** Sends the message using the in-app SmsManager API wrappers if it's an SMS or using android-smsmms for MMS. */
+@Suppress("DEPRECATION")
 fun Context.sendMessageCompat(
     text: String,
     addresses: List<String>,

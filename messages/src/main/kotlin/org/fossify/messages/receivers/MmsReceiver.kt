@@ -61,7 +61,7 @@ class MmsReceiver : MmsReceivedReceiver() {
                 .asBitmap()
                 .load(mms.attachment!!.attachments.first().getUri())
                 .centerCrop()
-                .into(size, size)
+                .submit(size, size)
                 .get()
         } catch (e: Exception) {
             null

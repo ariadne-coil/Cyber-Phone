@@ -56,7 +56,7 @@ class SearchResultsAdapter(
 
     fun updateItems(newItems: ArrayList<SearchResult>, highlightText: String = "") {
         if (newItems.hashCode() != searchResults.hashCode()) {
-            searchResults = newItems.clone() as ArrayList<SearchResult>
+            searchResults = ArrayList(newItems)
             textToHighlight = highlightText
             notifyDataSetChanged()
         } else if (textToHighlight != highlightText) {

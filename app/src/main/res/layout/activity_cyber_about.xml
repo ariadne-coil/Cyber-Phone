@@ -34,24 +34,116 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:padding="@dimen/activity_margin">
+
+                <ImageView
+                    android:id="@+id/about_app_icon"
+                    android:layout_width="96dp"
+                    android:layout_height="96dp"
+                    android:contentDescription="@string/about_app_icon"
+                    android:src="@mipmap/ic_launcher" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/about_version"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/normal_margin"
+                    android:text="@string/about_version_placeholder" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:padding="@dimen/activity_margin">
+
+                <ImageView
+                    android:id="@+id/about_ariadne_image"
+                    android:layout_width="160dp"
+                    android:layout_height="160dp"
+                    android:adjustViewBounds="true"
+                    android:contentDescription="@string/about_ariadne_name"
+                    android:src="@drawable/ariadne_cyber" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/about_ariadne_name"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/normal_margin"
+                    android:text="@string/about_ariadne_name" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/about_author_link"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/normal_margin"
+                    android:autoLink="web"
+                    android:linksClickable="true"
+                    android:text="@string/about_author_text" />
+            </LinearLayout>
+
             <TextView
                 style="@style/SettingsSectionLabelStyle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/about_author_title" />
+                android:text="@string/about_features_title" />
 
             <org.fossify.commons.views.MyTextView
-                android:id="@+id/about_author_link"
                 style="@style/SettingsTextLabelStyle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:autoLink="web"
-                android:linksClickable="true"
-                android:paddingEnd="@dimen/activity_margin"
                 android:paddingStart="@dimen/activity_margin"
-                android:text="@string/about_author_text" />
+                android:paddingEnd="@dimen/activity_margin"
+                android:text="@string/about_feature_1" />
 
-            <include layout="@layout/divider" />
+            <org.fossify.commons.views.MyTextView
+                style="@style/SettingsTextLabelStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="@dimen/activity_margin"
+                android:paddingEnd="@dimen/activity_margin"
+                android:text="@string/about_feature_2" />
+
+            <org.fossify.commons.views.MyTextView
+                style="@style/SettingsTextLabelStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="@dimen/activity_margin"
+                android:paddingEnd="@dimen/activity_margin"
+                android:text="@string/about_feature_3" />
+
+            <org.fossify.commons.views.MyTextView
+                style="@style/SettingsTextLabelStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="@dimen/activity_margin"
+                android:paddingEnd="@dimen/activity_margin"
+                android:text="@string/about_feature_4" />
+
+            <org.fossify.commons.views.MyTextView
+                style="@style/SettingsTextLabelStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="@dimen/activity_margin"
+                android:paddingEnd="@dimen/activity_margin"
+                android:text="@string/about_feature_5" />
+
+            <org.fossify.commons.views.MyTextView
+                style="@style/SettingsTextLabelStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="@dimen/activity_margin"
+                android:paddingEnd="@dimen/activity_margin"
+                android:text="@string/about_feature_6" />
 
             <TextView
                 style="@style/SettingsSectionLabelStyle"

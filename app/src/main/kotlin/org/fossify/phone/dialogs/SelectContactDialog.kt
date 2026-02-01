@@ -60,7 +60,6 @@ class SelectContactDialog(val activity: SimpleActivity, val contacts: List<Conta
         updateHintText(context.getString(R.string.search_contacts))
         binding.topToolbarSearch.imeOptions = EditorInfo.IME_ACTION_DONE
 
-        toggleHideOnScroll(true)
         setupMenu()
         setSearchViewListeners()
         updateSearchViewUi()

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.10 (2026-02-01)
+- Refined About screen layout with dynamic version, Ariadne artwork, and updated feature list.
+- Updated launcher monochrome icon handling and resized Ariadne asset for smaller APK footprint.
+- Resolved build warnings and modernized deprecated Android/Kotlin APIs across app and messages modules.
+
 ## v0.1.2 (2026-01-31)
 - Added Tapback-compatible message reactions (send + receive) with per-message emoji rendering.
 - Added compact reaction picker (single-row emoji bar) for received messages only.

@@ -392,6 +392,7 @@ object E2eManager {
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun upsertContactKeyImData(
         resolver: android.content.ContentResolver,
         rawId: Long,
@@ -444,6 +445,7 @@ object E2eManager {
         return resolver.delete(ContactsContract.Data.CONTENT_URI, selection, selectionArgs) > 0
     }
 
+    @Suppress("DEPRECATION")
     private fun getContactKeyFromImData(
         resolver: android.content.ContentResolver,
         rawId: Long?,
@@ -472,6 +474,7 @@ object E2eManager {
         }?.takeIf { it.isNotBlank() }
     }
 
+    @Suppress("DEPRECATION")
     private fun buildImSelection(idColumn: String, idValue: String): Pair<String, Array<String>> {
         val selection = buildString {
             append("${ContactsContract.Data.MIMETYPE}=?")

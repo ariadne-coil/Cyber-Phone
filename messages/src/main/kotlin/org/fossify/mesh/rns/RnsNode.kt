@@ -237,7 +237,8 @@ object RnsNode {
             return
         }
 
-        val destHash = packet.destination?.hash ?: return
+        val destination = packet.destination ?: return
+        val destHash = destination.hash
         val destKey = RnsHex.encode(destHash)
 
         if (packet.packetType == RnsPacket.ANNOUNCE) {
@@ -250,7 +251,7 @@ object RnsNode {
             return
         }
 
-        if (packet.destination?.type == RnsDestination.LINK) {
+        if (destination.type == RnsDestination.LINK) {
             handleLinkPacket(packet, iface)
             return
         }

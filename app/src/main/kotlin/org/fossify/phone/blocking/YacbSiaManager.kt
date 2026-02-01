@@ -167,17 +167,15 @@ object YacbSiaManager {
                 val ratingParam = params[1]
                 try {
                     when {
-                        ratingParam == Int::class.javaPrimitiveType || ratingParam == Integer::class.java ->
+                        ratingParam == Int::class.javaPrimitiveType || ratingParam == Int::class.javaObjectType ->
                             method.invoke(ws, number, ratingInt)
 
                         ratingParam == String::class.java ->
                             method.invoke(ws, number, rating.name)
 
                         ratingParam.isEnum -> {
-                            val enumValue = java.lang.Enum.valueOf(
-                                ratingParam as Class<out Enum<*>>,
-                                rating.name
-                            )
+                            val enumClass = ratingParam.asSubclass(Enum::class.java)
+                            val enumValue = java.lang.Enum.valueOf(enumClass, rating.name)
                             method.invoke(ws, number, enumValue)
                         }
                     }

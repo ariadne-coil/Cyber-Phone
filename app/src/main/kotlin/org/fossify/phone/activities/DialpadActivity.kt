@@ -7,7 +7,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.provider.Telephony.Sms.Intents.SECRET_CODE_ACTION
 import android.telephony.TelephonyManager
 import android.util.TypedValue
 import android.view.KeyEvent
@@ -304,7 +303,7 @@ class DialpadActivity : SimpleActivity() {
                 }
             } else {
                 val intent =
-                    Intent(SECRET_CODE_ACTION, "android_secret_code://$secretCode".toUri())
+                    Intent("android.provider.Telephony.SECRET_CODE", "android_secret_code://$secretCode".toUri())
                 sendBroadcast(intent)
             }
             return

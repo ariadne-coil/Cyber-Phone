@@ -21,6 +21,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import androidx.appcompat.content.res.AppCompatResources
+import org.fossify.phone.activities.MainActivity
 import org.fossify.commons.dialogs.PermissionRequiredDialog
 import org.fossify.commons.extensions.adjustAlpha
 import org.fossify.commons.extensions.appLaunched
@@ -253,7 +254,6 @@ class MessagesFragment(
 
     private fun setupOptionsMenu() {
         binding.mainMenu.requireToolbar().inflateMenu(R.menu.menu_main)
-        binding.mainMenu.toggleHideOnScroll(true)
         binding.mainMenu.setupMenu()
 
         binding.mainMenu.onSearchClosedListener = {
@@ -365,7 +365,7 @@ class MessagesFragment(
                     askPermissions()
                 } else {
                     val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_SMS)
-                    host.startActivityForResult(intent, REQUEST_CODE_SET_DEFAULT_SMS)
+                    (host as? MainActivity)?.launchDefaultSmsRoleIntent(intent)
                 }
             } else {
                 host.toast(org.fossify.commons.R.string.unknown_error_occurred)
@@ -376,7 +376,7 @@ class MessagesFragment(
             } else {
                 val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
                 intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, host.packageName)
-                host.startActivityForResult(intent, REQUEST_CODE_SET_DEFAULT_SMS)
+                (host as? MainActivity)?.launchDefaultSmsRoleIntent(intent)
             }
         }
     }

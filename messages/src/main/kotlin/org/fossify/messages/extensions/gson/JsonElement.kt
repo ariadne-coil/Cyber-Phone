@@ -47,7 +47,7 @@ val JsonElement.optJsonNull: JsonNull?
     get() = safeConversion { asJsonNull }
 
 val JsonElement.optCharacter: Char?
-    get() = safeConversion { asCharacter }
+    get() = safeConversion { asString.firstOrNull() }
 
 private fun <T> JsonElement.safeConversion(converter: () -> T?): T? {
 

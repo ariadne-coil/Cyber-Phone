@@ -135,7 +135,7 @@ class NotificationHelper(private val context: Context) {
         val otpCode = MessageCategorizer.extractOtp(body)
         val isOtpMessage = otpCode != null && MessageCategorizer.isOtpMessage(body)
         val builder = NotificationCompat.Builder(context, notificationChannelId).apply {
-            if (isOtpMessage && otpCode != null) {
+            if (isOtpMessage) {
                 val otpSender = resolveOtpSender(address, sender)
                 val styledOtp = SpannableString(otpCode).apply {
                     setSpan(StyleSpan(Typeface.BOLD), 0, otpCode.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
@@ -178,7 +178,7 @@ class NotificationHelper(private val context: Context) {
             builder.addAction(replyAction)
         }
 
-        if (isOtpMessage && otpCode != null) {
+        if (isOtpMessage) {
             val copyIntent = Intent(context, CopyOtpReceiver::class.java).apply {
                 action = COPY_OTP
                 putExtra(EXTRA_OTP, otpCode)

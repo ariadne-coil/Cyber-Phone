@@ -11,6 +11,7 @@ import android.content.res.ColorStateList
 import android.graphics.drawable.LayerDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
 import android.os.SystemClock
 import android.provider.ContactsContract
 import android.provider.DocumentsContract
@@ -40,9 +41,12 @@ import android.view.animation.OvershootInterpolator
 import android.view.inputmethod.EditorInfo
 import android.widget.RelativeLayout
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.core.content.ContextCompat
+import androidx.core.content.IntentCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
@@ -250,6 +254,13 @@ class ThreadActivity : SimpleActivity() {
     private var isAttachmentPickerVisible = false
 
     private val binding by viewBinding(ActivityThreadBinding::inflate)
+    private var pendingActivityResultCode: Int? = null
+    private val activityResultLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val requestCode = pendingActivityResultCode ?: return@registerForActivityResult
+            pendingActivityResultCode = null
+            handleActivityResult(requestCode, result.resultCode, result.data)
+        }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -593,8 +604,7 @@ class ThreadActivity : SimpleActivity() {
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
-        super.onActivityResult(requestCode, resultCode, resultData)
+    private fun handleActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
         if (resultCode != Activity.RESULT_OK) return
         val data = resultData?.data
         messageToResend = null
@@ -1181,7 +1191,7 @@ class ThreadActivity : SimpleActivity() {
                 val uri = intent.getStringExtra(THREAD_ATTACHMENT_URI)!!.toUri()
                 addAttachment(uri)
             } else if (intent.extras?.containsKey(THREAD_ATTACHMENT_URIS) == true) {
-                (intent.getSerializableExtra(THREAD_ATTACHMENT_URIS) as? ArrayList<Uri>)?.forEach {
+                IntentCompat.getParcelableArrayListExtra(intent, THREAD_ATTACHMENT_URIS, Uri::class.java)?.forEach {
                     addAttachment(it)
                 }
             }
@@ -1290,8 +1300,14 @@ class ThreadActivity : SimpleActivity() {
         if (availableSIMs.size > 1) {
             availableSIMs.forEachIndexed { index, subscriptionInfo ->
                 var label = subscriptionInfo.displayName?.toString() ?: ""
-                if (subscriptionInfo.number?.isNotEmpty() == true) {
-                    label += " (${subscriptionInfo.number})"
+                val simNumber = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    subscriptionManagerCompat().getPhoneNumber(subscriptionInfo.subscriptionId)
+                } else {
+                    @Suppress("DEPRECATION")
+                    subscriptionInfo.number
+                }
+                if (!simNumber.isNullOrEmpty()) {
+                    label += " ($simNumber)"
                 }
                 val simCard = SIMCard(index + 1, subscriptionInfo.subscriptionId, label)
                 availableSIMCards.add(simCard)
@@ -1686,10 +1702,13 @@ class ThreadActivity : SimpleActivity() {
     ) {
         hideKeyboard()
         try {
-            startActivityForResult(intent, requestCode)
+            pendingActivityResultCode = requestCode
+            activityResultLauncher.launch(intent)
         } catch (e: ActivityNotFoundException) {
+            pendingActivityResultCode = null
             showErrorToast(getString(error))
         } catch (e: Exception) {
+            pendingActivityResultCode = null
             showErrorToast(e)
         }
     }
@@ -2489,7 +2508,7 @@ class ThreadActivity : SimpleActivity() {
     }
 
     private fun getBottomBarColor() = if (isDynamicTheme()) {
-        resources.getColor(org.fossify.commons.R.color.you_bottom_bar_color)
+        ContextCompat.getColor(this, org.fossify.commons.R.color.you_bottom_bar_color)
     } else {
         getBottomNavigationBackgroundColor()
     }

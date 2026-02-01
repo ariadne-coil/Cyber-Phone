@@ -8,6 +8,7 @@ import android.provider.ContactsContract
 import android.telecom.PhoneAccount
 import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
+import androidx.core.content.IntentCompat
 import org.fossify.commons.R
 import org.fossify.commons.activities.BaseSimpleActivity
 import org.fossify.commons.dialogs.CallConfirmationDialog
@@ -159,7 +160,16 @@ fun SimpleActivity.getHandleToUse(
             when {
                 forceSimSelector -> showSelectSimDialog(phoneNumber, callback)
                 intent?.hasExtra(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE) == true -> {
-                    callback(intent.getParcelableExtra(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE)!!)
+                    val handle = IntentCompat.getParcelableExtra(
+                        intent,
+                        TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE,
+                        PhoneAccountHandle::class.java
+                    )
+                    if (handle != null) {
+                        callback(handle)
+                    } else {
+                        showSelectSimDialog(phoneNumber, callback)
+                    }
                 }
 
                 config.getCustomSIM(phoneNumber) != null -> {

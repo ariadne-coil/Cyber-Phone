@@ -1,7 +1,10 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import java.io.ByteArrayOutputStream
 import org.jetbrains.kotlin.konan.properties.Properties
 import java.io.FileInputStream
+import org.gradle.api.internal.ProcessOperations
+import org.gradle.process.ExecSpec
 
 plugins {
     alias(libs.plugins.android)
@@ -13,6 +16,21 @@ val keystorePropertiesFile: File = rootProject.file("keystore.properties")
 val keystoreProperties = Properties()
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
+fun gitVersionName(): String? {
+    return try {
+        val output = ByteArrayOutputStream()
+        (project as ProcessOperations).exec {
+            commandLine("git", "describe", "--tags", "--dirty", "--always")
+            standardOutput = output
+            isIgnoreExitValue = true
+            workingDir = rootProject.projectDir
+        }
+        output.toString().trim().ifBlank { null }
+    } catch (_: Exception) {
+        null
+    }
 }
 
 fun hasSigningVars(): Boolean {
@@ -29,7 +47,7 @@ android {
         applicationId = project.property("APP_ID").toString()
         minSdk = project.libs.versions.app.build.minimumSDK.get().toInt()
         targetSdk = project.libs.versions.app.build.targetSDK.get().toInt()
-        versionName = project.property("VERSION_NAME").toString()
+        versionName = gitVersionName() ?: project.property("VERSION_NAME").toString()
         versionCode = project.property("VERSION_CODE").toString().toInt()
     }
 
@@ -73,10 +91,6 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
-    }
-
-    sourceSets {
-        getByName("main").java.srcDirs("src/main/kotlin")
     }
 
     compileOptions {

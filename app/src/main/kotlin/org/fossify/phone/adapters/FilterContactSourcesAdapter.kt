@@ -71,7 +71,10 @@ class FilterContactSourcesAdapter(
         }
 
         private fun viewClicked(select: Boolean, contactSource: ContactSource) {
-            toggleItemSelection(select, contactSource, adapterPosition)
+            val position = bindingAdapterPosition
+            if (position != RecyclerView.NO_POSITION) {
+                toggleItemSelection(select, contactSource, position)
+            }
         }
     }
 }

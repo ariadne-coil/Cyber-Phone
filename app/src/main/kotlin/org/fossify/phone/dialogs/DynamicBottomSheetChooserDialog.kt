@@ -2,6 +2,7 @@ package org.fossify.phone.dialogs
 
 import android.os.Bundle
 import android.view.ViewGroup
+import androidx.core.os.BundleCompat
 import androidx.fragment.app.FragmentManager
 import org.fossify.commons.adapters.SimpleListItemAdapter
 import org.fossify.commons.fragments.BaseBottomSheetDialogFragment
@@ -21,9 +22,10 @@ class DynamicBottomSheetChooserDialog : BaseBottomSheetDialogFragment() {
     }
 
     private fun setupRecyclerView() {
-        @Suppress("UNCHECKED_CAST")
-        val listItems = arguments?.getParcelableArray(ITEMS) as Array<SimpleListItem>
-        getRecyclerViewAdapter().submitList(listItems.toList())
+        val listItems = arguments?.let { bundle ->
+            BundleCompat.getParcelableArrayList(bundle, ITEMS, SimpleListItem::class.java)
+        } ?: arrayListOf()
+        getRecyclerViewAdapter().submitList(listItems)
     }
 
     private fun getRecyclerViewAdapter(): SimpleListItemAdapter {
@@ -58,7 +60,7 @@ class DynamicBottomSheetChooserDialog : BaseBottomSheetDialogFragment() {
                 if (title != null) {
                     putInt(BOTTOM_SHEET_TITLE, title)
                 }
-                putParcelableArray(ITEMS, items)
+                putParcelableArrayList(ITEMS, ArrayList(items.toList()))
             }
             return DynamicBottomSheetChooserDialog().apply {
                 arguments = extras

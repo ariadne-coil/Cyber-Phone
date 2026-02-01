@@ -3,8 +3,10 @@ package org.fossify.phone.helpers
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.*
+import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
 import android.net.Uri
-import android.provider.MediaStore
+import android.os.Build
 import android.util.Size
 import org.fossify.commons.helpers.isQPlus
 import org.fossify.phone.R
@@ -21,10 +23,15 @@ class CallContactAvatarHelper(private val context: Context) {
                 bitmap = if (isQPlus()) {
                     val tmbSize = context.resources.getDimension(R.dimen.list_avatar_size).toInt()
                     contentResolver.loadThumbnail(photoUri, Size(tmbSize, tmbSize), null)
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val source = ImageDecoder.createSource(contentResolver, photoUri)
+                    ImageDecoder.decodeBitmap(source)
                 } else {
-                    MediaStore.Images.Media.getBitmap(contentResolver, photoUri)
+                    contentResolver.openInputStream(photoUri)?.use { BitmapFactory.decodeStream(it) }
                 }
-                bitmap = getCircularBitmap(bitmap!!)
+                if (bitmap != null) {
+                    bitmap = getCircularBitmap(bitmap)
+                }
             } catch (ignored: Exception) {
                 return null
             }

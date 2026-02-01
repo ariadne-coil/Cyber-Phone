@@ -2,6 +2,7 @@ package org.fossify.phone.helpers
 
 import android.annotation.SuppressLint
 import android.os.Handler
+import android.os.Looper
 import android.telecom.Call
 import android.telecom.CallAudioState
 import android.telecom.InCallService
@@ -96,22 +97,20 @@ class CallManager {
             }
         }
 
-        private fun getCallAudioState() = inCallService?.callAudioState
+        @Suppress("DEPRECATION")
+        private fun getCallAudioState(): CallAudioState? = inCallService?.callAudioState
 
         fun getSupportedAudioRoutes(): Array<AudioRoute> {
-            return AudioRoute.values().filter {
-                val supportedRouteMask = getCallAudioState()?.supportedRouteMask
-                if (supportedRouteMask != null) {
-                    supportedRouteMask and it.route == it.route
-                } else {
-                    false
-                }
-            }.toTypedArray()
+            val supportedRouteMask = getCallAudioState()?.supportedRouteMask ?: return emptyArray()
+            return AudioRoute.values()
+                .filter { supportedRouteMask and it.route == it.route }
+                .toTypedArray()
         }
 
-        fun getCallAudioRoute() = AudioRoute.fromRoute(getCallAudioState()?.route)
+        fun getCallAudioRoute(): AudioRoute? = AudioRoute.fromRoute(getCallAudioState()?.route)
 
         fun setAudioRoute(newRoute: Int) {
+            @Suppress("DEPRECATION")
             inCallService?.setAudioRoute(newRoute)
         }
 
@@ -203,10 +202,11 @@ class CallManager {
 
         fun keypad(char: Char) {
             call?.playDtmfTone(char)
-            Handler().postDelayed({
+            Handler(Looper.getMainLooper()).postDelayed({
                 call?.stopDtmfTone()
             }, DIALPAD_TONE_LENGTH_MS)
         }
+
     }
 }
 

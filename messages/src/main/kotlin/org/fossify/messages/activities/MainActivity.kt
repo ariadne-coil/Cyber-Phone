@@ -10,6 +10,7 @@ import android.graphics.drawable.LayerDrawable
 import android.os.Bundle
 import android.provider.Telephony
 import android.text.TextUtils
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import org.fossify.commons.dialogs.PermissionRequiredDialog
@@ -82,8 +83,6 @@ import org.greenrobot.eventbus.ThreadMode
 
 class MainActivity : SimpleActivity() {
     override var isSearchBarEnabled = true
-    
-    private val MAKE_DEFAULT_APP_REQUEST = 1
 
     private var storedTextColor = 0
     private var storedFontSize = 0
@@ -91,6 +90,14 @@ class MainActivity : SimpleActivity() {
     private var bus: EventBus? = null
 
     private val binding by viewBinding(ActivityMainBinding::inflate)
+    private val requestDefaultAppLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                askPermissions()
+            } else {
+                finish()
+            }
+        }
 
     @SuppressLint("InlinedApi")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -166,7 +173,6 @@ class MainActivity : SimpleActivity() {
 
     private fun setupOptionsMenu() {
         binding.mainMenu.requireToolbar().inflateMenu(R.menu.menu_main)
-        binding.mainMenu.toggleHideOnScroll(true)
         binding.mainMenu.setupMenu()
 
         binding.mainMenu.onSearchClosedListener = {
@@ -208,17 +214,6 @@ class MainActivity : SimpleActivity() {
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
-        super.onActivityResult(requestCode, resultCode, resultData)
-        if (requestCode == MAKE_DEFAULT_APP_REQUEST) {
-            if (resultCode == RESULT_OK) {
-                askPermissions()
-            } else {
-                finish()
-            }
-        }
-    }
-
     private fun storeStateVariables() {
         storedTextColor = getProperTextColor()
         storedFontSize = config.fontSize
@@ -236,7 +231,7 @@ class MainActivity : SimpleActivity() {
                     askPermissions()
                 } else {
                     val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_SMS)
-                    startActivityForResult(intent, MAKE_DEFAULT_APP_REQUEST)
+                    requestDefaultAppLauncher.launch(intent)
                 }
             } else {
                 toast(org.fossify.commons.R.string.unknown_error_occurred)
@@ -248,7 +243,7 @@ class MainActivity : SimpleActivity() {
             } else {
                 val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
                 intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
-                startActivityForResult(intent, MAKE_DEFAULT_APP_REQUEST)
+                requestDefaultAppLauncher.launch(intent)
             }
         }
     }

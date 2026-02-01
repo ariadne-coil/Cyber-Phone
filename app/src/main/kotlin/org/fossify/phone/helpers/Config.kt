@@ -9,6 +9,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import org.fossify.commons.helpers.BaseConfig
 import org.fossify.phone.extensions.getPhoneAccountHandleModel
+import org.fossify.phone.extensions.arePhoneNumbersEquivalent
 import org.fossify.phone.extensions.putPhoneAccountHandle
 import org.fossify.phone.models.SpeedDial
 import androidx.core.content.edit
@@ -63,8 +64,7 @@ class Config(context: Context) : BaseConfig(context) {
             .filterIsInstance<String>()
             .filter { it.startsWith(REMEMBER_SIM_PREFIX) }
             .firstOrNull {
-                @Suppress("DEPRECATION")
-                PhoneNumberUtils.compare(
+                arePhoneNumbersEquivalent(
                     it.removePrefix(REMEMBER_SIM_PREFIX),
                     normalizeCustomSIMNumber(number)
                 )

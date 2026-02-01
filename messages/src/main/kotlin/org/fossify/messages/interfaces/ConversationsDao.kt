@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RewriteQueriesToDropUnusedColumns
 import org.fossify.messages.models.Conversation
 import org.fossify.messages.models.ConversationWithSnippetOverride
 
@@ -34,6 +35,7 @@ interface ConversationsDao {
             ") " +
             "ORDER BY conversations.date DESC"
     )
+    @RewriteQueriesToDropUnusedColumns
     fun getNonArchivedMainWithLatestSnippet(): List<ConversationWithSnippetOverride>
 
     fun getNonArchivedMain(): List<Conversation> {
@@ -51,6 +53,7 @@ interface ConversationsDao {
             "WHERE archived = 0 AND message_category_cache.category = 1 " +
             "ORDER BY conversations.date DESC"
     )
+    @RewriteQueriesToDropUnusedColumns
     fun getNonArchivedOtpWithLatestSnippet(): List<ConversationWithSnippetOverride>
 
     fun getNonArchivedOtp(): List<Conversation> {
@@ -68,6 +71,7 @@ interface ConversationsDao {
             "WHERE archived = 0 AND message_category_cache.category = 2 AND message_category_cache.is_blocked = 1 " +
             "ORDER BY conversations.date DESC"
     )
+    @RewriteQueriesToDropUnusedColumns
     fun getNonArchivedSpamWithLatestSnippet(): List<ConversationWithSnippetOverride>
 
     fun getNonArchivedSpam(): List<Conversation> {

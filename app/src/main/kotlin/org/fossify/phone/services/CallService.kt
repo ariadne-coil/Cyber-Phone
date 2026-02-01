@@ -3,6 +3,7 @@ package org.fossify.phone.services
 import android.telecom.Call
 import android.telecom.CallAudioState
 import android.telecom.InCallService
+import android.os.Build
 import org.fossify.commons.extensions.canUseFullScreenIntent
 import org.fossify.commons.extensions.hasPermission
 import org.fossify.commons.helpers.PERMISSION_POST_NOTIFICATIONS
@@ -93,13 +94,14 @@ class CallService : InCallService() {
         EventBus.getDefault().post(Events.RefreshCallLog)
     }
 
-    @Suppress("DEPRECATION")
+    @Deprecated("Use onCallEndpointChanged on newer platforms.")
     override fun onCallAudioStateChanged(audioState: CallAudioState?) {
         super.onCallAudioStateChanged(audioState)
         if (audioState != null) {
             CallManager.onAudioStateChanged(audioState)
         }
     }
+
 
     override fun onDestroy() {
         super.onDestroy()

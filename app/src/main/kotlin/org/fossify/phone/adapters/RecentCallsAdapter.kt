@@ -2,6 +2,7 @@ package org.fossify.phone.adapters
 
 import android.annotation.SuppressLint
 import android.graphics.drawable.Drawable
+import androidx.core.content.ContextCompat
 import android.provider.CallLog.Calls
 import android.text.SpannableString
 import android.text.TextUtils
@@ -83,7 +84,7 @@ class RecentCallsAdapter(
     private lateinit var incomingMissedCallIcon: Drawable
     var fontSize: Float = activity.getTextSize()
     private val areMultipleSIMsAvailable = activity.areMultipleSIMsAvailable()
-    private var missedCallColor = resources.getColor(R.color.color_missed_call)
+    private var missedCallColor = ContextCompat.getColor(activity, R.color.color_missed_call)
     private var secondaryTextColor = textColor.adjustAlpha(0.6f)
     private var textToHighlight = ""
     private var durationPadding = resources.getDimension(R.dimen.normal_margin).toInt()

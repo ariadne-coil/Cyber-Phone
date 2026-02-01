@@ -5,17 +5,11 @@ import android.telecom.Call.STATE_CONNECTING
 import android.telecom.Call.STATE_DIALING
 import android.telecom.Call.STATE_SELECT_PHONE_ACCOUNT
 import org.fossify.commons.helpers.isQPlus
-import org.fossify.commons.helpers.isSPlus
 
 private val OUTGOING_CALL_STATES = arrayOf(STATE_CONNECTING, STATE_DIALING, STATE_SELECT_PHONE_ACCOUNT)
 
-@Suppress("DEPRECATION")
 fun Call?.getStateCompat(): Int {
-    return when {
-        this == null -> Call.STATE_DISCONNECTED
-        isSPlus() -> details.state
-        else -> state
-    }
+    return this?.details?.state ?: Call.STATE_DISCONNECTED
 }
 
 fun Call?.getCallDuration(): Int {

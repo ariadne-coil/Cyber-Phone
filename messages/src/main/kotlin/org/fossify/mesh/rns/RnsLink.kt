@@ -215,7 +215,7 @@ class RnsLink private constructor(
 
     fun validateProof(packet: RnsPacket): Double? {
         if (!initiator) return null
-        if (destination?.identity == null) return null
+        val identity = destination?.identity ?: return null
         val data = packet.data
         if (data.size != SIG_SIZE + X25519_PUB_SIZE && data.size != SIG_SIZE + X25519_PUB_SIZE + LINK_MTU_SIZE) {
             return null
@@ -232,14 +232,14 @@ class RnsLink private constructor(
         val truncated = data.copyOfRange(0, baseSize)
         val signature = truncated.copyOfRange(0, SIG_SIZE)
         val peerPub = truncated.copyOfRange(SIG_SIZE, baseSize)
-        val peerSigPub = destination.identity!!.ed25519Public
+        val peerSigPub = identity.ed25519Public
 
         peerPubBytes = peerPub
         peerSigPubBytes = peerSigPub
         handshake()
 
         val signedData = linkId + peerPub + peerSigPub + signalling
-        val valid = destination.identity!!.verify(signedData, signature)
+        val valid = identity.verify(signedData, signature)
         if (!valid) return null
 
         if (confirmedMtu != null) {

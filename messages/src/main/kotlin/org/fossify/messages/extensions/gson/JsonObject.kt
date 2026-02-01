@@ -41,5 +41,4 @@ fun JsonObject.optShort(key: String) = optGet(key)?.asShort
 
 fun JsonObject.optJsonNull(key: String) = optGet(key)?.asJsonNull
 
-fun JsonObject.optCharacter(key: String) = optGet(key)?.asCharacter
-
+fun JsonObject.optCharacter(key: String) = optGet(key)?.asString?.firstOrNull()

@@ -138,6 +138,17 @@
     <string name="about_author_text">https://ariadnecyber.substack.com/</string>
     <string name="about_ack_title">Acknowledgements</string>
     <string name="about_ack_text">Fossify Phone\nFossify Messages\nFossify Commons\nYet Another Call Blocker</string>
+    <string name="about_app_icon">App icon</string>
+    <string name="about_version_placeholder">Version</string>
+    <string name="about_version_format">Version %1$s</string>
+    <string name="about_ariadne_name">Ariadne Cyber</string>
+    <string name="about_features_title">Key features</string>
+    <string name="about_feature_1">- Caller ID and spam protection</string>
+    <string name="about_feature_2">- Fast dialer with smart contact search</string>
+    <string name="about_feature_3">- SMS/MMS with attachments and scheduling</string>
+    <string name="about_feature_4">- End-to-end encrypted conversations</string>
+    <string name="about_feature_5">- Mesh networking support</string>
+    <string name="about_feature_6">- Customizable themes and privacy controls</string>
     <!--
         Haven't found some strings? There's more at
         https://github.com/FossifyOrg/Commons/tree/master/commons/src/main/res

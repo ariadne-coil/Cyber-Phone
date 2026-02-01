@@ -10,11 +10,14 @@ import android.graphics.drawable.Icon
 import android.graphics.drawable.LayerDrawable
 import android.os.Bundle
 import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.coordinatorlayout.widget.CoordinatorLayout
+import androidx.core.content.ContextCompat
 import androidx.viewpager.widget.ViewPager
 import com.google.android.material.snackbar.Snackbar
 import me.grantland.widget.AutofitHelper
@@ -61,6 +64,13 @@ class MainActivity : SimpleActivity() {
     private var storedStartNameWithSurname = false
     private var mainHolderBehavior: CoordinatorLayout.Behavior<*>? = null
     var cachedContacts = ArrayList<Contact>()
+    private val setDefaultSmsLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            getMessagesFragment()?.handleActivityResult(
+                MessagesFragment.REQUEST_CODE_SET_DEFAULT_SMS,
+                result.resultCode
+            )
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -152,7 +162,7 @@ class MainActivity : SimpleActivity() {
         }
 
         checkShortcuts()
-        Handler().postDelayed({
+        Handler(Looper.getMainLooper()).postDelayed({
             getRecentsFragment()?.refreshItems()
         }, 2000)
     }
@@ -219,7 +229,6 @@ class MainActivity : SimpleActivity() {
     private fun setupOptionsMenu() {
         binding.mainMenu.apply {
             requireToolbar().inflateMenu(R.menu.menu)
-            toggleHideOnScroll(false)
             setupMenu()
 
             onSearchClosedListener = {
@@ -317,7 +326,7 @@ class MainActivity : SimpleActivity() {
     @SuppressLint("NewApi")
     private fun getLaunchDialpadShortcut(appIconColor: Int): ShortcutInfo {
         val newEvent = getString(R.string.dialpad)
-        val drawable = resources.getDrawable(R.drawable.shortcut_dialpad)
+        val drawable = ContextCompat.getDrawable(this, R.drawable.shortcut_dialpad)
         (drawable as LayerDrawable).findDrawableByLayerId(R.id.shortcut_dialpad_background).applyColorFilter(appIconColor)
         val bmp = drawable.convertToBitmap()
 
@@ -373,7 +382,7 @@ class MainActivity : SimpleActivity() {
 
         // selecting the proper tab sometimes glitches, add an extra selector to make sure we have it right
         binding.mainTabsHolder.onGlobalLayout {
-            Handler().postDelayed({
+            Handler(Looper.getMainLooper()).postDelayed({
                 var wantedTab = getDefaultTab()
 
                 // open the Recents tab if we got here by clicking a missed call notification
@@ -446,6 +455,10 @@ class MainActivity : SimpleActivity() {
         binding.mainTabsHolder.beGoneIf(binding.mainTabsHolder.tabCount == 1)
         storedShowTabs = config.showTabs
         storedStartNameWithSurname = config.startNameWithSurname
+    }
+
+    fun launchDefaultSmsRoleIntent(intent: Intent) {
+        setDefaultSmsLauncher.launch(intent)
     }
 
     private fun getTabIcon(position: Int): Drawable {

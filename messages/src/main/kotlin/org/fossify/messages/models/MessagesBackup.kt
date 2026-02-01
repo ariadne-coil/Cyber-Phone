@@ -17,7 +17,7 @@ sealed class MessagesBackup {
 
 object BackupSerializer :
     JsonContentPolymorphicSerializer<MessagesBackup>(MessagesBackup::class) {
-    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<out MessagesBackup> {
+    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<MessagesBackup> {
         return when (element.jsonObject["backupType"]?.jsonPrimitive?.content) {
             "sms" -> SmsBackup.serializer()
             "mms" -> MmsBackup.serializer()

@@ -9,10 +9,10 @@ import java.lang.reflect.Type
 import kotlin.math.ceil
 
 // https://stackoverflow.com/a/36529534/10552591
-class MapDeserializerDoubleAsIntFix : JsonDeserializer<Map<String, Any>?> {
+class MapDeserializerDoubleAsIntFix : JsonDeserializer<Map<String, Any?>?> {
     @Throws(JsonParseException::class)
-    override fun deserialize(json: JsonElement, typeOfT: Type, context: JsonDeserializationContext): Map<String, Any>? {
-        return read(json) as Map<String, Any>?
+    override fun deserialize(json: JsonElement, typeOfT: Type, context: JsonDeserializationContext): Map<String, Any?>? {
+        return read(json) as? Map<String, Any?>
     }
 
     fun read(element: JsonElement): Any? {

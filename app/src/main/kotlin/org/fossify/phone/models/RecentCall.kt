@@ -1,8 +1,8 @@
 package org.fossify.phone.models
 
-import android.telephony.PhoneNumberUtils
 import org.fossify.commons.extensions.normalizePhoneNumber
 import org.fossify.phone.extensions.getDayCode
+import org.fossify.phone.extensions.arePhoneNumbersEquivalent
 
 /**
  * Used at displaying recent calls.
@@ -29,7 +29,7 @@ data class RecentCall(
     fun doesContainPhoneNumber(text: String): Boolean {
         return if (text.toLongOrNull() != null) {
             val normalizedText = text.normalizePhoneNumber()
-            PhoneNumberUtils.compare(phoneNumber.normalizePhoneNumber(), normalizedText) ||
+            arePhoneNumbersEquivalent(phoneNumber, normalizedText) ||
                     phoneNumber.contains(text) ||
                     phoneNumber.normalizePhoneNumber().contains(normalizedText) ||
                     phoneNumber.contains(normalizedText)
