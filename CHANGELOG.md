@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.11 (2026-02-02)
+- Added opt-in YACB community reputation with auto-update toggle and last-refresh status.
+- Added caller reputation line in the in-call UI (emoji + colored counts) with DB readiness messaging.
+- Added thread ID subtitle in message threads for E2E debugging.
+- Added Gradle build speedups (parallel/cache/vfs) and disabled minify for debug builds.
+
 ## v0.1.10 (2026-02-01)
 - Refined About screen layout with dynamic version, Ariadne artwork, and updated feature list.
 - Updated launcher monochrome icon handling and resized Ariadne asset for smaller APK footprint.

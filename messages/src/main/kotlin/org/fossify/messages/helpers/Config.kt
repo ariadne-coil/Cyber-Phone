@@ -157,6 +157,18 @@ class Config(context: Context) : BaseConfig(context) {
         get() = prefs.getInt(SPAM_REPUTATION_THRESHOLD, SPAM_REPUTATION_BALANCED)
         set(value) = prefs.edit().putInt(SPAM_REPUTATION_THRESHOLD, value).apply()
 
+    var yacbCommunityEnabled: Boolean
+        get() = prefs.getBoolean(YACB_COMMUNITY_ENABLED, false)
+        set(value) = prefs.edit().putBoolean(YACB_COMMUNITY_ENABLED, value).apply()
+
+    var yacbLastRefresh: Long
+        get() = prefs.getLong(YACB_LAST_REFRESH, 0L)
+        set(value) = prefs.edit().putLong(YACB_LAST_REFRESH, value).apply()
+
+    var yacbAutoUpdate: Boolean
+        get() = prefs.getBoolean(YACB_AUTO_UPDATE, true)
+        set(value) = prefs.edit().putBoolean(YACB_AUTO_UPDATE, value).apply()
+
     var shortCodeFilterMode: Int
         get() = prefs.getInt(SHORT_CODE_FILTER_MODE, SHORT_CODE_FILTER_NEVER_SPAM)
         set(value) = prefs.edit().putInt(SHORT_CODE_FILTER_MODE, value).apply()

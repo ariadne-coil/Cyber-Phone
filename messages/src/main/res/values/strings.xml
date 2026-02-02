@@ -83,6 +83,7 @@
     <string name="ai_spam_model_mediapipe_bert">MediaPipe BERT (accurate)</string>
     <string name="ai_spam_model_mediapipe_average_word">MediaPipe Average Word (fast)</string>
     <string name="allow_permissions">Allow permissions to load messages</string>
+    <string name="thread_id_format">Thread ID: %1$d</string>
     <!-- Archive -->
     <string name="unarchive">Unarchive</string>
     <string name="empty_archive">Delete all archived conversations</string>

@@ -1287,6 +1287,7 @@ class ThreadActivity : SimpleActivity() {
         } else {
             participants.getThreadTitle()
         }
+        binding.threadToolbar.subtitle = getString(R.string.thread_id_format, threadId)
     }
 
     @SuppressLint("MissingPermission")

@@ -60,6 +60,25 @@ Cyber Phone integrates the Reticulum Network Stack to enable off-grid communicat
 
 *   Optional AI spam classification that runs entirely on-device and is privacy friendly
 
+## Privacy & Network Behavior
+
+Cyber Phone does not ship analytics or Play Services. Network access is only used for user-enabled features:
+
+*   **Community spam reputation (YACB)**: Optional. When enabled, the app downloads community reputation data and can submit ratings for numbers you explicitly mark as spam/not spam.
+*   **AI spam model updates**: Optional. Models are downloaded only when you select a model and trigger updates.
+*   **Mesh networking**: Optional. Only runs when Mesh mode or routing is enabled in Settings.
+
+By default, these network-backed features are disabled until you opt in.
+
+## Permissions
+
+Cyber Phone needs core telephony permissions to function as a full replacement Phone/SMS app:
+
+*   Phone + Call Log (dialer, call history, spam blocking)
+*   Contacts (integrated phonebook, caller ID, in-app editing)
+*   SMS/MMS (messaging, classification, notifications)
+*   Notifications + full-screen alerts (incoming call/message UI)
+
 ## Build the Node
 
 To compile the app:

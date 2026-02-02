@@ -20,6 +20,8 @@ import android.view.WindowManager
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import android.widget.ImageView
+import android.text.SpannableString
+import android.text.style.ForegroundColorSpan
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.os.postDelayed
 import androidx.core.view.children
@@ -39,9 +41,11 @@ import org.fossify.phone.databinding.ActivityCallBinding
 import org.fossify.phone.dialogs.DynamicBottomSheetChooserDialog
 import org.fossify.phone.extensions.*
 import org.fossify.phone.helpers.*
+import org.fossify.phone.blocking.YacbSiaManager
 import java.util.Locale
 import org.fossify.phone.models.AudioRoute
 import org.fossify.phone.models.CallContact
+import org.fossify.messages.extensions.config as messagesConfig
 import kotlin.math.max
 import kotlin.math.min
 
@@ -626,6 +630,7 @@ class CallActivity : SimpleActivity() {
     private fun updateCallerIdEnrichment(number: String) {
         if (number.isBlank()) {
             binding.callerLocation.beGone()
+            binding.callerReputation.beGone()
             return
         }
         ensureBackgroundThread {
@@ -645,9 +650,68 @@ class CallActivity : SimpleActivity() {
             }.orEmpty().trim()
             val info = listOf(location, carrier).filter { it.isNotEmpty() }.joinToString(" • ")
 
+            val yacbEnabled = messagesConfig.yacbCommunityEnabled
+            val reputationCounts = if (yacbEnabled) {
+                if (!YacbSiaManager.isCommunityDbReady()) {
+                    YacbSiaManager.ensureCommunityDbAsync(this@CallActivity)
+                    intArrayOf(-1, -1, -1)
+                } else {
+                    val normalized = number.normalizePhoneNumber().trim()
+                    val counts = if (normalized.isNotEmpty()) {
+                        YacbSiaManager.getRatingCounts(normalized)
+                    } else {
+                        null
+                    }
+                    if (counts != null && counts.size >= 3) {
+                        intArrayOf(counts[1], counts[0], counts[2])
+                    } else {
+                        intArrayOf(0, 0, 0)
+                    }
+                }
+            } else {
+                null
+            }
+
             runOnUiThread {
                 binding.callerLocation.text = info
                 binding.callerLocation.beVisibleIf(info.isNotEmpty())
+                if (reputationCounts != null) {
+                    if (reputationCounts[0] == -1 && reputationCounts[1] == -1) {
+                        binding.callerReputation.text = getString(R.string.call_reputation_db_not_ready)
+                        binding.callerReputation.beVisible()
+                    } else {
+                        val positive = reputationCounts[0]
+                        val negative = reputationCounts[1]
+                        val text = getString(R.string.call_reputation_format, positive, negative)
+                        val spannable = SpannableString(text)
+                        val posStr = positive.toString()
+                        val negStr = negative.toString()
+                        val posStart = text.indexOf(posStr)
+                        val negStart = text.indexOf(negStr)
+                        if (posStart >= 0) {
+                            val posColor = getColor(R.color.color_outgoing_call)
+                            spannable.setSpan(
+                                ForegroundColorSpan(posColor),
+                                posStart,
+                                posStart + posStr.length,
+                                SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE
+                            )
+                        }
+                        if (negStart >= 0) {
+                            val negColor = getColor(R.color.color_missed_call)
+                            spannable.setSpan(
+                                ForegroundColorSpan(negColor),
+                                negStart,
+                                negStart + negStr.length,
+                                SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE
+                            )
+                        }
+                        binding.callerReputation.text = spannable
+                        binding.callerReputation.beVisible()
+                    }
+                } else {
+                    binding.callerReputation.beGone()
+                }
             }
         }
     }

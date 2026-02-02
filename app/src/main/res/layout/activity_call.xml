@@ -113,12 +113,28 @@
         android:gravity="center_horizontal"
         android:textSize="@dimen/call_status_text_size"
         android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@id/call_status_label"
+        app:layout_constraintBottom_toTopOf="@id/caller_reputation"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/caller_number"
         android:textDirection="firstStrongLtr"
         tools:text="California • Verizon" />
+
+    <org.fossify.commons.views.MyTextView
+        android:id="@+id/caller_reputation"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/normal_margin"
+        android:alpha="0.85"
+        android:gravity="center_horizontal"
+        android:textSize="@dimen/call_status_text_size"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/call_status_label"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/caller_location"
+        android:textDirection="firstStrongLtr"
+        tools:text="Reputation: +12 • -3 • 1" />
 
     <org.fossify.commons.views.MyTextView
         android:id="@+id/call_status_label"

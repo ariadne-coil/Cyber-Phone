@@ -205,6 +205,9 @@ object MessageCategorizer {
             return true
         }
         val normalizedNumber = address.normalizePhoneNumber().trim()
+        if (!context.messagesConfig.yacbCommunityEnabled) {
+            return false
+        }
         if (!isKnownContact && allowSpamChecks && normalizedNumber.isNotEmpty()) {
             val counts = getYacbRatingCounts(context, normalizedNumber)
             if (counts != null && counts.size >= 3) {
@@ -257,6 +260,9 @@ object MessageCategorizer {
     }
 
     fun submitCommunityRating(context: Context, number: String, positive: Boolean) {
+        if (!context.messagesConfig.yacbCommunityEnabled) {
+            return
+        }
         if (!yacbLoaded.get()) {
             getYacbRating(context, number)
         }

@@ -9,6 +9,7 @@ import org.fossify.commons.extensions.normalizePhoneNumber
 import org.fossify.commons.helpers.PERMISSION_READ_CONTACTS
 import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.phone.extensions.config
+import org.fossify.messages.extensions.config as messagesConfig
 
 // Ported from YetAnotherCallBlocker (AGPL-3.0): NumberInfoService/BlacklistUtils ideas.
 class YacbBlockingEngine(private val context: Context) {
@@ -54,7 +55,8 @@ class YacbBlockingEngine(private val context: Context) {
                 return@isInContacts
             }
 
-            val rating = YacbSiaManager.getRating(normalizedNumber)
+            val yacbEnabled = context.messagesConfig.yacbCommunityEnabled
+            val rating = if (yacbEnabled) YacbSiaManager.getRating(normalizedNumber) else null
             if (config.blockNegativeRatings && rating == YacbSiaManager.Rating.NEGATIVE) {
                 callback(
                     BlockDecision(
@@ -67,7 +69,11 @@ class YacbBlockingEngine(private val context: Context) {
             }
 
             if (config.blockUnknownNumbers) {
-                val displayName = YacbSiaManager.getFeaturedName(normalizedNumber)
+                val displayName = if (yacbEnabled) {
+                    YacbSiaManager.getFeaturedName(normalizedNumber)
+                } else {
+                    null
+                }
                 callback(
                     BlockDecision(
                         shouldBlock = true,
@@ -78,7 +84,11 @@ class YacbBlockingEngine(private val context: Context) {
                 return@isInContacts
             }
 
-            val displayName = YacbSiaManager.getFeaturedName(normalizedNumber)
+            val displayName = if (yacbEnabled) {
+                YacbSiaManager.getFeaturedName(normalizedNumber)
+            } else {
+                null
+            }
             callback(
                 BlockDecision(
                     shouldBlock = false,

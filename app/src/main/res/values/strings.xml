@@ -90,6 +90,12 @@
     <string name="show_blocked_call_notifications">Show blocked call notifications</string>
     <string name="show_call_rating_notifications">Show call rating notifications</string>
     <string name="spam_reputation_threshold">Spam reputation threshold</string>
+    <string name="spam_reputation_community">Community spam reputation (YACB)</string>
+    <string name="spam_reputation_community_summary">Enable community reputation lookups and rating submissions</string>
+    <string name="spam_reputation_last_updated">Last updated: %1$s</string>
+    <string name="spam_reputation_never_updated">Never updated</string>
+    <string name="spam_reputation_downloading">Downloading…</string>
+    <string name="spam_reputation_auto_update">Auto-update community DB</string>
     <string name="spam_reputation_aggressive">Aggressive (&gt;=40% negative, &gt;=3 votes)</string>
     <string name="spam_reputation_balanced">Balanced (&gt;=55% negative, &gt;=5 votes)</string>
     <string name="spam_reputation_conservative">Conservative (&gt;=70% negative, &gt;=5 votes)</string>
@@ -102,6 +108,8 @@
     <string name="call_rating_positive">Community rating: Positive</string>
     <string name="call_rating_neutral">Community rating: Neutral</string>
     <string name="call_rating_negative">Community rating: Negative</string>
+    <string name="call_reputation_format">\ud83d\udc4d %1$d   \ud83d\udc4e %2$d</string>
+    <string name="call_reputation_db_not_ready">DB not downloaded</string>
 
     <!-- Speed dial -->
     <string name="speed_dial">Speed dial</string>

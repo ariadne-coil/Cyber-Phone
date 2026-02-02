@@ -3,6 +3,7 @@ package org.fossify.phone.activities
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.text.format.DateUtils
 import android.view.Menu
 import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.serialization.SerializationException
@@ -13,6 +14,8 @@ import org.fossify.commons.dialogs.RadioGroupDialog
 import org.fossify.commons.dialogs.ConfirmationDialog
 import org.fossify.commons.dialogs.SecurityDialog
 import org.fossify.commons.extensions.baseConfig
+import org.fossify.commons.extensions.beGone
+import org.fossify.commons.extensions.beVisible
 import org.fossify.commons.extensions.beVisibleIf
 import org.fossify.commons.extensions.formatWithDeprecatedBadge
 import org.fossify.commons.extensions.getBlockedNumbers
@@ -48,6 +51,7 @@ import org.fossify.phone.helpers.TAB_MESSAGES
 import org.fossify.phone.extensions.launchAccountsConfiguration
 import org.fossify.phone.helpers.RecentsHelper
 import org.fossify.phone.models.RecentCall
+import org.fossify.phone.blocking.YacbSiaManager
 import org.fossify.messages.activities.ManageBlockedKeywordsActivity
 import org.fossify.messages.dialogs.ExportMessagesDialog
 import org.fossify.messages.extensions.config as messagesConfig
@@ -178,6 +182,8 @@ class SettingsActivity : SimpleActivity() {
         setupManageBlockedNumbers()
         setupManageBlockedKeywords()
         setupSpamReputationThreshold()
+        setupSpamReputationCommunity()
+        setupSpamReputationAutoUpdate()
         setupShortCodeFilter()
         setupAiSpamSettings()
         setupManageSpeedDial()
@@ -338,6 +344,57 @@ class SettingsActivity : SimpleActivity() {
                 settingsSpamReputationValue.text = getSpamReputationThresholdText()
                 rebuildMessageCategoryCache()
             }
+        }
+    }
+
+    private fun setupSpamReputationCommunity() = binding.apply {
+        settingsSpamReputationCommunity.isChecked = messagesConfig.yacbCommunityEnabled
+        updateYacbStatus()
+        settingsSpamReputationCommunityHolder.setOnClickListener {
+            settingsSpamReputationCommunity.toggle()
+            messagesConfig.yacbCommunityEnabled = settingsSpamReputationCommunity.isChecked
+            if (settingsSpamReputationCommunity.isChecked) {
+                updateYacbStatus(isDownloading = true)
+                YacbSiaManager.ensureCommunityDbAsync(this@SettingsActivity) { _ ->
+                    runOnUiThread { updateYacbStatus() }
+                }
+            } else {
+                YacbSiaManager.disable(this@SettingsActivity)
+                updateYacbStatus()
+            }
+            rebuildMessageCategoryCache()
+        }
+    }
+
+    private fun setupSpamReputationAutoUpdate() = binding.apply {
+        settingsSpamReputationAutoUpdate.isChecked = messagesConfig.yacbAutoUpdate
+        settingsSpamReputationAutoUpdateHolder.setOnClickListener {
+            settingsSpamReputationAutoUpdate.toggle()
+            messagesConfig.yacbAutoUpdate = settingsSpamReputationAutoUpdate.isChecked
+            YacbSiaManager.updateAutoUpdate(this@SettingsActivity)
+        }
+        settingsSpamReputationAutoUpdateHolder.beVisibleIf(messagesConfig.yacbCommunityEnabled)
+    }
+
+    private fun updateYacbStatus(isDownloading: Boolean = false) = binding.apply {
+        if (!messagesConfig.yacbCommunityEnabled) {
+            settingsSpamReputationCommunityStatus.beGone()
+            settingsSpamReputationAutoUpdateHolder.beGone()
+            return@apply
+        }
+        settingsSpamReputationCommunityStatus.beVisible()
+        settingsSpamReputationAutoUpdateHolder.beVisible()
+        settingsSpamReputationCommunityStatus.text = when {
+            isDownloading -> getString(R.string.spam_reputation_downloading)
+            messagesConfig.yacbLastRefresh > 0L -> {
+                val formatted = DateUtils.formatDateTime(
+                    this@SettingsActivity,
+                    messagesConfig.yacbLastRefresh,
+                    DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME
+                )
+                getString(R.string.spam_reputation_last_updated, formatted)
+            }
+            else -> getString(R.string.spam_reputation_never_updated)
         }
     }
 

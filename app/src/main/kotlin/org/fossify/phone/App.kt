@@ -9,6 +9,7 @@ import org.fossify.commons.FossifyApp
 import org.fossify.commons.extensions.hasPermission
 import org.fossify.commons.helpers.PERMISSION_READ_CONTACTS
 import org.fossify.mesh.MeshManager
+import org.fossify.messages.extensions.config
 import org.fossify.messages.helpers.MessagingCache
 import org.fossify.phone.blocking.YacbSiaManager
 
@@ -17,7 +18,9 @@ class App : FossifyApp() {
 
     override fun onCreate() {
         super.onCreate()
-        YacbSiaManager.init(this)
+        if (config.yacbCommunityEnabled) {
+            YacbSiaManager.init(this)
+        }
         MeshManager.sync(this)
         if (hasPermission(PERMISSION_READ_CONTACTS)) {
             listOf(

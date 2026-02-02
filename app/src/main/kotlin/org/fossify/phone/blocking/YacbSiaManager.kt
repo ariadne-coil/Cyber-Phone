@@ -8,6 +8,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequest
 import androidx.work.WorkManager
+import org.fossify.commons.helpers.ensureBackgroundThread
 import dummydomain.yetanothercallblocker.sia.Properties
 import dummydomain.yetanothercallblocker.sia.SettingsImpl
 import dummydomain.yetanothercallblocker.sia.Storage
@@ -23,6 +24,7 @@ import dummydomain.yetanothercallblocker.sia.network.OkHttpClientFactory
 import dummydomain.yetanothercallblocker.sia.network.WebService
 import dummydomain.yetanothercallblocker.sia.utils.Utils
 import okhttp3.OkHttpClient
+import org.fossify.messages.extensions.config as messagesConfig
 import java.io.FileInputStream
 import java.io.IOException
 import java.io.InputStream
@@ -43,6 +45,7 @@ object YacbSiaManager {
     private lateinit var siaMetadata: SiaMetadata
     private lateinit var dbManager: DbManager
     private var webService: WebService? = null
+    private lateinit var appContext: Context
 
     fun init(context: Context) {
         if (initialized) {
@@ -54,6 +57,7 @@ object YacbSiaManager {
             }
 
             val appContext = context.applicationContext
+            this.appContext = appContext
             val storage = AndroidStorage(appContext)
             val properties = AndroidProperties(appContext, SIA_PROPERTIES)
             val settings = SettingsImpl(properties)
@@ -119,9 +123,50 @@ object YacbSiaManager {
             )
 
             initialized = true
-            ensureMainDatabase()
-            scheduleUpdates(appContext)
+            ensureCommunityDbAsync(appContext)
+            updateAutoUpdate(appContext)
         }
+    }
+
+    fun disable(context: Context) {
+        try {
+            WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+        } catch (_: Exception) {
+        }
+        initialized = false
+        webService = null
+    }
+
+    fun updateAutoUpdate(context: Context) {
+        val appContext = context.applicationContext
+        if (appContext.messagesConfig.yacbCommunityEnabled && appContext.messagesConfig.yacbAutoUpdate) {
+            scheduleUpdates(appContext)
+        } else {
+            try {
+                WorkManager.getInstance(appContext).cancelUniqueWork(WORK_NAME)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    fun ensureCommunityDbAsync(context: Context, onFinished: ((Boolean) -> Unit)? = null) {
+        if (!initialized) {
+            init(context)
+        }
+        ensureBackgroundThread {
+            val wasReady = isCommunityDbReady()
+            ensureMainDatabase()
+            val isReady = isCommunityDbReady()
+            val appContext = context.applicationContext
+            if (!wasReady && isReady) {
+                appContext.messagesConfig.yacbLastRefresh = System.currentTimeMillis()
+            }
+            onFinished?.invoke(isReady)
+        }
+    }
+
+    fun isCommunityDbReady(): Boolean {
+        return initialized && ::communityDatabase.isInitialized && communityDatabase.isOperational
     }
 
     fun getRating(number: String): Rating? {
@@ -235,6 +280,9 @@ object YacbSiaManager {
                 communityDatabase.reload()
                 featuredDatabase.reload()
                 siaMetadata.reload()
+                if (::appContext.isInitialized) {
+                    appContext.messagesConfig.yacbLastRefresh = System.currentTimeMillis()
+                }
             }
         } catch (e: Exception) {
             Log.w("YacbSiaManager", "Main DB download failed", e)
