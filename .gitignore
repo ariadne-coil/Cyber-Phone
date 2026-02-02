@@ -19,3 +19,7 @@ fastlane/report.xml
 /tmp/
 /LXMF-0.9.3.zip
 /third_party/
+
+# Local-only reference materials
+/third_party/reticulum/
+/third_party/lxmf/
