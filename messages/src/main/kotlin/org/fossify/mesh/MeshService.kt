@@ -12,12 +12,20 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.net.wifi.WifiManager
+import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationCompat
 import org.fossify.messages.R
 import org.fossify.mesh.MeshConfig
 import org.fossify.mesh.call.MeshCallRouter
 import org.fossify.mesh.lxmf.LxmfRouter
 import org.fossify.mesh.rns.RnsNode
+import org.fossify.mesh.rns.RnsUdpInterface
+import org.fossify.mesh.wifidirect.MeshWifiDirectController
+import org.fossify.mesh.wifidirect.MeshWifiDirectState
+import org.fossify.mesh.ble.MeshBleController
+import org.fossify.mesh.rns.RnsInterface
+import org.fossify.mesh.wifiaware.MeshWifiAwareController
+import org.fossify.mesh.wifiaware.MeshWifiAwareState
 
 class MeshService : Service() {
     companion object {
@@ -40,6 +48,12 @@ class MeshService : Service() {
         }
     }
     private var multicastLock: WifiManager.MulticastLock? = null
+    private var wifiDirectController: MeshWifiDirectController? = null
+    private var wifiDirectInterfaceAdded = false
+    private var bleController: MeshBleController? = null
+    private var bleInterface: RnsInterface? = null
+    private var wifiAwareController: MeshWifiAwareController? = null
+    private var wifiAwareInterface: RnsInterface? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -65,7 +79,11 @@ class MeshService : Service() {
             RnsNode.start(this, routingEnabled)
             LxmfRouter.start(this)
             LxmfRouter.addListener(lxmfListener)
+            RnsNode.announceAll()
             MeshCallRouter.start(this)
+            startWifiDirect()
+            startBle()
+            startWifiAware()
             START_STICKY
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start mesh service", e)
@@ -79,6 +97,9 @@ class MeshService : Service() {
         LxmfRouter.removeListener(lxmfListener)
         LxmfRouter.stop()
         MeshCallRouter.stop()
+        stopWifiDirect()
+        stopBle()
+        stopWifiAware()
         RnsNode.stop()
         statusHandler.removeCallbacks(statusUpdater)
         releaseMulticastLock()
@@ -166,5 +187,112 @@ class MeshService : Service() {
         } finally {
             multicastLock = null
         }
+    }
+
+    private fun startWifiDirect() {
+        val config = MeshConfig.newInstance(this)
+        if (!config.meshWifiDirectEnabled) return
+        if (wifiDirectController != null) return
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            android.Manifest.permission.NEARBY_WIFI_DEVICES
+        } else {
+            android.Manifest.permission.ACCESS_FINE_LOCATION
+        }
+        if (ContextCompat.checkSelfPermission(this, permission) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+        wifiDirectController = MeshWifiDirectController(this) { group ->
+            if (!wifiDirectInterfaceAdded) {
+                val iface = RnsUdpInterface(
+                    name = "udp-wfd",
+                    listenPort = 4243,
+                    forwardAddress = "192.168.49.255",
+                    forwardPort = 4243
+                ) { raw, ifaceRef ->
+                    RnsNode.handleIncomingFromInterface(raw, ifaceRef)
+                }
+                RnsNode.addInterface(iface)
+                wifiDirectInterfaceAdded = true
+            }
+        }
+        wifiDirectController?.start()
+    }
+
+    private fun stopWifiDirect() {
+        wifiDirectController?.stop()
+        wifiDirectController = null
+        MeshWifiDirectState.clear()
+        if (wifiDirectInterfaceAdded) {
+            RnsNode.removeInterface("udp-wfd")
+            wifiDirectInterfaceAdded = false
+        }
+    }
+
+    private fun startBle() {
+        val config = MeshConfig.newInstance(this)
+        if (!config.meshBleEnabled) return
+        if (bleController != null) return
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            android.Manifest.permission.BLUETOOTH_CONNECT
+        } else {
+            android.Manifest.permission.ACCESS_FINE_LOCATION
+        }
+        if (ContextCompat.checkSelfPermission(this, permission) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+        bleController = MeshBleController(this) { raw ->
+            bleInterface?.let { RnsNode.handleIncomingFromInterface(raw, it) }
+        }.also { it.start() }
+        bleInterface = object : RnsInterface {
+            override val name: String = "ble"
+            override fun start() {}
+            override fun stop() {}
+            override fun send(raw: ByteArray) {
+                bleController?.send(raw)
+            }
+        }
+        bleInterface?.let { RnsNode.addInterface(it) }
+    }
+
+    private fun stopBle() {
+        bleController?.stop()
+        bleController = null
+        bleInterface?.let { RnsNode.removeInterface(it.name) }
+        bleInterface = null
+    }
+
+    private fun startWifiAware() {
+        val config = MeshConfig.newInstance(this)
+        if (!config.meshWifiAwareEnabled) return
+        if (wifiAwareController != null) return
+        if (!packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_WIFI_AWARE)) return
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            android.Manifest.permission.NEARBY_WIFI_DEVICES
+        } else {
+            android.Manifest.permission.ACCESS_FINE_LOCATION
+        }
+        if (ContextCompat.checkSelfPermission(this, permission) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+        wifiAwareController = MeshWifiAwareController(this) { raw ->
+            wifiAwareInterface?.let { RnsNode.handleIncomingFromInterface(raw, it) }
+        }.also { it.start() }
+        wifiAwareInterface = object : RnsInterface {
+            override val name: String = "wifiaware"
+            override fun start() {}
+            override fun stop() {}
+            override fun send(raw: ByteArray) {
+                wifiAwareController?.send(raw)
+            }
+        }
+        wifiAwareInterface?.let { RnsNode.addInterface(it) }
+    }
+
+    private fun stopWifiAware() {
+        wifiAwareController?.stop()
+        wifiAwareController = null
+        MeshWifiAwareState.setActive(false)
+        wifiAwareInterface?.let { RnsNode.removeInterface(it.name) }
+        wifiAwareInterface = null
     }
 }

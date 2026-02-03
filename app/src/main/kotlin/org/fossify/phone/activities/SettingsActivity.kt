@@ -79,11 +79,6 @@ import org.fossify.messages.helpers.SHORT_CODE_FILTER_NEVER_SPAM
 import org.fossify.messages.helpers.SHORT_CODE_FILTER_STANDARD
 import org.fossify.messages.helpers.AiSpamModelManager
 import org.fossify.messages.helpers.refreshConversations
-import org.fossify.mesh.MeshConfig
-import org.fossify.mesh.MeshManager
-import org.fossify.mesh.MeshMode
-import org.fossify.mesh.call.MeshCallQuality
-import org.fossify.mesh.rns.RnsNode
 import java.util.Locale
 import kotlin.system.exitProcess
 
@@ -204,10 +199,6 @@ class SettingsActivity : SimpleActivity() {
         setupDisableProximitySensor()
         setupDisableSwipeToAnswer()
         setupAlwaysShowFullscreen()
-        setupMeshMode()
-        setupMeshCallQuality()
-        setupMeshRouting()
-        setupMeshStatus()
         setupShowCharacterCounter()
         setupUseSimpleCharacters()
         setupSendOnEnter()
@@ -238,7 +229,6 @@ class SettingsActivity : SimpleActivity() {
                 settingsGeneralSettingsLabel,
                 settingsStartupLabel,
                 settingsCallsLabel,
-                settingsMeshLabel,
                 settingsDialpadSectionLabel,
                 settingsNotificationsLabel,
                 settingsOutgoingMessagesLabel,
@@ -901,102 +891,6 @@ class SettingsActivity : SimpleActivity() {
                 settingsAlwaysShowFullscreen.toggle()
                 config.alwaysShowFullscreen = settingsAlwaysShowFullscreen.isChecked
             }
-        }
-    }
-
-    private fun setupMeshMode() = binding.apply {
-        val meshConfig = MeshConfig.newInstance(this@SettingsActivity)
-        settingsMeshModeValue.text = getMeshModeLabel(meshConfig.getMeshMode())
-        settingsMeshModeHolder.setOnClickListener {
-            val items = arrayListOf(
-                RadioItem(MeshMode.STANDARD_ONLY.id, getString(R.string.mesh_mode_standard)),
-                RadioItem(MeshMode.MESH_WITH_FALLBACK.id, getString(R.string.mesh_mode_fallback)),
-                RadioItem(MeshMode.MESH_ONLY.id, getString(R.string.mesh_mode_mesh_only))
-            )
-
-            RadioGroupDialog(this@SettingsActivity, items, meshConfig.meshMode) {
-                meshConfig.meshMode = it as Int
-                settingsMeshModeValue.text = getMeshModeLabel(meshConfig.getMeshMode())
-                updateMeshRoutingUi(meshConfig)
-                updateMeshStatus(meshConfig)
-                MeshManager.sync(this@SettingsActivity)
-            }
-        }
-
-        updateMeshRoutingUi(meshConfig)
-        updateMeshStatus(meshConfig)
-    }
-
-    private fun setupMeshCallQuality() = binding.apply {
-        val meshConfig = MeshConfig.newInstance(this@SettingsActivity)
-        settingsMeshCallQualityValue.text = getMeshCallQualityLabel(meshConfig.meshCallQuality)
-        settingsMeshCallQualityHolder.setOnClickListener {
-            val items = arrayListOf(
-                RadioItem(MeshCallQuality.LOW.id, getString(R.string.mesh_call_quality_low)),
-                RadioItem(MeshCallQuality.HIGH.id, getString(R.string.mesh_call_quality_high))
-            )
-            RadioGroupDialog(this@SettingsActivity, items, meshConfig.meshCallQuality) {
-                meshConfig.meshCallQuality = it as Int
-                settingsMeshCallQualityValue.text = getMeshCallQualityLabel(meshConfig.meshCallQuality)
-            }
-        }
-        updateMeshRoutingUi(meshConfig)
-    }
-
-    private fun setupMeshRouting() = binding.apply {
-        val meshConfig = MeshConfig.newInstance(this@SettingsActivity)
-        settingsMeshRouting.isChecked = meshConfig.meshRoutingEnabled
-        settingsMeshRoutingHolder.setOnClickListener {
-            settingsMeshRouting.toggle()
-            val routingEnabled = settingsMeshRouting.isChecked
-            meshConfig.meshRoutingEnabled = routingEnabled
-            if (routingEnabled && meshConfig.getMeshMode() == MeshMode.STANDARD_ONLY) {
-                meshConfig.meshMode = MeshMode.MESH_WITH_FALLBACK.id
-                settingsMeshModeValue.text = getMeshModeLabel(meshConfig.getMeshMode())
-            }
-            updateMeshRoutingUi(meshConfig)
-            updateMeshStatus(meshConfig)
-            MeshManager.sync(this@SettingsActivity)
-        }
-    }
-
-    private fun updateMeshRoutingUi(meshConfig: MeshConfig) = binding.apply {
-        val isMeshEnabled = meshConfig.getMeshMode() != MeshMode.STANDARD_ONLY
-        settingsMeshRouting.isEnabled = isMeshEnabled
-        settingsMeshRoutingHolder.isEnabled = isMeshEnabled
-        settingsMeshCallQualityHolder.isEnabled = isMeshEnabled
-        if (!isMeshEnabled && meshConfig.meshRoutingEnabled) {
-            meshConfig.meshRoutingEnabled = false
-            settingsMeshRouting.isChecked = false
-        }
-    }
-
-    private fun setupMeshStatus() {
-        updateMeshStatus(MeshConfig.newInstance(this))
-    }
-
-    private fun updateMeshStatus(meshConfig: MeshConfig) = binding.apply {
-        val neighbors = RnsNode.getDirectNeighborCount()
-        val routingStatus = if (meshConfig.meshRoutingEnabled && RnsNode.hasRecentRoutingActivity()) {
-            getString(R.string.mesh_routing_in_use)
-        } else {
-            getString(R.string.mesh_routing_idle)
-        }
-        settingsMeshStatusValue.text = getString(R.string.mesh_service_status, neighbors, routingStatus)
-    }
-
-    private fun getMeshModeLabel(mode: MeshMode): String {
-        return when (mode) {
-            MeshMode.STANDARD_ONLY -> getString(R.string.mesh_mode_standard)
-            MeshMode.MESH_WITH_FALLBACK -> getString(R.string.mesh_mode_fallback)
-            MeshMode.MESH_ONLY -> getString(R.string.mesh_mode_mesh_only)
-        }
-    }
-
-    private fun getMeshCallQualityLabel(value: Int): String {
-        return when (MeshCallQuality.fromId(value)) {
-            MeshCallQuality.LOW -> getString(R.string.mesh_call_quality_low)
-            MeshCallQuality.HIGH -> getString(R.string.mesh_call_quality_high)
         }
     }
 

@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.Manifest
 import android.os.Bundle
+import android.os.Build
 import android.provider.ContactsContract
 import android.widget.ImageView
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,6 +17,7 @@ import com.google.zxing.common.BitMatrix
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import org.fossify.commons.dialogs.ConfirmationDialog
+import org.fossify.commons.dialogs.RadioGroupDialog
 import org.fossify.commons.extensions.copyToClipboard
 import org.fossify.commons.extensions.hasPermission
 import org.fossify.commons.extensions.showErrorToast
@@ -25,15 +27,22 @@ import org.fossify.commons.extensions.viewBinding
 import org.fossify.commons.helpers.PERMISSION_READ_CONTACTS
 import org.fossify.commons.helpers.PERMISSION_WRITE_CONTACTS
 import org.fossify.commons.helpers.NavigationIcon
+import org.fossify.commons.models.RadioItem
 import org.fossify.messages.R
 import org.fossify.messages.databinding.ActivityManageE2eKeysBinding
 import org.fossify.messages.helpers.E2eManager
 import org.fossify.messages.helpers.JSON_MIME_TYPE
 import org.fossify.messages.helpers.MeshDiscoveryManager
 import org.fossify.messages.helpers.TXT_MIME_TYPE
+import org.fossify.mesh.MeshConfig
 import org.fossify.mesh.MeshIdentityStore
 import org.fossify.mesh.MeshManager
 import org.fossify.mesh.MeshContactHelper
+import org.fossify.mesh.rns.RnsNode
+import org.fossify.mesh.MeshMode
+import org.fossify.mesh.call.MeshCallQuality
+import org.fossify.mesh.wifidirect.MeshWifiDirectState
+import org.fossify.mesh.wifiaware.MeshWifiAwareState
 
 class ManageE2eKeysActivity : SimpleActivity() {
     private val binding by viewBinding(ActivityManageE2eKeysBinding::inflate)
@@ -78,6 +87,46 @@ class ManageE2eKeysActivity : SimpleActivity() {
             if (granted) {
                 scanQrCode()
             } else {
+                toast(R.string.profile_mesh_scan_denied)
+            }
+        }
+
+    private val requestWifiDirectPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                val meshConfig = MeshConfig.newInstance(this)
+                meshConfig.meshWifiDirectEnabled = true
+                binding.profileMeshWifidirect.isChecked = true
+                MeshManager.sync(this)
+            } else {
+                binding.profileMeshWifidirect.isChecked = false
+                toast(R.string.profile_mesh_scan_denied)
+            }
+        }
+
+    private val requestBlePermissions =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
+            val granted = results.values.all { it }
+            if (granted) {
+                val meshConfig = MeshConfig.newInstance(this)
+                meshConfig.meshBleEnabled = true
+                binding.profileMeshBle.isChecked = true
+                MeshManager.sync(this)
+            } else {
+                binding.profileMeshBle.isChecked = false
+                toast(R.string.profile_mesh_scan_denied)
+            }
+        }
+
+    private val requestWifiAwarePermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                val meshConfig = MeshConfig.newInstance(this)
+                meshConfig.meshWifiAwareEnabled = true
+                binding.profileMeshWifiAware.isChecked = true
+                MeshManager.sync(this)
+            } else {
+                binding.profileMeshWifiAware.isChecked = false
                 toast(R.string.profile_mesh_scan_denied)
             }
         }
@@ -136,11 +185,13 @@ class ManageE2eKeysActivity : SimpleActivity() {
         updateTextColors(binding.manageE2eKeysHolder)
         refreshProfile()
         setupActions()
+        setupMeshSettings()
     }
 
     override fun onResume() {
         super.onResume()
         refreshProfile()
+        updateMeshStatus(MeshConfig.newInstance(this))
     }
 
     private fun refreshProfile() {
@@ -162,6 +213,10 @@ class ManageE2eKeysActivity : SimpleActivity() {
         binding.profileMeshAddressValue.setOnClickListener {
             val address = MeshDiscoveryManager.getLocalMeshAddress(this) ?: return@setOnClickListener
             copyToClipboard(address)
+        }
+        binding.profileMeshAnnounceHolder.setOnClickListener {
+            RnsNode.announceAll()
+            toast(R.string.profile_mesh_announced)
         }
         binding.profileShowQrHolder.setOnClickListener {
             showQrCode()
@@ -190,6 +245,212 @@ class ManageE2eKeysActivity : SimpleActivity() {
                 toast(R.string.e2e_keys_regenerated)
             }
         }
+    }
+
+    private fun setupMeshSettings() = binding.apply {
+        val meshConfig = MeshConfig.newInstance(this@ManageE2eKeysActivity)
+        profileMeshModeValue.text = getMeshModeLabel(meshConfig.getMeshMode())
+        profileMeshModeHolder.setOnClickListener {
+            val items = arrayListOf(
+                RadioItem(MeshMode.STANDARD_ONLY.id, getString(R.string.mesh_mode_standard)),
+                RadioItem(MeshMode.MESH_WITH_FALLBACK.id, getString(R.string.mesh_mode_fallback)),
+                RadioItem(MeshMode.MESH_ONLY.id, getString(R.string.mesh_mode_mesh_only))
+            )
+            RadioGroupDialog(this@ManageE2eKeysActivity, items, meshConfig.meshMode) {
+                meshConfig.meshMode = it as Int
+                profileMeshModeValue.text = getMeshModeLabel(meshConfig.getMeshMode())
+                updateMeshRoutingUi(meshConfig)
+                updateMeshStatus(meshConfig)
+                MeshManager.sync(this@ManageE2eKeysActivity)
+            }
+        }
+
+        profileMeshCallQualityValue.text = getMeshCallQualityLabel(meshConfig.meshCallQuality)
+        profileMeshCallQualityHolder.setOnClickListener {
+            val items = arrayListOf(
+                RadioItem(MeshCallQuality.LOW.id, getString(R.string.mesh_call_quality_low)),
+                RadioItem(MeshCallQuality.HIGH.id, getString(R.string.mesh_call_quality_high))
+            )
+            RadioGroupDialog(this@ManageE2eKeysActivity, items, meshConfig.meshCallQuality) {
+                meshConfig.meshCallQuality = it as Int
+                profileMeshCallQualityValue.text = getMeshCallQualityLabel(meshConfig.meshCallQuality)
+            }
+        }
+
+        profileMeshRouting.isChecked = meshConfig.meshRoutingEnabled
+        profileMeshRoutingHolder.setOnClickListener {
+            profileMeshRouting.toggle()
+            val routingEnabled = profileMeshRouting.isChecked
+            meshConfig.meshRoutingEnabled = routingEnabled
+            if (routingEnabled && meshConfig.getMeshMode() == MeshMode.STANDARD_ONLY) {
+                meshConfig.meshMode = MeshMode.MESH_WITH_FALLBACK.id
+                profileMeshModeValue.text = getMeshModeLabel(meshConfig.getMeshMode())
+            }
+            updateMeshRoutingUi(meshConfig)
+            updateMeshStatus(meshConfig)
+            MeshManager.sync(this@ManageE2eKeysActivity)
+        }
+
+        profileMeshWifidirect.isChecked = meshConfig.meshWifiDirectEnabled
+        profileMeshWifidirectHolder.setOnClickListener {
+            profileMeshWifidirect.toggle()
+            val enabled = profileMeshWifidirect.isChecked
+            if (enabled) {
+                val permission = getWifiDirectPermission()
+                if (ContextCompat.checkSelfPermission(this@ManageE2eKeysActivity, permission) != PackageManager.PERMISSION_GRANTED) {
+                    requestWifiDirectPermission.launch(permission)
+                    return@setOnClickListener
+                }
+            }
+            meshConfig.meshWifiDirectEnabled = enabled
+            MeshManager.sync(this@ManageE2eKeysActivity)
+        }
+
+        profileMeshBle.isChecked = meshConfig.meshBleEnabled
+        profileMeshBleHolder.setOnClickListener {
+            profileMeshBle.toggle()
+            val enabled = profileMeshBle.isChecked
+            if (enabled) {
+                val permissions = getBlePermissions()
+                val missing = permissions.any {
+                    ContextCompat.checkSelfPermission(this@ManageE2eKeysActivity, it) != PackageManager.PERMISSION_GRANTED
+                }
+                if (missing) {
+                    requestBlePermissions.launch(permissions.toTypedArray())
+                    return@setOnClickListener
+                }
+            }
+            meshConfig.meshBleEnabled = enabled
+            MeshManager.sync(this@ManageE2eKeysActivity)
+        }
+
+        val hasWifiAware = packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_AWARE)
+        profileMeshWifiAwareHolder.visibility = if (hasWifiAware) android.view.View.VISIBLE else android.view.View.GONE
+        if (hasWifiAware) {
+            profileMeshWifiAware.isChecked = meshConfig.meshWifiAwareEnabled
+            profileMeshWifiAwareHolder.setOnClickListener {
+                profileMeshWifiAware.toggle()
+                val enabled = profileMeshWifiAware.isChecked
+                if (enabled) {
+                    val permission = getWifiAwarePermission()
+                    if (ContextCompat.checkSelfPermission(this@ManageE2eKeysActivity, permission) != PackageManager.PERMISSION_GRANTED) {
+                        requestWifiAwarePermission.launch(permission)
+                        return@setOnClickListener
+                    }
+                }
+                meshConfig.meshWifiAwareEnabled = enabled
+                MeshManager.sync(this@ManageE2eKeysActivity)
+            }
+        }
+
+        updateMeshRoutingUi(meshConfig)
+        updateMeshStatus(meshConfig)
+    }
+
+    private fun updateMeshRoutingUi(meshConfig: MeshConfig) = binding.apply {
+        val isMeshEnabled = meshConfig.getMeshMode() != MeshMode.STANDARD_ONLY
+        profileMeshRouting.isEnabled = isMeshEnabled
+        profileMeshRoutingHolder.isEnabled = isMeshEnabled
+        profileMeshCallQualityHolder.isEnabled = isMeshEnabled
+        if (!isMeshEnabled && meshConfig.meshRoutingEnabled) {
+            meshConfig.meshRoutingEnabled = false
+            profileMeshRouting.isChecked = false
+        }
+    }
+
+    private fun updateMeshStatus(meshConfig: MeshConfig) = binding.apply {
+        val neighbors = RnsNode.getDirectNeighborCount()
+        val routingStatus = if (meshConfig.meshRoutingEnabled && RnsNode.hasRecentRoutingActivity()) {
+            getString(R.string.mesh_routing_in_use)
+        } else {
+            getString(R.string.mesh_routing_idle)
+        }
+        val rawCount = RnsNode.getRawPacketReceivedCount()
+        val announceCount = RnsNode.getAnnounceReceivedCount()
+        val lastPacketMs = RnsNode.getLastPacketReceivedMs()
+        val lastPacketText = if (lastPacketMs > 0L) {
+            android.text.format.DateUtils.getRelativeTimeSpanString(lastPacketMs).toString()
+        } else {
+            getString(R.string.profile_unknown)
+        }
+        val status = getString(R.string.mesh_service_status, neighbors, routingStatus)
+        val diagnostics = getString(R.string.mesh_diagnostics, rawCount, announceCount, lastPacketText)
+        val wifiStatus = buildWifiDirectStatus()
+        val awareStatus = buildWifiAwareStatus()
+        profileMeshStatusValue.text = "$status\n$diagnostics\n$wifiStatus\n$awareStatus"
+    }
+
+    private fun getMeshModeLabel(mode: MeshMode): String {
+        return when (mode) {
+            MeshMode.STANDARD_ONLY -> getString(R.string.mesh_mode_standard)
+            MeshMode.MESH_WITH_FALLBACK -> getString(R.string.mesh_mode_fallback)
+            MeshMode.MESH_ONLY -> getString(R.string.mesh_mode_mesh_only)
+        }
+    }
+
+    private fun getMeshCallQualityLabel(value: Int): String {
+        return when (MeshCallQuality.fromId(value)) {
+            MeshCallQuality.LOW -> getString(R.string.mesh_call_quality_low)
+            MeshCallQuality.HIGH -> getString(R.string.mesh_call_quality_high)
+        }
+    }
+
+    private fun getWifiDirectPermission(): String {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.NEARBY_WIFI_DEVICES
+        } else {
+            Manifest.permission.ACCESS_FINE_LOCATION
+        }
+    }
+
+    private fun getWifiAwarePermission(): String {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.NEARBY_WIFI_DEVICES
+        } else {
+            Manifest.permission.ACCESS_FINE_LOCATION
+        }
+    }
+
+    private fun getBlePermissions(): List<String> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            listOf(
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_ADVERTISE
+            )
+        } else {
+            listOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    private fun buildWifiDirectStatus(): String {
+        val ssid = MeshWifiDirectState.getSsid()
+        val passphrase = MeshWifiDirectState.getPassphrase()
+        val isOwner = MeshWifiDirectState.isGroupOwner()
+        val status = if (!ssid.isNullOrBlank()) {
+            val role = if (isOwner) "Owner" else "Client"
+            if (!passphrase.isNullOrBlank()) {
+                "$ssid ($role) • $passphrase"
+            } else {
+                "$ssid ($role)"
+            }
+        } else {
+            getString(R.string.mesh_wifidirect_inactive)
+        }
+        return getString(R.string.mesh_wifidirect_status, status)
+    }
+
+    private fun buildWifiAwareStatus(): String {
+        val supported = packageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_AWARE)
+        if (!supported) {
+            return getString(R.string.mesh_wifiaware_status, getString(R.string.mesh_wifiaware_unsupported))
+        }
+        val status = if (MeshWifiAwareState.isActive()) {
+            getString(R.string.mesh_wifiaware_active)
+        } else {
+            getString(R.string.mesh_wifiaware_inactive)
+        }
+        return getString(R.string.mesh_wifiaware_status, status)
     }
 
     private fun showQrCode() {

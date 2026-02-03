@@ -41,4 +41,16 @@ class MeshConfig(context: Context) : BaseConfig(context) {
     var meshOutboundStampCosts: String?
         get() = prefs.getString(MESH_OUTBOUND_STAMP_COSTS, null)
         set(value) = prefs.edit().putString(MESH_OUTBOUND_STAMP_COSTS, value).apply()
+
+    var meshWifiDirectEnabled: Boolean
+        get() = prefs.getBoolean(MESH_WIFI_DIRECT_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(MESH_WIFI_DIRECT_ENABLED, value).apply()
+
+    var meshBleEnabled: Boolean
+        get() = prefs.getBoolean(MESH_BLE_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(MESH_BLE_ENABLED, value).apply()
+
+    var meshWifiAwareEnabled: Boolean
+        get() = prefs.getBoolean(MESH_WIFI_AWARE_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(MESH_WIFI_AWARE_ENABLED, value).apply()
 }

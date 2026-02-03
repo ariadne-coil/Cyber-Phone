@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/manage_e2e_keys_coordinator"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
@@ -114,6 +115,23 @@
             <include layout="@layout/divider" />
 
             <RelativeLayout
+                android:id="@+id/profile_mesh_announce_holder"
+                style="@style/SettingsHolderTextViewOneLinerStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_mesh_announce_label"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/profile_mesh_announce" />
+
+            </RelativeLayout>
+
+            <include layout="@layout/divider" />
+
+            <RelativeLayout
                 android:id="@+id/profile_show_qr_holder"
                 style="@style/SettingsHolderTextViewOneLinerStyle"
                 android:layout_width="match_parent"
@@ -159,6 +177,144 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/profile_rotate_mesh" />
+
+            </RelativeLayout>
+
+            <include layout="@layout/divider" />
+
+            <TextView
+                android:id="@+id/profile_mesh_settings_label"
+                style="@style/SettingsSectionLabelStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/mesh_networking" />
+
+            <RelativeLayout
+                android:id="@+id/profile_mesh_mode_holder"
+                style="@style/SettingsHolderTextViewStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_mesh_mode_label"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mesh_mode" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_mesh_mode_value"
+                    style="@style/SettingsTextValueStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@+id/profile_mesh_mode_label"
+                    tools:text="@string/mesh_mode_standard" />
+
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/profile_mesh_call_quality_holder"
+                style="@style/SettingsHolderTextViewStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_mesh_call_quality_label"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mesh_call_quality" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_mesh_call_quality_value"
+                    style="@style/SettingsTextValueStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@+id/profile_mesh_call_quality_label"
+                    tools:text="@string/mesh_call_quality_low" />
+
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/profile_mesh_routing_holder"
+                style="@style/SettingsHolderSwitchStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyMaterialSwitch
+                    android:id="@+id/profile_mesh_routing"
+                    style="@style/SettingsSwitchStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mesh_routing_enabled" />
+
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/profile_mesh_wifidirect_holder"
+                style="@style/SettingsHolderSwitchStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyMaterialSwitch
+                    android:id="@+id/profile_mesh_wifidirect"
+                    style="@style/SettingsSwitchStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mesh_wifidirect_enabled" />
+
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/profile_mesh_ble_holder"
+                style="@style/SettingsHolderSwitchStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyMaterialSwitch
+                    android:id="@+id/profile_mesh_ble"
+                    style="@style/SettingsSwitchStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mesh_ble_enabled" />
+
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/profile_mesh_wifi_aware_holder"
+                style="@style/SettingsHolderSwitchStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyMaterialSwitch
+                    android:id="@+id/profile_mesh_wifi_aware"
+                    style="@style/SettingsSwitchStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mesh_wifiaware_enabled" />
+
+            </RelativeLayout>
+
+            <RelativeLayout
+                android:id="@+id/profile_mesh_status_holder"
+                style="@style/SettingsHolderTextViewStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_mesh_status_label"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mesh_status" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_mesh_status_value"
+                    style="@style/SettingsTextValueStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@+id/profile_mesh_status_label"
+                    tools:text="@string/mesh_service_status" />
 
             </RelativeLayout>
 

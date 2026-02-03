@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.1 (2026-02-03)
+- Moved all mesh controls into Cyber Features and renamed the Profile section.
+- Added Wi‑Fi Direct discovery toggle and status readout (group/role/credentials).
+- Added BLE mesh transport (advertise/scan + GATT) and toggle.
+- Added Wi‑Fi Aware (NAN) transport with feature gating, toggle, and status.
+- Added mesh diagnostics counters (packets/announces/last packet).
+
 ## v0.2.0 (2026-02-03)
 - Added Reticulum-compatible link resource segmentation (multi‑segment transfers) and request/response resource support.
 - Enabled mesh attachments (photos, videos, files) via LXMF fields with local persistence and thread rendering.

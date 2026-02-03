@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 object RnsNode {
     private const val DEFAULT_UDP_PORT = 4242
+    private const val DEFAULT_MULTICAST_GROUP = "239.255.0.1"
     private const val MAX_HOPS = 128
     private const val ANNOUNCE_CACHE_LIMIT = 256
     private const val RESOURCE_CACHE_LIMIT = 256
@@ -81,6 +82,9 @@ object RnsNode {
     private var announceFuture: ScheduledFuture<*>? = null
 
     private var routingEnabled = false
+    private val announceReceivedCount = AtomicLong(0L)
+    private val lastPacketReceivedMs = AtomicLong(0L)
+    private val rawPacketReceivedCount = AtomicLong(0L)
 
     fun start(context: Context, routing: Boolean) {
         if (running.setIfFalse()) {
@@ -93,7 +97,16 @@ object RnsNode {
             ) { raw, iface ->
                 handleIncoming(raw, iface)
             }
+            val multicastInterface = RnsUdpInterface(
+                name = "udp-mcast",
+                listenPort = DEFAULT_UDP_PORT,
+                forwardAddress = DEFAULT_MULTICAST_GROUP,
+                forwardPort = DEFAULT_UDP_PORT
+            ) { raw, iface ->
+                handleIncoming(raw, iface)
+            }
             interfaces.add(udpInterface)
+            interfaces.add(multicastInterface)
             interfaces.forEach { it.start() }
             registerPathRequestDestination()
             startAnnounceScheduler()
@@ -104,8 +117,10 @@ object RnsNode {
 
     fun stop() {
         if (running.setIfTrue()) {
-            interfaces.forEach { it.stop() }
-            interfaces.clear()
+            synchronized(interfaces) {
+                interfaces.forEach { it.stop() }
+                interfaces.clear()
+            }
             pathTable.clear()
             announceCache.clear()
             resourceCache.clear()
@@ -121,6 +136,9 @@ object RnsNode {
             pendingLinkPackets.clear()
             localDestinations.clear()
             knownDestinations.clear()
+            announceReceivedCount.set(0L)
+            lastPacketReceivedMs.set(0L)
+            rawPacketReceivedCount.set(0L)
             announceFuture?.cancel(true)
             announceFuture = null
         }
@@ -136,6 +154,31 @@ object RnsNode {
 
     fun removeAnnounceListener(listener: (RnsAnnounce, RnsPacket) -> Unit) {
         announceListeners.remove(listener)
+    }
+
+    fun addInterface(interfaceRef: RnsInterface) {
+        synchronized(interfaces) {
+            if (interfaces.any { it.name == interfaceRef.name }) return
+            interfaces.add(interfaceRef)
+            interfaceRef.start()
+        }
+    }
+
+    fun removeInterface(name: String) {
+        synchronized(interfaces) {
+            val iterator = interfaces.iterator()
+            while (iterator.hasNext()) {
+                val iface = iterator.next()
+                if (iface.name == name) {
+                    iface.stop()
+                    iterator.remove()
+                }
+            }
+        }
+    }
+
+    fun handleIncomingFromInterface(raw: ByteArray, iface: RnsInterface) {
+        handleIncoming(raw, iface)
     }
 
     fun requestPath(destinationHash: ByteArray) {
@@ -259,6 +302,12 @@ object RnsNode {
             entry.hops <= 1 && now - entry.timestamp <= timeoutMs
         }
     }
+
+    fun getAnnounceReceivedCount(): Long = announceReceivedCount.get()
+
+    fun getLastPacketReceivedMs(): Long = lastPacketReceivedMs.get()
+
+    fun getRawPacketReceivedCount(): Long = rawPacketReceivedCount.get()
 
     fun getActiveLinkCount(): Int = activeLinksById.size
 
@@ -495,6 +544,8 @@ object RnsNode {
     }
 
     private fun handleIncoming(raw: ByteArray, iface: RnsInterface) {
+        lastPacketReceivedMs.set(System.currentTimeMillis())
+        rawPacketReceivedCount.incrementAndGet()
         val packet = try {
             RnsPacket.fromRaw(raw)
         } catch (_: Exception) {
@@ -644,6 +695,7 @@ object RnsNode {
 
     private fun handleAnnounce(raw: ByteArray, packet: RnsPacket, iface: RnsInterface) {
         val announce = RnsAnnounce.validate(packet) ?: return
+        announceReceivedCount.incrementAndGet()
         val key = RnsHex.encode(announce.destinationHash)
         if (localDestinations.containsKey(key)) {
             return
