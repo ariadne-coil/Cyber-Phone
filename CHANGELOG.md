@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.0 (2026-02-03)
+- Added Reticulum-compatible link resource segmentation (multi‑segment transfers) and request/response resource support.
+- Enabled mesh attachments (photos, videos, files) via LXMF fields with local persistence and thread rendering.
+- Improved mesh fallback logic and attachment size handling when mesh is available.
+- Added a changelog link to the README for easier release visibility.
+
 ## v0.1.11 (2026-02-02)
 - Added opt-in YACB community reputation with auto-update toggle and last-refresh status.
 - Added caller reputation line in the in-call UI (emoji + colored counts) with DB readiness messaging.

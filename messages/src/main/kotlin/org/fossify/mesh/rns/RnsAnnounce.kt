@@ -90,7 +90,8 @@ data class RnsAnnounce(
         fun build(
             destination: RnsDestination,
             appData: ByteArray? = null,
-            ratchet: ByteArray? = null
+            ratchet: ByteArray? = null,
+            context: Int = RnsPacket.NONE
         ): RnsPacket {
             val identity = destination.identity ?: error("Destination requires identity for announce")
             val randomSeed = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
@@ -116,7 +117,7 @@ data class RnsAnnounce(
                 destination = RnsDestination.fromHash(destination.hash, destination.type),
                 data = payload,
                 packetType = RnsPacket.ANNOUNCE,
-                context = RnsPacket.NONE,
+                context = context,
                 contextFlag = contextFlag
             )
         }

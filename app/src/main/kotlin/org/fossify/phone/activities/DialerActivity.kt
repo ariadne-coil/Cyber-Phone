@@ -11,6 +11,13 @@ import org.fossify.commons.extensions.*
 import org.fossify.commons.helpers.REQUEST_CODE_SET_DEFAULT_DIALER
 import org.fossify.phone.R
 import org.fossify.phone.extensions.getHandleToUse
+import org.fossify.mesh.MeshConfig
+import org.fossify.mesh.MeshMode
+import org.fossify.mesh.call.MeshCallQuality
+import org.fossify.mesh.call.MeshCallRouter
+import org.fossify.mesh.lxmf.LxmfAddress
+import org.fossify.phone.mesh.MeshCallContactHelper
+import org.fossify.phone.mesh.MeshCallController
 
 class DialerActivity : SimpleActivity() {
     private var callNumber: Uri? = null
@@ -36,25 +43,92 @@ class DialerActivity : SimpleActivity() {
     @SuppressLint("MissingPermission")
     private fun initOutgoingCall() {
         try {
-            if (isNumberBlocked(callNumber.toString().replace("tel:", ""), getBlockedNumbers())) {
+            val rawNumber = callNumber.toString().replace("tel:", "")
+            if (isNumberBlocked(rawNumber, getBlockedNumbers())) {
                 toast(R.string.calling_blocked_number)
                 finish()
                 return
             }
 
-            getHandleToUse(intent, callNumber.toString()) { handle ->
-                if (handle != null) {
-                    Bundle().apply {
-                        putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle)
-                        putBoolean(TelecomManager.EXTRA_START_CALL_WITH_VIDEO_STATE, false)
-                        putBoolean(TelecomManager.EXTRA_START_CALL_WITH_SPEAKERPHONE, false)
-                        telecomManager.placeCall(callNumber, this)
-                    }
-                }
-                finish()
+            val meshConfig = MeshConfig.newInstance(this)
+            val meshMode = meshConfig.getMeshMode()
+            val meshAddress = if (meshMode != MeshMode.STANDARD_ONLY) {
+                MeshCallContactHelper.getMeshAddressForNumber(this, rawNumber)
+            } else {
+                null
             }
+
+            if (!meshAddress.isNullOrBlank() && meshMode != MeshMode.STANDARD_ONLY) {
+                attemptMeshCall(rawNumber, meshAddress, meshMode)
+                return
+            } else if (meshMode == MeshMode.MESH_ONLY) {
+                toast(R.string.mesh_delivery_failed)
+                finish()
+                return
+            }
+
+            placeTelCall()
         } catch (e: Exception) {
             showErrorToast(e)
+            finish()
+        }
+    }
+
+    private fun attemptMeshCall(phoneNumber: String, meshAddress: String, meshMode: MeshMode) {
+        val destinationHash = LxmfAddress.decode(meshAddress)
+        if (destinationHash == null) {
+            if (meshMode == MeshMode.MESH_WITH_FALLBACK) {
+                placeTelCall()
+            } else {
+                toast(R.string.mesh_invalid_address)
+                finish()
+            }
+            return
+        }
+
+        val preferredQuality = MeshCallQuality.fromId(MeshConfig.newInstance(this).meshCallQuality)
+        MeshCallRouter.probe(
+            context = this,
+            remoteDeliveryHash = destinationHash,
+            preferredQuality = preferredQuality,
+            timeoutMs = 4000L
+        ) { result ->
+            runOnUiThread {
+                val destination = result.remoteDestination
+                if (result.success && destination != null) {
+                    val displayName = MeshCallContactHelper.getContactName(this, phoneNumber)
+                    MeshCallController.placeMeshCall(
+                        context = this,
+                        remoteDeliveryHash = destinationHash,
+                        remoteCallHash = result.remoteCallHash,
+                        remoteDestination = destination,
+                        quality = result.quality,
+                        displayName = displayName,
+                        phoneNumber = phoneNumber
+                    )
+                    finish()
+                } else {
+                    if (meshMode == MeshMode.MESH_WITH_FALLBACK) {
+                        placeTelCall()
+                    } else {
+                        toast(R.string.mesh_delivery_failed)
+                        finish()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun placeTelCall() {
+        getHandleToUse(intent, callNumber.toString()) { handle ->
+            if (handle != null) {
+                Bundle().apply {
+                    putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle)
+                    putBoolean(TelecomManager.EXTRA_START_CALL_WITH_VIDEO_STATE, false)
+                    putBoolean(TelecomManager.EXTRA_START_CALL_WITH_SPEAKERPHONE, false)
+                    telecomManager.placeCall(callNumber, this)
+                }
+            }
             finish()
         }
     }

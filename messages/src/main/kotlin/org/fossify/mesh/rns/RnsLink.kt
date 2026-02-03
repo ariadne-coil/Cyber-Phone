@@ -4,7 +4,10 @@ import org.bouncycastle.crypto.agreement.X25519Agreement
 import org.bouncycastle.crypto.params.X25519PrivateKeyParameters
 import org.bouncycastle.crypto.params.X25519PublicKeyParameters
 import org.msgpack.core.MessagePack
+import org.msgpack.core.MessagePacker
+import org.msgpack.core.MessageUnpacker
 import kotlin.math.floor
+import java.util.concurrent.ConcurrentHashMap
 
 class RnsLink private constructor(
     val owner: RnsDestination,
@@ -182,6 +185,8 @@ class RnsLink private constructor(
     private var peerSigPubBytes: ByteArray? = null
     private var requestTimeMs: Long = 0L
     private var rttSeconds: Double? = null
+    private val pendingRequests = ConcurrentHashMap<String, RnsRequestReceipt>()
+    private var remoteIdentity: RnsIdentity? = null
 
     fun buildLinkRequestPacket(): RnsPacket {
         if (!initiator) error("Only initiator can build link requests")
@@ -280,7 +285,210 @@ class RnsLink private constructor(
         }
     }
 
+    fun encryptStream(payload: ByteArray): ByteArray? {
+        val activeToken = token ?: return null
+        return try {
+            activeToken.encrypt(payload)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun decryptStream(payload: ByteArray): ByteArray? {
+        val activeToken = token ?: return null
+        return try {
+            activeToken.decrypt(payload)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     fun isActive(): Boolean = status == ACTIVE
+
+    fun request(
+        path: String,
+        data: Any?,
+        sendPacket: (RnsLink, Int, Int, ByteArray) -> ByteArray?,
+        onResponse: ((RnsRequestReceipt) -> Unit)? = null,
+        onFailure: ((RnsRequestReceipt) -> Unit)? = null,
+        sendResource: ((ByteArray, ByteArray, Boolean) -> Boolean)? = null
+    ): RnsRequestReceipt? {
+        if (!isActive()) return null
+        val requestPayload = packRequest(path, data)
+        val requestId = if (requestPayload.size <= mdu) {
+            val raw = sendPacket(this, RnsPacket.DATA, RnsPacket.REQUEST, requestPayload) ?: run {
+                val failed = RnsRequestReceipt(ByteArray(0), onResponse, onFailure)
+                onFailure?.invoke(failed)
+                return null
+            }
+            RnsHash.truncatedHash(RnsHash.sha256(RnsPacket.getHashablePart(raw)))
+        } else {
+            val computed = RnsHash.truncatedHash(RnsHash.sha256(requestPayload))
+            val sent = sendResource?.invoke(requestPayload, computed, false) ?: false
+            if (!sent) {
+                val failed = RnsRequestReceipt(ByteArray(0), onResponse, onFailure)
+                onFailure?.invoke(failed)
+                return null
+            }
+            computed
+        }
+        val receipt = RnsRequestReceipt(requestId, onResponse, onFailure)
+        pendingRequests[RnsHex.encode(requestId)] = receipt
+        return receipt
+    }
+
+    fun handleRequest(
+        payload: ByteArray,
+        destination: RnsDestination,
+        requestId: ByteArray,
+        sendPacket: (RnsLink, Int, Int, ByteArray) -> Unit,
+        sendResource: ((ByteArray, ByteArray, Boolean) -> Boolean)? = null
+    ) {
+        if (requestId.isEmpty()) return
+        try {
+            val unpacker = MessagePack.newDefaultUnpacker(payload)
+            val arraySize = unpacker.unpackArrayHeader()
+            if (arraySize < 3) {
+                unpacker.close()
+                return
+            }
+            val requestedAt = unpacker.unpackDouble()
+            val pathHash = unpacker.unpackBinaryHeader().let { len ->
+                val bytes = ByteArray(len)
+                unpacker.readPayload(bytes)
+                bytes
+            }
+            val dataValue = unpackAny(unpacker.unpackValue())
+            unpacker.close()
+
+            val handler = destination.getRequestHandler(pathHash) ?: return
+            val response = handler.handle(pathHash, dataValue, requestedAt, remoteIdentity, linkId)
+            if (response == null) return
+            val responsePayload = packResponse(requestId, response)
+            if (responsePayload.size <= mdu) {
+                sendPacket(this, RnsPacket.DATA, RnsPacket.RESPONSE, responsePayload)
+            } else {
+                sendResource?.invoke(responsePayload, requestId, true)
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    fun identify(identity: RnsIdentity, sendPacket: (RnsLink, Int, Int, ByteArray) -> ByteArray?): Boolean {
+        if (!initiator || !isActive()) return false
+        val signedData = linkId + identity.publicKey
+        val signature = identity.sign(signedData)
+        val payload = identity.publicKey + signature
+        val raw = sendPacket(this, RnsPacket.DATA, RnsPacket.LINKIDENTIFY, payload)
+        return raw != null
+    }
+
+    fun handleIdentify(payload: ByteArray): Boolean {
+        if (initiator) return false
+        val expectedSize = RnsIdentity.KEY_SIZE * 2
+        if (payload.size != expectedSize) return false
+        val publicKey = payload.copyOfRange(0, RnsIdentity.KEY_SIZE)
+        val signature = payload.copyOfRange(RnsIdentity.KEY_SIZE, payload.size)
+        val identity = RnsIdentity.fromPublic(publicKey)
+        val signedData = linkId + publicKey
+        return if (identity.verify(signedData, signature)) {
+            remoteIdentity = identity
+            true
+        } else {
+            false
+        }
+    }
+
+    fun getRemoteIdentity(): RnsIdentity? = remoteIdentity
+
+    fun handleResponse(payload: ByteArray) {
+        try {
+            val unpacker = MessagePack.newDefaultUnpacker(payload)
+            val size = unpacker.unpackArrayHeader()
+            if (size < 2) {
+                unpacker.close()
+                return
+            }
+            val requestId = unpacker.unpackBinaryHeader().let { len ->
+                val bytes = ByteArray(len)
+                unpacker.readPayload(bytes)
+                bytes
+            }
+            val response = unpackAny(unpacker.unpackValue())
+            unpacker.close()
+            val key = RnsHex.encode(requestId)
+            val receipt = pendingRequests.remove(key) ?: return
+            receipt.response = response
+            receipt.onResponse?.invoke(receipt)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun packRequest(path: String, data: Any?): ByteArray {
+        val packer = MessagePack.newDefaultBufferPacker()
+        packer.packArrayHeader(3)
+        packer.packDouble(System.currentTimeMillis() / 1000.0)
+        val pathHash = RnsHash.truncatedHash(path.toByteArray(Charsets.UTF_8))
+        packer.packBinaryHeader(pathHash.size)
+        packer.writePayload(pathHash)
+        packAny(packer, data)
+        packer.close()
+        return packer.toByteArray()
+    }
+
+    private fun packResponse(requestId: ByteArray, response: Any?): ByteArray {
+        val packer = MessagePack.newDefaultBufferPacker()
+        packer.packArrayHeader(2)
+        packer.packBinaryHeader(requestId.size)
+        packer.writePayload(requestId)
+        packAny(packer, response)
+        packer.close()
+        return packer.toByteArray()
+    }
+
+    private fun packAny(packer: MessagePacker, value: Any?) {
+        when (value) {
+            null -> packer.packNil()
+            is String -> packer.packString(value)
+            is ByteArray -> {
+                packer.packBinaryHeader(value.size)
+                packer.writePayload(value)
+            }
+            is Int -> packer.packInt(value)
+            is Long -> packer.packLong(value)
+            is Double -> packer.packDouble(value)
+            is Float -> packer.packFloat(value)
+            is Boolean -> packer.packBoolean(value)
+            is List<*> -> {
+                packer.packArrayHeader(value.size)
+                value.forEach { packAny(packer, it) }
+            }
+            is Map<*, *> -> {
+                packer.packMapHeader(value.size)
+                value.forEach { (k, v) ->
+                    packAny(packer, k)
+                    packAny(packer, v)
+                }
+            }
+            else -> packer.packString(value.toString())
+        }
+    }
+
+    private fun unpackAny(value: org.msgpack.value.Value): Any? {
+        return when {
+            value.isNilValue -> null
+            value.isBooleanValue -> value.asBooleanValue().boolean
+            value.isIntegerValue -> value.asIntegerValue().toLong()
+            value.isFloatValue -> value.asFloatValue().toDouble()
+            value.isStringValue -> value.asStringValue().asString()
+            value.isBinaryValue -> value.asBinaryValue().asByteArray()
+            value.isArrayValue -> value.asArrayValue().list().map { unpackAny(it) }
+            value.isMapValue -> value.asMapValue().map().mapNotNull { entry ->
+                unpackAny(entry.key) to unpackAny(entry.value)
+            }.toMap()
+            else -> null
+        }
+    }
 
     private fun handshake() {
         if (status != PENDING) return

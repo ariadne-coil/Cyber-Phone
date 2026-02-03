@@ -6,6 +6,8 @@ import java.nio.ByteBuffer
 
 object LxmfAddress {
     const val PREFIX = "mesh:"
+    private const val ALT_PREFIX = "lxm:"
+    private const val ALT_PREFIX_SCHEME = "lxm://"
     private const val HASH_BYTES = 16
 
     fun encode(hash: ByteArray): String {
@@ -27,7 +29,17 @@ object LxmfAddress {
 
     fun normalize(address: String): String {
         val trimmed = address.trim().lowercase()
-        return if (trimmed.startsWith(PREFIX)) trimmed else PREFIX + trimmed
+        val normalized = when {
+            trimmed.startsWith(ALT_PREFIX_SCHEME) -> ALT_PREFIX + trimmed.removePrefix(ALT_PREFIX_SCHEME)
+            trimmed.startsWith(ALT_PREFIX) -> trimmed
+            trimmed.startsWith(PREFIX) -> trimmed
+            else -> PREFIX + trimmed
+        }
+        return if (normalized.startsWith(ALT_PREFIX)) {
+            PREFIX + normalized.removePrefix(ALT_PREFIX)
+        } else {
+            normalized
+        }
     }
 
     fun isMeshAddress(address: String): Boolean {

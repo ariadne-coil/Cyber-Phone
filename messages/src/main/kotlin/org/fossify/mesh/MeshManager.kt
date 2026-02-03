@@ -14,6 +14,14 @@ object MeshManager {
         }
     }
 
+    fun restart(context: Context) {
+        val appContext = context.applicationContext
+        stop(appContext)
+        if (shouldRun(appContext)) {
+            start(appContext)
+        }
+    }
+
     fun shouldRun(context: Context): Boolean {
         val config = MeshConfig.newInstance(context)
         return config.getMeshMode() != MeshMode.STANDARD_ONLY || config.meshRoutingEnabled

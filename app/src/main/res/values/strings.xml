@@ -132,6 +132,10 @@
     <string name="mesh_mode_fallback">Mesh with fallback</string>
     <string name="mesh_mode_mesh_only">Mesh only</string>
     <string name="mesh_routing_enabled">Allow routing for other devices (act as node)</string>
+    <string name="mesh_call_quality">Mesh call quality</string>
+    <string name="mesh_call_quality_low">Low (16 kHz)</string>
+    <string name="mesh_call_quality_high">High (48 kHz)</string>
+    <string name="mesh_call_account_label">Mesh calls</string>
 
     <!-- FAQ -->
     <string name="faq_1_title">I hear incoming calls, but the screen doesn\'t turn on. What can I do?</string>

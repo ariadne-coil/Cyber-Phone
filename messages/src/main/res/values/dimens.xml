@@ -14,4 +14,5 @@
     <dimen name="attachment_button_height">96dp</dimen>
     <dimen name="attachment_button_width">90dp</dimen>
     <dimen name="default_keyboard_height">250dp</dimen>
+    <dimen name="profile_qr_size">240dp</dimen>
 </resources>

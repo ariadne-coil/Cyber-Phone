@@ -20,6 +20,7 @@ import org.fossify.messages.extensions.shouldUnarchive
 import org.fossify.messages.extensions.showReceivedMessageNotification
 import org.fossify.messages.extensions.updateConversationArchivedStatus
 import org.fossify.messages.helpers.E2eManager
+import org.fossify.messages.helpers.MeshDiscoveryManager
 import org.fossify.messages.helpers.MessageCategorizer
 import org.fossify.messages.helpers.ReactionHelper
 import org.fossify.messages.helpers.refreshConversations
@@ -74,6 +75,14 @@ class MmsReceiver : MmsReceivedReceiver() {
 
         val displayResult = E2eManager.getDisplayResult(context, mms.threadId, mms.body, mms.date.toLong())
         val displayBody = displayResult.body
+        MeshDiscoveryManager.handleIncomingMeshAddress(
+            context = context,
+            address = address,
+            threadId = mms.threadId,
+            text = mms.body,
+            subscriptionId = -1,
+            allowAutoReply = true
+        )
         val tapback = ReactionHelper.parseTapback(displayBody)
         if (tapback != null) {
             val sender = address

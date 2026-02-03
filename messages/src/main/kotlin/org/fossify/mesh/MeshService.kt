@@ -11,9 +11,11 @@ import android.os.IBinder
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.net.wifi.WifiManager
 import androidx.core.app.NotificationCompat
 import org.fossify.messages.R
 import org.fossify.mesh.MeshConfig
+import org.fossify.mesh.call.MeshCallRouter
 import org.fossify.mesh.lxmf.LxmfRouter
 import org.fossify.mesh.rns.RnsNode
 
@@ -37,6 +39,7 @@ class MeshService : Service() {
             statusHandler.postDelayed(this, STATUS_UPDATE_INTERVAL_MS)
         }
     }
+    private var multicastLock: WifiManager.MulticastLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -53,11 +56,13 @@ class MeshService : Service() {
         statusHandler.postDelayed(statusUpdater, STATUS_UPDATE_INTERVAL_MS)
 
         return try {
+            acquireMulticastLock()
             MeshIdentityStore.getOrCreate(this)
             val routingEnabled = MeshConfig.newInstance(this).meshRoutingEnabled
             RnsNode.start(this, routingEnabled)
             LxmfRouter.start(this)
             LxmfRouter.addListener(lxmfListener)
+            MeshCallRouter.start(this)
             START_STICKY
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start mesh service", e)
@@ -70,8 +75,10 @@ class MeshService : Service() {
     override fun onDestroy() {
         LxmfRouter.removeListener(lxmfListener)
         LxmfRouter.stop()
+        MeshCallRouter.stop()
         RnsNode.stop()
         statusHandler.removeCallbacks(statusUpdater)
+        releaseMulticastLock()
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
@@ -114,6 +121,28 @@ class MeshService : Service() {
                 NotificationManager.IMPORTANCE_LOW
             )
             manager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun acquireMulticastLock() {
+        if (multicastLock != null) return
+        try {
+            val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            multicastLock = wifi.createMulticastLock("mesh-multicast").apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to acquire multicast lock", e)
+        }
+    }
+
+    private fun releaseMulticastLock() {
+        try {
+            multicastLock?.release()
+        } catch (_: Exception) {
+        } finally {
+            multicastLock = null
         }
     }
 }

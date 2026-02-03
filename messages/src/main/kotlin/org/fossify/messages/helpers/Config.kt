@@ -240,4 +240,8 @@ class Config(context: Context) : BaseConfig(context) {
     var e2eKeySetTimes: String
         get() = prefs.getString(E2E_KEY_SET_TIMES, "") ?: ""
         set(value) = prefs.edit().putString(E2E_KEY_SET_TIMES, value).apply()
+
+    var meshAddressReplyThreads: Set<String>
+        get() = prefs.getStringSet(MESH_ADDRESS_REPLY_THREADS, HashSet()) ?: HashSet()
+        set(value) = prefs.edit().putStringSet(MESH_ADDRESS_REPLY_THREADS, value).apply()
 }

@@ -7,6 +7,7 @@ import org.bouncycastle.crypto.params.X25519PrivateKeyParameters
 import org.bouncycastle.crypto.params.X25519PublicKeyParameters
 import org.bouncycastle.crypto.signers.Ed25519Signer
 import java.security.SecureRandom
+import java.util.concurrent.ConcurrentHashMap
 
 class RnsIdentity private constructor(
     val publicKey: ByteArray,
@@ -16,6 +17,7 @@ class RnsIdentity private constructor(
         const val KEY_SIZE = 64
         private const val KEY_HALF = 32
         private const val DERIVED_KEY_LENGTH = 64
+        private val knownRatchets = ConcurrentHashMap<String, ByteArray>()
 
         fun generate(): RnsIdentity {
             val rng = SecureRandom()
@@ -39,6 +41,23 @@ class RnsIdentity private constructor(
             val edPrivate = Ed25519PrivateKeyParameters(privateKey, KEY_HALF)
             val publicKey = xPrivate.generatePublicKey().encoded + edPrivate.generatePublicKey().encoded
             return RnsIdentity(publicKey = publicKey, privateKey = privateKey)
+        }
+
+        fun generateRatchetPrivate(): ByteArray {
+            return X25519PrivateKeyParameters(SecureRandom()).encoded
+        }
+
+        fun ratchetPublicFromPrivate(privateKey: ByteArray): ByteArray {
+            return X25519PrivateKeyParameters(privateKey, 0).generatePublicKey().encoded
+        }
+
+        fun rememberRatchet(destinationHash: ByteArray, ratchetPublic: ByteArray) {
+            if (ratchetPublic.isEmpty()) return
+            knownRatchets[RnsHex.encode(destinationHash)] = ratchetPublic
+        }
+
+        fun getRatchetForDestination(destinationHash: ByteArray): ByteArray? {
+            return knownRatchets[RnsHex.encode(destinationHash)]
         }
     }
 
@@ -92,7 +111,11 @@ class RnsIdentity private constructor(
         return ephemeral.generatePublicKey().encoded + ciphertext
     }
 
-    fun decrypt(ciphertextToken: ByteArray, ratchets: List<ByteArray>? = null): ByteArray? {
+    fun decrypt(
+        ciphertextToken: ByteArray,
+        ratchets: List<ByteArray>? = null,
+        enforceRatchets: Boolean = false
+    ): ByteArray? {
         val xPrivate = x25519Private ?: error("Identity does not contain private key")
         if (ciphertextToken.size <= KEY_HALF) return null
         val peerPubBytes = ciphertextToken.copyOfRange(0, KEY_HALF)
@@ -102,7 +125,9 @@ class RnsIdentity private constructor(
         if (!ratchets.isNullOrEmpty()) {
             keysToTry.addAll(ratchets)
         }
-        keysToTry.add(xPrivate)
+        if (!enforceRatchets) {
+            keysToTry.add(xPrivate)
+        }
 
         for (privateKey in keysToTry) {
             try {

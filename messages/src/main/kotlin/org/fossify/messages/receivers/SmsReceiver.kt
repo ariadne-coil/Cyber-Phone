@@ -22,6 +22,7 @@ import org.fossify.messages.extensions.shouldUnarchive
 import org.fossify.messages.extensions.showReceivedMessageNotification
 import org.fossify.messages.extensions.updateConversationArchivedStatus
 import org.fossify.messages.helpers.E2eManager
+import org.fossify.messages.helpers.MeshDiscoveryManager
 import org.fossify.messages.helpers.MessageCategorizer
 import org.fossify.messages.helpers.ReactionHelper
 import org.fossify.messages.helpers.refreshConversations
@@ -58,6 +59,14 @@ class SmsReceiver : BroadcastReceiver() {
                     text = body,
                     receivedAtMillis = date,
                     subscriptionId = subscriptionId
+                )
+                MeshDiscoveryManager.handleIncomingMeshAddress(
+                    context = appContext,
+                    address = address,
+                    threadId = threadId,
+                    text = body,
+                    subscriptionId = subscriptionId,
+                    allowAutoReply = true
                 )
 
                 handleMessageSync(

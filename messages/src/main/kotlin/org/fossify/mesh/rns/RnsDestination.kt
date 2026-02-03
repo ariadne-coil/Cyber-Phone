@@ -1,5 +1,7 @@
 package org.fossify.mesh.rns
 
+import java.util.concurrent.ConcurrentHashMap
+
 class RnsDestination private constructor(
     val identity: RnsIdentity?,
     val direction: Int,
@@ -69,6 +71,23 @@ class RnsDestination private constructor(
             return RnsDestination(identity, direction, type, appName, aspects, name, nameHash, hashOverride)
         }
 
+        fun createPlain(direction: Int, appName: String, aspects: List<String>): RnsDestination {
+            val name = expandName(null, appName, aspects)
+            val nameHash = RnsHash.sha256(name.toByteArray(Charsets.UTF_8))
+                .copyOfRange(0, RnsConstants.NAME_HASH_LENGTH_BITS / 8)
+            val hash = hash(null, appName, aspects)
+            return RnsDestination(
+                identity = null,
+                direction = direction,
+                type = PLAIN,
+                appName = appName,
+                aspects = aspects,
+                name = name,
+                nameHash = nameHash,
+                hash = hash
+            )
+        }
+
         fun fromHash(hash: ByteArray, type: Int): RnsDestination {
             return RnsDestination(
                 identity = null,
@@ -90,12 +109,54 @@ class RnsDestination private constructor(
         }
     }
 
+    private var ratchets: List<ByteArray> = emptyList()
+    private var enforceRatchets: Boolean = false
+    private val requestHandlers = ConcurrentHashMap<String, RequestHandler>()
+
+    fun interface RequestHandler {
+        fun handle(
+            pathHash: ByteArray,
+            data: Any?,
+            requestedAt: Double,
+            remoteIdentity: RnsIdentity?,
+            linkId: ByteArray
+        ): Any?
+    }
+
+    fun setRatchets(ratchetPrivates: List<ByteArray>, enforce: Boolean = false) {
+        ratchets = ratchetPrivates
+        enforceRatchets = enforce
+    }
+
+    fun registerRequestHandler(path: String, handler: RequestHandler) {
+        val pathHash = RnsHash.truncatedHash(path.toByteArray(Charsets.UTF_8))
+        registerRequestHandler(pathHash, handler)
+    }
+
+    fun registerRequestHandler(pathHash: ByteArray, handler: RequestHandler) {
+        requestHandlers[RnsHex.encode(pathHash)] = handler
+    }
+
+    fun removeRequestHandler(path: String) {
+        val pathHash = RnsHash.truncatedHash(path.toByteArray(Charsets.UTF_8))
+        removeRequestHandler(pathHash)
+    }
+
+    fun removeRequestHandler(pathHash: ByteArray) {
+        requestHandlers.remove(RnsHex.encode(pathHash))
+    }
+
+    fun getRequestHandler(pathHash: ByteArray): RequestHandler? {
+        return requestHandlers[RnsHex.encode(pathHash)]
+    }
+
     fun encrypt(plaintext: ByteArray): ByteArray {
         return when (type) {
             PLAIN -> plaintext
             SINGLE -> {
                 val id = identity ?: error("Single destination requires identity")
-                id.encrypt(plaintext)
+                val ratchet = RnsIdentity.getRatchetForDestination(hash)
+                id.encrypt(plaintext, ratchet)
             }
             GROUP -> error("Group destination encryption not implemented")
             else -> plaintext
@@ -107,7 +168,11 @@ class RnsDestination private constructor(
             PLAIN -> ciphertext
             SINGLE -> {
                 val id = identity ?: error("Single destination requires identity")
-                id.decrypt(ciphertext)
+                if (ratchets.isNotEmpty()) {
+                    id.decrypt(ciphertext, ratchets, enforceRatchets)
+                } else {
+                    id.decrypt(ciphertext)
+                }
             }
             GROUP -> error("Group destination decryption not implemented")
             else -> ciphertext

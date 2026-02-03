@@ -35,11 +35,141 @@
             android:orientation="vertical">
 
             <TextView
+                android:id="@+id/profile_section_label"
+                style="@style/SettingsSectionLabelStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/profile_section" />
+
+            <RelativeLayout
+                android:id="@+id/profile_contact_holder"
+                style="@style/SettingsHolderTextViewStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_contact_label"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/profile_contact_label" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_contact_value"
+                    style="@style/SettingsTextValueStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@+id/profile_contact_label" />
+
+            </RelativeLayout>
+
+            <include layout="@layout/divider" />
+
+            <RelativeLayout
+                android:id="@+id/profile_phone_holder"
+                style="@style/SettingsHolderTextViewStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_phone_label"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/profile_phone_label" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_phone_value"
+                    style="@style/SettingsTextValueStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@+id/profile_phone_label" />
+
+            </RelativeLayout>
+
+            <include layout="@layout/divider" />
+
+            <RelativeLayout
+                android:id="@+id/profile_mesh_address_holder"
+                style="@style/SettingsHolderTextViewStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_mesh_address_label"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/profile_mesh_address_label" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_mesh_address_value"
+                    style="@style/SettingsTextValueStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@+id/profile_mesh_address_label" />
+
+            </RelativeLayout>
+
+            <include layout="@layout/divider" />
+
+            <RelativeLayout
+                android:id="@+id/profile_show_qr_holder"
+                style="@style/SettingsHolderTextViewOneLinerStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_show_qr_label"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/profile_show_qr" />
+
+            </RelativeLayout>
+
+            <include layout="@layout/divider" />
+
+            <RelativeLayout
+                android:id="@+id/profile_scan_qr_holder"
+                style="@style/SettingsHolderTextViewOneLinerStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_scan_qr_label"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/profile_scan_qr" />
+
+            </RelativeLayout>
+
+            <include layout="@layout/divider" />
+
+            <RelativeLayout
+                android:id="@+id/profile_rotate_mesh_holder"
+                style="@style/SettingsHolderTextViewOneLinerStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_rotate_mesh_label"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/profile_rotate_mesh" />
+
+            </RelativeLayout>
+
+            <include layout="@layout/divider" />
+
+            <TextView
                 android:id="@+id/manage_e2e_keys_section_label"
                 style="@style/SettingsSectionLabelStyle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/manage_e2e_keys" />
+                android:text="@string/e2e_section_label" />
 
             <RelativeLayout
                 android:id="@+id/manage_e2e_keys_public_holder"
@@ -59,8 +189,7 @@
                     style="@style/SettingsTextValueStyle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_below="@+id/manage_e2e_keys_public_label"
-                    android:textIsSelectable="true" />
+                    android:layout_below="@+id/manage_e2e_keys_public_label" />
 
             </RelativeLayout>
 
@@ -84,42 +213,7 @@
                     style="@style/SettingsTextValueStyle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_below="@+id/manage_e2e_keys_private_label"
-                    android:textIsSelectable="true" />
-
-            </RelativeLayout>
-
-            <include layout="@layout/divider" />
-
-            <RelativeLayout
-                android:id="@+id/manage_e2e_keys_copy_public_holder"
-                style="@style/SettingsHolderTextViewOneLinerStyle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-
-                <org.fossify.commons.views.MyTextView
-                    android:id="@+id/manage_e2e_keys_copy_public_label"
-                    style="@style/SettingsTextLabelStyle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/e2e_copy_public_key" />
-
-            </RelativeLayout>
-
-            <include layout="@layout/divider" />
-
-            <RelativeLayout
-                android:id="@+id/manage_e2e_keys_copy_private_holder"
-                style="@style/SettingsHolderTextViewOneLinerStyle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-
-                <org.fossify.commons.views.MyTextView
-                    android:id="@+id/manage_e2e_keys_copy_private_label"
-                    style="@style/SettingsTextLabelStyle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/e2e_copy_private_key" />
+                    android:layout_below="@+id/manage_e2e_keys_private_label" />
 
             </RelativeLayout>
 

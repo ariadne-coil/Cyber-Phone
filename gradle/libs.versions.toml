@@ -20,6 +20,7 @@ eventbus = "3.3.1"
 room = "2.8.4"
 #Fossify
 commons = "5.13.1"
+commons-compress = "1.26.2"
 mmslib = "1.0.0"
 indicator-fast-scroll = "4524cd0b61"
 #Gradle
@@ -36,6 +37,10 @@ slf4j = "1.7.36"
 work = "2.11.0"
 bouncycastle = "1.78.1"
 msgpack = "0.9.11"
+zxingCore = "3.5.3"
+zxingEmbedded = "4.3.0"
+concentus = "6c2328dc19"
+junit = "4.13.2"
 #build
 app-build-compileSDKVersion = "36"
 app-build-targetSDK = "36"
@@ -57,6 +62,7 @@ androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref =
 compose-detekt = { module = "io.nlopez.compose.rules:detekt", version.ref = "detektCompose" }
 #Fossify
 fossify-commons = { module = "org.fossify:commons", version.ref = "commons" }
+commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commons-compress" }
 indicator-fast-scroll = { module = "org.fossify:IndicatorFastScroll", version.ref = "indicator-fast-scroll" }
 mmslib = { module = "org.fossify:mmslib", version.ref = "mmslib" }
 #EventBus
@@ -77,6 +83,10 @@ slf4j-android = { module = "org.slf4j:slf4j-android", version.ref = "slf4j" }
 work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
 bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 msgpack-core = { module = "org.msgpack:msgpack-core", version.ref = "msgpack" }
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxingCore" }
+zxing-embedded = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxingEmbedded" }
+concentus = { module = "com.github.lostromb:concentus", version.ref = "concentus" }
+junit = { module = "junit:junit", version.ref = "junit" }
 
 [bundles]
 room = [

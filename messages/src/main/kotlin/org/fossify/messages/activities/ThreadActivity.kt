@@ -172,6 +172,7 @@ import org.fossify.messages.helpers.FILE_SIZE_NONE
 import org.fossify.messages.helpers.IS_LAUNCHED_FROM_SHORTCUT
 import org.fossify.messages.helpers.IS_RECYCLE_BIN
 import org.fossify.messages.helpers.MESSAGES_LIMIT
+import org.fossify.messages.helpers.MeshDiscoveryManager
 import org.fossify.messages.helpers.PICK_CONTACT_INTENT
 import org.fossify.messages.helpers.PICK_DOCUMENT_INTENT
 import org.fossify.messages.helpers.PICK_PHOTO_INTENT
@@ -213,6 +214,8 @@ import org.fossify.messages.models.ThreadItem.ThreadSent
 import org.fossify.mesh.MeshConfig
 import org.fossify.mesh.MeshMode
 import org.fossify.mesh.lxmf.LxmfAddress
+import org.fossify.mesh.lxmf.LxmfAttachmentPayload
+import org.fossify.mesh.lxmf.LxmfAttachments
 import org.fossify.mesh.lxmf.LxmfRouter
 import org.fossify.mesh.lxmf.LxmfStore
 import org.greenrobot.eventbus.EventBus
@@ -385,6 +388,10 @@ class ThreadActivity : SimpleActivity() {
         val firstPhoneNumber = participants.firstOrNull()?.phoneNumbers?.firstOrNull()?.value
         val archiveAvailable = config.isArchiveAvailable
         val canUseE2e = participants.size == 1 && !isSpecialNumber() && !isRecycleBin && !isMeshThread()
+        val meshMode = MeshConfig.newInstance(this).getMeshMode()
+        val canUseMeshDiscovery = participants.size == 1 && !isSpecialNumber() && !isRecycleBin && !isMeshThread() &&
+            meshMode != MeshMode.STANDARD_ONLY
+        val meshAddress = participants.firstOrNull()?.let { MeshDiscoveryManager.getMeshAddressForContact(this, it) }
         val canEditContactKey = canUseE2e && participants.firstOrNull()?.let {
             it.rawId > 0 || it.contactId > 0
         } == true
@@ -420,6 +427,8 @@ class ThreadActivity : SimpleActivity() {
             findItem(R.id.encrypt_messages).isChecked =
                 hasSharedSecret && E2eManager.isThreadEncrypted(this@ThreadActivity, threadId)
             findItem(R.id.edit_contact_key).isVisible = canEditContactKey
+            findItem(R.id.exchange_mesh_address).isVisible = canUseMeshDiscovery
+            findItem(R.id.start_mesh_chat).isVisible = canUseMeshDiscovery && !meshAddress.isNullOrBlank()
         }
         updateSpamThreadStatus()
     }
@@ -540,6 +549,8 @@ class ThreadActivity : SimpleActivity() {
             R.id.rename_conversation -> renameConversation()
             R.id.conversation_details -> launchConversationDetails(threadId)
             R.id.exchange_keys -> sendKeyExchange()
+            R.id.exchange_mesh_address -> sendMeshAddressExchange()
+            R.id.start_mesh_chat -> startMeshChat()
             R.id.encrypt_messages -> toggleEncryption(menuItem)
             R.id.edit_contact_key -> editContactKey()
             R.id.mark_as_not_spam -> markAsNotSpam()
@@ -570,6 +581,38 @@ class ThreadActivity : SimpleActivity() {
         E2eManager.markKeySent(this, threadId)
         sendMessageCompat(message, listOf(address), subscriptionId, emptyList())
         toast(R.string.e2e_key_exchange_sent)
+    }
+
+    private fun sendMeshAddressExchange() {
+        if (participants.size != 1 || isSpecialNumber() || isRecycleBin || isMeshThread()) {
+            return
+        }
+        val address = participants.getAddresses().firstOrNull()
+        if (address.isNullOrBlank()) {
+            showErrorToast(getString(org.fossify.commons.R.string.unknown_error_occurred))
+            return
+        }
+        val message = MeshDiscoveryManager.buildMeshAddressMessage(this) ?: run {
+            showErrorToast(getString(org.fossify.commons.R.string.unknown_error_occurred))
+            return
+        }
+        val subscriptionId = availableSIMCards.getOrNull(currentSIMCardIndex)?.subscriptionId
+            ?: SmsManager.getDefaultSmsSubscriptionId()
+        sendMessageCompat(message, listOf(address), subscriptionId, emptyList())
+        toast(R.string.mesh_address_exchange_sent)
+    }
+
+    private fun startMeshChat() {
+        val contact = participants.firstOrNull() ?: return
+        val meshAddress = MeshDiscoveryManager.getMeshAddressForContact(this, contact) ?: return
+        val newThreadId = getThreadId(setOf(meshAddress))
+        Intent(this, ThreadActivity::class.java).apply {
+            putExtra(THREAD_ID, newThreadId)
+            putExtra(THREAD_TITLE, contact.name)
+            putExtra(THREAD_NUMBER, meshAddress)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            startActivity(this)
+        }
     }
 
     private fun toggleEncryption(menuItem: MenuItem) {
@@ -1807,12 +1850,21 @@ class ThreadActivity : SimpleActivity() {
         val isImage = mimeType.isImageMimeType()
         val isGif = mimeType.isGifMimeType()
         if (isGif || !isImage) {
-            // is it assumed that images will always be compressed below the max MMS size limit
-            val fileSize = getFileSizeFromUri(uri)
-            val mmsFileSizeLimit = config.mmsFileSizeLimit
-            if (mmsFileSizeLimit != FILE_SIZE_NONE && fileSize > mmsFileSizeLimit) {
-                toast(R.string.attachment_sized_exceeds_max_limit, length = Toast.LENGTH_LONG)
-                return
+            val meshMode = MeshConfig.newInstance(this).getMeshMode()
+            val meshAddress = if (!isMeshThread() && participants.size == 1 && !isSpecialNumber() && !isRecycleBin) {
+                MeshDiscoveryManager.getMeshAddressForContact(this, participants.first())
+            } else {
+                null
+            }
+            val bypassLimit = isMeshThread() || (!meshAddress.isNullOrBlank() && meshMode != MeshMode.STANDARD_ONLY)
+            if (!bypassLimit) {
+                // is it assumed that images will always be compressed below the max MMS size limit
+                val fileSize = getFileSizeFromUri(uri)
+                val mmsFileSizeLimit = config.mmsFileSizeLimit
+                if (mmsFileSizeLimit != FILE_SIZE_NONE && fileSize > mmsFileSizeLimit) {
+                    toast(R.string.attachment_sized_exceeds_max_limit, length = Toast.LENGTH_LONG)
+                    return
+                }
             }
         }
 
@@ -1899,17 +1951,54 @@ class ThreadActivity : SimpleActivity() {
 
         text = removeDiacriticsIfNeeded(text)
 
+        val meshMode = MeshConfig.newInstance(this).getMeshMode()
+        val meshAddress = if (!isMeshThread() && participants.size == 1 && !isSpecialNumber() && !isRecycleBin) {
+            MeshDiscoveryManager.getMeshAddressForContact(this, participants.first())
+        } else {
+            null
+        }
+
         if (isMeshThread()) {
-            if (getAttachmentSelections().isNotEmpty()) {
-                showErrorToast(getString(R.string.mesh_attachments_not_supported))
-                return
-            }
             if (isScheduledMessage) {
                 showErrorToast(getString(R.string.mesh_scheduled_not_supported))
                 return
             }
-            sendMeshMessage(text)
+            val attachments = getAttachmentSelections()
+            if (attachments.isNotEmpty()) {
+                sendMeshMessageWithAttachments(
+                    destination = participants.getAddresses().firstOrNull().orEmpty(),
+                    text = text,
+                    attachments = attachments,
+                    allowFallback = false,
+                    fallbackNumber = null
+                )
+            } else {
+                sendMeshMessage(text)
+            }
             return
+        } else if (!meshAddress.isNullOrBlank() && meshMode != MeshMode.STANDARD_ONLY) {
+            if (isScheduledMessage && meshMode == MeshMode.MESH_ONLY) {
+                showErrorToast(getString(R.string.mesh_scheduled_not_supported))
+                return
+            }
+            val attachments = getAttachmentSelections()
+            val allowFallback = meshMode == MeshMode.MESH_WITH_FALLBACK
+            val fallbackNumber = participants.getAddresses().firstOrNull { !LxmfAddress.isMeshAddress(it) }
+            if (attachments.isNotEmpty()) {
+                sendMeshMessageWithAttachments(
+                    destination = meshAddress,
+                    text = text,
+                    attachments = attachments,
+                    allowFallback = allowFallback,
+                    fallbackNumber = fallbackNumber
+                )
+                return
+            } else {
+                val sent = sendMeshMessageToAddress(meshAddress, text, allowFallback, fallbackNumber)
+                if (sent || meshMode == MeshMode.MESH_ONLY) {
+                    return
+                }
+            }
         }
 
         val subscriptionId = availableSIMCards.getOrNull(currentSIMCardIndex)?.subscriptionId
@@ -1929,11 +2018,45 @@ class ThreadActivity : SimpleActivity() {
             showErrorToast(getString(org.fossify.commons.R.string.unknown_error_occurred))
             return
         }
+        sendMeshMessageToAddress(destination, text, allowFallback = true)
+    }
+
+    private fun sendMeshMessageToAddress(
+        destination: String,
+        text: String,
+        allowFallback: Boolean,
+        fallbackNumber: String? = null
+    ): Boolean {
         val normalized = LxmfAddress.normalize(destination)
         val destinationHash = LxmfAddress.decode(normalized)
         if (destinationHash == null) {
             showErrorToast(getString(R.string.mesh_invalid_address))
-            return
+            return false
+        }
+
+        val meshMode = MeshConfig.newInstance(this).getMeshMode()
+        if (meshMode == MeshMode.STANDARD_ONLY) {
+            showErrorToast(getString(R.string.mesh_disabled))
+            return false
+        }
+
+        val timestamp = (System.currentTimeMillis() / 1000L).toInt()
+        val messageId = LxmfAddress.messageIdForHash(
+            normalized.toByteArray(Charsets.UTF_8) + timestamp.toString().toByteArray()
+        )
+        val sent = LxmfRouter.sendText(destinationHash, text) {
+            LxmfStore.markDelivered(this, messageId)
+        }
+        if (!sent) {
+            if (allowFallback) {
+                val fallbackAllowed = fallbackNumber != null || !LxmfAddress.isMeshAddress(destination)
+                if (fallbackAllowed) {
+                    sendNormalMessage(text, SmsManager.getDefaultSmsSubscriptionId())
+                    return true
+                }
+            }
+            showErrorToast(getString(R.string.mesh_delivery_failed))
+            return false
         }
 
         val meshThreadId = LxmfAddress.threadIdForAddress(normalized)
@@ -1942,24 +2065,75 @@ class ThreadActivity : SimpleActivity() {
             conversation = LxmfStore.ensureConversation(this, normalized)
         }
 
+        LxmfStore.storeOutgoing(this, normalized, text, timestamp, messageId)
+        clearCurrentMessage()
+        return true
+    }
+
+    private fun sendMeshMessageWithAttachments(
+        destination: String,
+        text: String,
+        attachments: List<AttachmentSelection>,
+        allowFallback: Boolean,
+        fallbackNumber: String?
+    ) {
+        val normalized = LxmfAddress.normalize(destination)
+        val destinationHash = LxmfAddress.decode(normalized)
+        if (destinationHash == null) {
+            showErrorToast(getString(R.string.mesh_invalid_address))
+            return
+        }
         val meshMode = MeshConfig.newInstance(this).getMeshMode()
         if (meshMode == MeshMode.STANDARD_ONLY) {
             showErrorToast(getString(R.string.mesh_disabled))
             return
         }
 
-        val sent = LxmfRouter.sendText(destinationHash, text)
-        if (!sent) {
-            if (meshMode == MeshMode.MESH_WITH_FALLBACK && !LxmfAddress.isMeshAddress(destination)) {
-                sendNormalMessage(text, SmsManager.getDefaultSmsSubscriptionId())
-            } else {
-                showErrorToast(getString(R.string.mesh_delivery_failed))
-            }
-            return
-        }
+        val timestamp = (System.currentTimeMillis() / 1000L).toInt()
+        val messageId = LxmfAddress.messageIdForHash(
+            normalized.toByteArray(Charsets.UTF_8) + timestamp.toString().toByteArray()
+        )
 
-        LxmfStore.storeOutgoing(this, normalized, text)
-        clearCurrentMessage()
+        ensureBackgroundThread {
+            val payloads = buildMeshAttachmentPayloads(attachments)
+            val fields = LxmfAttachments.encode(payloads)
+            val sent = LxmfRouter.sendText(destinationHash, text, fields) {
+                LxmfStore.markDelivered(this, messageId)
+            }
+            if (!sent) {
+                if (allowFallback && fallbackNumber != null) {
+                    runOnUiThread {
+                        sendNormalMessage(text, SmsManager.getDefaultSmsSubscriptionId())
+                    }
+                    return@ensureBackgroundThread
+                }
+                runOnUiThread {
+                    showErrorToast(getString(R.string.mesh_delivery_failed))
+                }
+                return@ensureBackgroundThread
+            }
+
+            if (threadId != LxmfAddress.threadIdForAddress(normalized)) {
+                threadId = LxmfAddress.threadIdForAddress(normalized)
+                conversation = LxmfStore.ensureConversation(this, normalized)
+            }
+
+            LxmfStore.storeOutgoing(this, normalized, text, timestamp, messageId, payloads)
+            runOnUiThread { clearCurrentMessage() }
+        }
+    }
+
+    private fun buildMeshAttachmentPayloads(selections: List<AttachmentSelection>): List<LxmfAttachmentPayload> {
+        if (selections.isEmpty()) return emptyList()
+        val result = ArrayList<LxmfAttachmentPayload>()
+        selections.forEach { selection ->
+            try {
+                val data = contentResolver.openInputStream(selection.uri)?.use { it.readBytes() } ?: return@forEach
+                result.add(LxmfAttachmentPayload(selection.filename, selection.mimetype, data))
+            } catch (_: Exception) {
+            }
+        }
+        return result
     }
 
     private fun sendScheduledMessage(text: String, subscriptionId: Int) {

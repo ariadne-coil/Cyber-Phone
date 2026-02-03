@@ -3,6 +3,7 @@ package org.fossify.mesh.lxmf
 import org.fossify.mesh.rns.RnsDestination
 import org.fossify.mesh.rns.RnsHash
 import org.fossify.mesh.rns.RnsIdentity
+import org.fossify.mesh.lxmf.LxmfStamper
 import org.msgpack.core.MessagePack
 import org.msgpack.value.Value
 
@@ -21,6 +22,8 @@ class LxmfMessage private constructor(
     var packed: ByteArray? = null
     var incoming: Boolean = false
     var signatureValidated: Boolean = false
+    var stamp: ByteArray? = null
+    var stampCost: Int? = null
 
     fun pack(): ByteArray {
         if (packed != null) {
@@ -38,11 +41,25 @@ class LxmfMessage private constructor(
             content.toByteArray(Charsets.UTF_8),
             fields
         )
-        val packedPayload = packPayload(payload)
-        val hashedPart = destinationHash + sourceHash + packedPayload
+        val basePacked = packPayload(payload)
+        val hashedPart = destinationHash + sourceHash + basePacked
         val messageHash = RnsHash.sha256(hashedPart)
         val signedPart = hashedPart + messageHash
         val signature = source.sign(signedPart) ?: error("Source identity missing for signature")
+        val finalPayload = payload.toMutableList()
+        val stampCost = stampCost
+        if (stampCost != null && stampCost > 0) {
+            val stampResult = LxmfStamper.generateStamp(
+                messageHash,
+                stampCost,
+                LxmfStamper.WORKBLOCK_EXPAND_ROUNDS
+            )
+            if (stampResult != null && stampResult.stamp.isNotEmpty()) {
+                stamp = stampResult.stamp
+                finalPayload.add(stampResult.stamp)
+            }
+        }
+        val packedPayload = packPayload(finalPayload)
         val packedMessage = destinationHash + sourceHash + signature + packedPayload
 
         this.signature = signature
@@ -61,7 +78,8 @@ class LxmfMessage private constructor(
             source: RnsDestination,
             title: String,
             content: String,
-            fields: Map<Int, Any?> = emptyMap()
+            fields: Map<Int, Any?> = emptyMap(),
+            stampCost: Int? = null
         ): LxmfMessage {
             val message = LxmfMessage(
                 destinationHash = destination.hash,
@@ -72,6 +90,7 @@ class LxmfMessage private constructor(
             )
             message.title = title
             message.content = content
+            message.stampCost = stampCost
             return message
         }
 
@@ -128,6 +147,12 @@ class LxmfMessage private constructor(
             message.hash = messageHash
             message.packed = lxmfBytes
             message.incoming = true
+            if (unpackedPayload.size > 4) {
+                val stampValue = unpackedPayload[4]
+                if (stampValue is ByteArray) {
+                    message.stamp = stampValue
+                }
+            }
             message.signatureValidated = sourceIdentity?.verify(signedPart, signature) == true
             return message
         }

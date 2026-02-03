@@ -9,6 +9,7 @@ import org.fossify.commons.extensions.getPhoneNumberTypeText
 import org.fossify.commons.helpers.ContactsHelper
 import org.fossify.commons.helpers.MyContactsContentProvider
 import org.fossify.commons.helpers.ensureBackgroundThread
+import org.fossify.mesh.MeshContactHelper
 import org.fossify.phone.R
 import org.fossify.phone.extensions.config
 import org.fossify.phone.extensions.isConference
@@ -75,6 +76,14 @@ fun getCallContact(context: Context, call: Call?, callback: (CallContact) -> Uni
 
                 callback(callContact)
             }
+        } else if (uri.startsWith("mesh:")) {
+            val trimmed = uri.removePrefix("mesh:")
+            val normalized = if (trimmed.startsWith("mesh:")) trimmed else "mesh:$trimmed"
+            val (name, photoUri) = MeshContactHelper.getContactNameAndPhotoForMeshAddress(context, normalized)
+            callContact.number = normalized
+            callContact.name = name ?: normalized
+            callContact.photoUri = photoUri ?: ""
+            callback(callContact)
         }
     }
 }

@@ -79,6 +79,8 @@ const val E2E_KEY_SENT_THREADS = "e2e_key_sent_threads"
 const val E2E_KEY_SET_TIMES = "e2e_key_set_times"
 const val E2E_KEY_MESSAGE_PREFIX = "E2EKEY1:"
 const val E2E_ENCRYPTED_MESSAGE_PREFIX = "E2E1:"
+const val MESH_ADDRESS_MESSAGE_PREFIX = "MESHADDR1:"
+const val MESH_ADDRESS_REPLY_THREADS = "mesh_address_reply_threads"
 
 private const val PATH = "org.fossify.org.fossify.messages.action."
 const val MARK_AS_READ = PATH + "mark_as_read"

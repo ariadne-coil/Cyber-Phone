@@ -4,6 +4,9 @@ import android.content.Context
 import java.util.LinkedHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
 object RnsNode {
@@ -17,6 +20,10 @@ object RnsNode {
     private const val RESOURCE_ASSEMBLY_TIMEOUT_MS = 5 * 60 * 1000L
     private const val DIRECT_NEIGHBOR_TIMEOUT_MS = 5 * 60 * 1000L
     private const val ROUTING_ACTIVITY_WINDOW_MS = 2 * 60 * 1000L
+    private const val ANNOUNCE_INTERVAL_MS = 10 * 60 * 1000L
+    private const val PATH_REQUEST_MIN_INTERVAL_MS = 20_000L
+    private const val PATH_REQUEST_TAG_LIMIT = 32_000
+    private const val PATH_REQUEST_APP = "rnstransport"
 
     private val interfaces = mutableListOf<RnsInterface>()
     private val running = AtomicBooleanState()
@@ -31,12 +38,47 @@ object RnsNode {
     private val resourceAssemblers = ConcurrentHashMap<String, ResourceAssembler>()
     private val resourceListeners = CopyOnWriteArrayList<(RnsResource) -> Unit>()
     private val resourceAdvertisementListeners = CopyOnWriteArrayList<(RnsResourceAdvertisement) -> Unit>()
+    private val linkResourceManager = RnsLinkResourceManager { data, link, meta ->
+        if (meta.isRequest) {
+            val requestId = meta.requestId ?: RnsHash.truncatedHash(RnsHash.sha256(data))
+            link.handleRequest(data, link.owner, requestId, { linkInstance, packetType, context, payload ->
+                sendLinkPacket(linkInstance, packetType, context, payload, null)
+            }, { payload, responseId, isResponse ->
+                sendLinkResource(link, payload, responseId, isResponse = isResponse, isRequest = false)
+            })
+            return@RnsLinkResourceManager
+        }
+
+        if (meta.isResponse) {
+            link.handleResponse(data)
+            return@RnsLinkResourceManager
+        }
+
+        val resource = RnsResource(
+            hash = RnsHash.sha256(data),
+            sourceHash = link.owner.hash,
+            destinationHash = link.owner.hash,
+            kind = RnsResourceKind.LXMF_MESSAGE,
+            encrypted = false,
+            timestamp = System.currentTimeMillis() / 1000L,
+            data = data
+        )
+        resourceListeners.forEach { it(resource) }
+    }
     private val pendingLinksById = ConcurrentHashMap<String, RnsLink>()
     private val pendingLinksByDestination = ConcurrentHashMap<String, String>()
     private val activeLinksById = ConcurrentHashMap<String, RnsLink>()
     private val activeLinksByDestination = ConcurrentHashMap<String, String>()
     private val pendingLinkResources = ConcurrentHashMap<String, CopyOnWriteArrayList<PendingLinkResource>>()
+    private val pendingLinkPackets = ConcurrentHashMap<String, CopyOnWriteArrayList<PendingLinkPacket>>()
     private val lastRoutingActivityMs = AtomicLong(0L)
+    private val pathRequestTags = LinkedHashMap<String, Long>()
+    private val lastPathRequestMs = ConcurrentHashMap<String, Long>()
+    private val announceListeners = CopyOnWriteArrayList<(RnsAnnounce, RnsPacket) -> Unit>()
+    private val receipts = ConcurrentHashMap<String, RnsReceipt>()
+
+    private val announceScheduler = Executors.newSingleThreadScheduledExecutor()
+    private var announceFuture: ScheduledFuture<*>? = null
 
     private var routingEnabled = false
 
@@ -53,6 +95,8 @@ object RnsNode {
             }
             interfaces.add(udpInterface)
             interfaces.forEach { it.start() }
+            registerPathRequestDestination()
+            startAnnounceScheduler()
         } else {
             routingEnabled = routing
         }
@@ -74,11 +118,139 @@ object RnsNode {
             activeLinksById.clear()
             activeLinksByDestination.clear()
             pendingLinkResources.clear()
+            pendingLinkPackets.clear()
+            localDestinations.clear()
+            knownDestinations.clear()
+            announceFuture?.cancel(true)
+            announceFuture = null
         }
     }
 
     fun setRoutingEnabled(enabled: Boolean) {
         routingEnabled = enabled
+    }
+
+    fun addAnnounceListener(listener: (RnsAnnounce, RnsPacket) -> Unit) {
+        announceListeners.add(listener)
+    }
+
+    fun removeAnnounceListener(listener: (RnsAnnounce, RnsPacket) -> Unit) {
+        announceListeners.remove(listener)
+    }
+
+    fun requestPath(destinationHash: ByteArray) {
+        val now = System.currentTimeMillis()
+        val key = RnsHex.encode(destinationHash)
+        val last = lastPathRequestMs[key] ?: 0L
+        if (now - last < PATH_REQUEST_MIN_INTERVAL_MS) return
+        lastPathRequestMs[key] = now
+
+        val tag = RnsHash.truncatedHash((destinationHash + now.toString().toByteArray()))
+        val payload = destinationHash + tag
+        val dest = RnsDestination.createPlain(
+            direction = RnsDestination.OUT,
+            appName = PATH_REQUEST_APP,
+            aspects = listOf("path", "request")
+        )
+        val packet = RnsPacket(
+            destination = dest,
+            data = payload,
+            packetType = RnsPacket.DATA,
+            transportType = RnsTransport.BROADCAST,
+            headerType = RnsPacket.HEADER_1
+        )
+        send(packet)
+    }
+
+    private fun registerPathRequestDestination() {
+        val destination = RnsDestination.createPlain(
+            direction = RnsDestination.IN,
+            appName = PATH_REQUEST_APP,
+            aspects = listOf("path", "request")
+        )
+        registerDestination(destination, { packet, data ->
+            handlePathRequest(packet, data)
+        })
+    }
+
+    private fun handlePathRequest(packet: RnsPacket, data: ByteArray) {
+        if (data.size < RnsConstants.TRUNCATED_HASH_LENGTH_BITS / 8) return
+        val destHashLength = RnsConstants.TRUNCATED_HASH_LENGTH_BITS / 8
+        val destinationHash = data.copyOfRange(0, destHashLength)
+        val tagBytes = if (data.size > destHashLength * 2) {
+            data.copyOfRange(destHashLength * 2, data.size)
+        } else if (data.size > destHashLength) {
+            data.copyOfRange(destHashLength, data.size)
+        } else {
+            ByteArray(0)
+        }
+
+        if (tagBytes.isNotEmpty()) {
+            val tagKey = RnsHex.encode(destinationHash) + ":" + RnsHex.encode(tagBytes)
+            synchronized(pathRequestTags) {
+                if (pathRequestTags.containsKey(tagKey)) return
+                pathRequestTags[tagKey] = System.currentTimeMillis()
+                trimPathRequestTags()
+            }
+        }
+
+        val destKey = RnsHex.encode(destinationHash)
+        val local = localDestinations[destKey]
+        if (local != null) {
+            val config = local.announceProvider?.invoke()
+            announce(
+                destination = local.destination,
+                appData = config?.appData,
+                ratchetPublic = config?.ratchetPublic,
+                context = RnsPacket.PATH_RESPONSE
+            )
+            return
+        }
+
+        val known = knownDestinations[destKey]
+        if (known != null) {
+            sendPathResponseFromKnown(known)
+        }
+    }
+
+    private fun sendPathResponseFromKnown(known: KnownDestination) {
+        val announceData = buildAnnounceData(known)
+        val packet = RnsPacket(
+            destination = RnsDestination.fromHash(known.destinationHash, RnsDestination.SINGLE),
+            data = announceData,
+            packetType = RnsPacket.ANNOUNCE,
+            context = RnsPacket.PATH_RESPONSE,
+            contextFlag = if (known.ratchet.isNotEmpty()) RnsPacket.FLAG_SET else RnsPacket.FLAG_UNSET
+        )
+        send(packet)
+    }
+
+    private fun buildAnnounceData(known: KnownDestination): ByteArray {
+        val payload = ArrayList<Byte>()
+        payload.addAll(known.publicKey.toList())
+        payload.addAll(known.nameHash.toList())
+        payload.addAll(known.randomHash.toList())
+        payload.addAll(known.ratchet.toList())
+        payload.addAll(known.signature.toList())
+        known.appData?.let { payload.addAll(it.toList()) }
+        return payload.toByteArray()
+    }
+
+    private fun trimPathRequestTags() {
+        while (pathRequestTags.size > PATH_REQUEST_TAG_LIMIT) {
+            val key = pathRequestTags.entries.firstOrNull()?.key ?: return
+            pathRequestTags.remove(key)
+        }
+    }
+
+    private fun startAnnounceScheduler() {
+        announceFuture?.cancel(true)
+        announceFuture = announceScheduler.scheduleAtFixedRate(
+            { announceAll() },
+            ANNOUNCE_INTERVAL_MS,
+            ANNOUNCE_INTERVAL_MS,
+            TimeUnit.MILLISECONDS
+        )
     }
 
     fun getDirectNeighborCount(timeoutMs: Long = DIRECT_NEIGHBOR_TIMEOUT_MS): Int {
@@ -203,21 +375,93 @@ object RnsNode {
         return true
     }
 
+    fun sendPacketViaLink(
+        owner: RnsDestination,
+        destination: RnsDestination,
+        payload: ByteArray,
+        context: Int = RnsPacket.NONE,
+        packetType: Int = RnsPacket.DATA
+    ): Boolean {
+        val link = ensureLink(owner, destination) ?: return false
+        if (link.isActive()) {
+            return sendLinkPacket(link, packetType, context, payload, null) != null
+        } else {
+            queueLinkPacket(link, packetType, context, payload)
+        }
+        return true
+    }
+
+    fun sendPacketOnLink(
+        linkId: ByteArray,
+        payload: ByteArray,
+        context: Int = RnsPacket.NONE,
+        packetType: Int = RnsPacket.DATA
+    ): Boolean {
+        val link = activeLinksById[RnsHex.encode(linkId)] ?: return false
+        return sendLinkPacket(link, packetType, context, payload, null) != null
+    }
+
+    fun identifyLink(owner: RnsDestination, destination: RnsDestination, identity: RnsIdentity): Boolean {
+        val link = ensureLink(owner, destination) ?: return false
+        if (!link.isActive()) return false
+        return link.identify(identity) { linkInstance, packetType, context, payload ->
+            sendLinkPacket(linkInstance, packetType, context, payload, null)
+        }
+    }
+
+    fun requestOverLink(
+        owner: RnsDestination,
+        destination: RnsDestination,
+        path: String,
+        data: Any?,
+        onResponse: ((RnsRequestReceipt) -> Unit)? = null,
+        onFailure: ((RnsRequestReceipt) -> Unit)? = null
+    ): RnsRequestReceipt? {
+        val link = ensureLink(owner, destination) ?: return null
+        return link.request(path, data, { linkInstance, packetType, context, payload ->
+            sendLinkPacket(linkInstance, packetType, context, payload, null)
+        }, onResponse, onFailure, { payload, requestId, isResponse ->
+            sendLinkResource(link, payload, requestId, isResponse = isResponse, isRequest = !isResponse)
+        })
+    }
+
     fun hasResource(resourceHash: ByteArray): Boolean {
         return resourceCache.containsKey(RnsHex.encode(resourceHash))
     }
 
-    fun registerDestination(destination: RnsDestination, callback: (RnsPacket, ByteArray) -> Unit) {
-        localDestinations[RnsHex.encode(destination.hash)] = LocalDestination(destination, callback)
+    fun registerDestination(
+        destination: RnsDestination,
+        callback: (RnsPacket, ByteArray) -> Unit,
+        announceProvider: (() -> RnsAnnounceConfig)? = null
+    ) {
+        localDestinations[RnsHex.encode(destination.hash)] = LocalDestination(destination, callback, announceProvider)
     }
 
     fun unregisterDestination(destinationHash: ByteArray) {
         localDestinations.remove(RnsHex.encode(destinationHash))
     }
 
-    fun announce(destination: RnsDestination, appData: ByteArray? = null) {
-        val packet = RnsAnnounce.build(destination, appData)
+    fun announce(
+        destination: RnsDestination,
+        appData: ByteArray? = null,
+        ratchetPublic: ByteArray? = null,
+        context: Int = RnsPacket.NONE
+    ) {
+        val packet = RnsAnnounce.build(destination, appData, ratchetPublic, context)
         send(packet)
+    }
+
+    fun announceAll() {
+        localDestinations.values.forEach { local ->
+            if (local.destination.identity == null || local.destination.type != RnsDestination.SINGLE) return@forEach
+            val config = local.announceProvider?.invoke()
+            announce(
+                destination = local.destination,
+                appData = config?.appData,
+                ratchetPublic = config?.ratchetPublic,
+                context = RnsPacket.NONE
+            )
+        }
     }
 
     fun send(packet: RnsPacket, interfaceName: String? = null) {
@@ -230,6 +474,26 @@ object RnsNode {
         }
     }
 
+    fun sendWithReceipt(
+        packet: RnsPacket,
+        destinationHash: ByteArray,
+        onDelivered: (() -> Unit)? = null
+    ) {
+        val raw = packet.pack()
+        val hashable = RnsPacket.getHashablePart(raw)
+        val fullHash = RnsHash.sha256(hashable)
+        val truncated = RnsHash.truncatedHash(fullHash)
+        val receipt = RnsReceipt(
+            packetHash = fullHash,
+            truncatedHash = truncated,
+            destinationHash = destinationHash,
+            createdAt = System.currentTimeMillis(),
+            onDelivered = onDelivered
+        )
+        receipts[RnsHex.encode(truncated)] = receipt
+        send(packet)
+    }
+
     private fun handleIncoming(raw: ByteArray, iface: RnsInterface) {
         val packet = try {
             RnsPacket.fromRaw(raw)
@@ -240,6 +504,11 @@ object RnsNode {
         val destination = packet.destination ?: return
         val destHash = destination.hash
         val destKey = RnsHex.encode(destHash)
+
+        if (packet.packetType == RnsPacket.PROOF && destination.type != RnsDestination.LINK) {
+            handleProof(packet)
+            return
+        }
 
         if (packet.packetType == RnsPacket.ANNOUNCE) {
             handleAnnounce(raw, packet, iface)
@@ -281,6 +550,7 @@ object RnsNode {
         if (local != null) {
             val payload = decryptPayload(packet, local.destination) ?: return
             local.callback(packet, payload)
+            maybeSendProof(packet, local)
             return
         }
 
@@ -313,9 +583,18 @@ object RnsNode {
         val linkKey = RnsHex.encode(linkId)
         val link = activeLinksById[linkKey] ?: pendingLinksById[linkKey] ?: return
 
-        if (packet.packetType == RnsPacket.PROOF && packet.context == RnsPacket.LRPROOF) {
-            handleLinkProof(link, packet, iface)
-            return
+        if (packet.packetType == RnsPacket.PROOF) {
+            if (packet.context == RnsPacket.LRPROOF) {
+                handleLinkProof(link, packet, iface)
+                return
+            }
+            if (packet.context == RnsPacket.RESOURCE_PRF) {
+                val payload = link.decryptForPacket(packet.packetType, packet.context, packet.data) ?: return
+                linkResourceManager.handleProof(payload, link) { packetType, context, data ->
+                    sendLinkPacket(link, packetType, context, data, iface.name)
+                }
+                return
+            }
         }
 
         val payload = link.decryptForPacket(packet.packetType, packet.context, packet.data) ?: return
@@ -325,9 +604,28 @@ object RnsNode {
                     activateLink(link)
                 }
             }
-            RnsPacket.RESOURCE_ADV -> handleResourceAdvertisementPayload(payload)
+            RnsPacket.REQUEST -> {
+                val requestId = packet.raw?.let { raw ->
+                    RnsHash.truncatedHash(RnsHash.sha256(RnsPacket.getHashablePart(raw)))
+                } ?: return
+                link.handleRequest(payload, link.owner, requestId, { target, packetType, context, data ->
+                    sendLinkPacket(target, packetType, context, data, iface.name)
+                }, { responsePayload, responseId, isResponse ->
+                    sendLinkResource(link, responsePayload, responseId, isResponse = isResponse, isRequest = false)
+                })
+            }
+            RnsPacket.RESPONSE -> link.handleResponse(payload)
+            RnsPacket.LINKIDENTIFY -> link.handleIdentify(payload)
+            RnsPacket.RESOURCE_ADV -> linkResourceManager.handleAdvertisement(payload, link) { packetType, context, data ->
+                sendLinkPacket(link, packetType, context, data, iface.name)
+            }
             RnsPacket.RESOURCE_REQ -> handleResourceRequestPayload(payload, link)
-            RnsPacket.RESOURCE -> handleResourceChunk(packet.copy(data = payload))
+            RnsPacket.RESOURCE_HMU -> linkResourceManager.handleHmu(payload, link) { packetType, context, data ->
+                sendLinkPacket(link, packetType, context, data, iface.name)
+            }
+            RnsPacket.RESOURCE -> linkResourceManager.handlePart(payload, link) { packetType, context, data ->
+                sendLinkPacket(link, packetType, context, data, iface.name)
+            }
             else -> {
                 val ownerKey = RnsHex.encode(link.owner.hash)
                 val local = localDestinations[ownerKey] ?: return
@@ -356,10 +654,25 @@ object RnsNode {
             destinationHash = announce.destinationHash,
             publicKey = announce.publicKey,
             nameHash = announce.nameHash,
+            randomHash = announce.randomHash,
+            ratchet = announce.ratchet,
+            signature = announce.signature,
             appData = announce.appData,
             lastSeen = now,
-            hops = packet.hops
+            hops = packet.hops,
+            contextFlag = packet.contextFlag
         )
+
+        if (announce.ratchet.isNotEmpty()) {
+            RnsIdentity.rememberRatchet(announce.destinationHash, announce.ratchet)
+        }
+
+        announceListeners.forEach { listener ->
+            try {
+                listener(announce, packet)
+            } catch (_: Exception) {
+            }
+        }
 
         pathTable[key] = PathEntry(iface, packet.hops, now)
 
@@ -375,6 +688,52 @@ object RnsNode {
         if (routingEnabled) {
             forwardAnnounce(raw, packet, iface)
         }
+    }
+
+    private fun handleProof(packet: RnsPacket) {
+        val data = packet.data
+        val hashLength = 32
+        val sigLength = 64
+        if (data.size < hashLength + sigLength) return
+        val proofHash = data.copyOfRange(0, hashLength)
+        val signature = data.copyOfRange(hashLength, hashLength + sigLength)
+        val truncated = RnsHash.truncatedHash(proofHash)
+        val receiptKey = RnsHex.encode(truncated)
+        val receipt = receipts[receiptKey] ?: return
+        if (!proofHash.contentEquals(receipt.packetHash)) return
+
+        val known = knownDestinations[RnsHex.encode(receipt.destinationHash)]
+        val verified = if (known != null) {
+            val identity = RnsIdentity.fromPublic(known.publicKey)
+            identity.verify(proofHash, signature)
+        } else {
+            true
+        }
+        if (!verified) return
+        receipts.remove(receiptKey)
+        receipt.onDelivered?.invoke()
+    }
+
+    private fun maybeSendProof(packet: RnsPacket, local: LocalDestination) {
+        if (packet.packetType != RnsPacket.DATA) return
+        if (packet.context >= RnsPacket.RESOURCE && packet.context <= RnsPacket.RESOURCE_RCL) return
+        if (packet.context >= RnsPacket.KEEPALIVE && packet.context <= RnsPacket.LRPROOF) return
+        if (local.destination.type == RnsDestination.PLAIN) return
+        val identity = local.destination.identity ?: return
+        if (identity.privateKey == null) return
+        val raw = packet.raw ?: return
+        val hashable = RnsPacket.getHashablePart(raw)
+        val fullHash = RnsHash.sha256(hashable)
+        val signature = identity.sign(fullHash)
+        val proofData = fullHash + signature
+        val proofDest = RnsDestination.fromHash(RnsHash.truncatedHash(fullHash), RnsDestination.PLAIN)
+        val proofPacket = RnsPacket(
+            destination = proofDest,
+            data = proofData,
+            packetType = RnsPacket.PROOF,
+            context = RnsPacket.NONE
+        )
+        send(proofPacket)
     }
 
     private fun handleResourceAdvertisement(raw: ByteArray, packet: RnsPacket, iface: RnsInterface) {
@@ -425,11 +784,9 @@ object RnsNode {
     }
 
     private fun handleResourceRequestPayload(payload: ByteArray, link: RnsLink) {
-        val request = RnsResourceCodec.unpackRequest(payload) ?: return
-        val key = RnsHex.encode(request.hash)
-        val resource = resourceCache[key] ?: return
-        val indices = request.requestedIndices.takeIf { it.isNotEmpty() }
-        sendResourceToLink(link, resource, indices)
+        linkResourceManager.handleRequest(payload, link) { packetType, context, data ->
+            sendLinkPacket(link, packetType, context, data, null)
+        }
     }
 
     private fun handleResourceChunk(packet: RnsPacket) {
@@ -619,9 +976,13 @@ object RnsNode {
         val destinationHash: ByteArray,
         val publicKey: ByteArray,
         val nameHash: ByteArray,
+        val randomHash: ByteArray,
+        val ratchet: ByteArray,
+        val signature: ByteArray,
         val appData: ByteArray?,
         val lastSeen: Long,
-        val hops: Int
+        val hops: Int,
+        val contextFlag: Int
     )
 
     data class PathEntry(
@@ -635,12 +996,24 @@ object RnsNode {
 
     data class LocalDestination(
         val destination: RnsDestination,
-        val callback: (RnsPacket, ByteArray) -> Unit
+        val callback: (RnsPacket, ByteArray) -> Unit,
+        val announceProvider: (() -> RnsAnnounceConfig)? = null
+    )
+
+    data class RnsAnnounceConfig(
+        val appData: ByteArray? = null,
+        val ratchetPublic: ByteArray? = null
     )
 
     private data class PendingLinkResource(
         val resource: RnsResource,
         val requestedIndices: List<Int>?
+    )
+
+    private data class PendingLinkPacket(
+        val packetType: Int,
+        val context: Int,
+        val payload: ByteArray
     )
 
     private data class ResourceAssembler(
@@ -763,6 +1136,7 @@ object RnsNode {
             activeLinksByDestination[destKey] = linkKey
         }
         flushPendingLinkResources(link)
+        flushPendingLinkPackets(link)
     }
 
     private fun queueLinkResource(link: RnsLink, resource: RnsResource, requestedIndices: List<Int>?) {
@@ -771,36 +1145,26 @@ object RnsNode {
         pending.add(PendingLinkResource(resource, requestedIndices))
     }
 
+    private fun queueLinkPacket(link: RnsLink, packetType: Int, context: Int, payload: ByteArray) {
+        val linkKey = RnsHex.encode(link.linkId)
+        val pending = pendingLinkPackets.getOrPut(linkKey) { CopyOnWriteArrayList() }
+        pending.add(PendingLinkPacket(packetType, context, payload))
+    }
+
     private fun flushPendingLinkResources(link: RnsLink) {
         val linkKey = RnsHex.encode(link.linkId)
         val pending = pendingLinkResources.remove(linkKey) ?: return
         pending.forEach { sendResourceToLink(link, it.resource, it.requestedIndices) }
     }
 
+    private fun flushPendingLinkPackets(link: RnsLink) {
+        val linkKey = RnsHex.encode(link.linkId)
+        val pending = pendingLinkPackets.remove(linkKey) ?: return
+        pending.forEach { sendLinkPacket(link, it.packetType, it.context, it.payload, null) }
+    }
+
     private fun sendResourceToLink(link: RnsLink, resource: RnsResource, requestedIndices: List<Int>?) {
-        cacheResource(resource)
-        val indices = requestedIndices?.distinct()?.sorted() ?: emptyList()
-        val totalParts = countParts(resource.data.size)
-        val maxSize = RnsResourceCodec.maxChunkSize
-        val iterable = if (indices.isEmpty()) (0 until totalParts).toList() else indices
-        iterable.forEach { index ->
-            if (index < 0 || index >= totalParts) return@forEach
-            val offset = index * maxSize
-            val end = (offset + maxSize).coerceAtMost(resource.data.size)
-            val data = resource.data.copyOfRange(offset, end)
-            val chunk = RnsResourceChunk(
-                hash = resource.hash,
-                sourceHash = resource.sourceHash,
-                destinationHash = resource.destinationHash,
-                kind = resource.kind,
-                encrypted = resource.encrypted,
-                index = index,
-                totalParts = totalParts,
-                data = data
-            )
-            val payload = RnsResourceCodec.packChunk(chunk)
-            sendLinkPacket(link, RnsPacket.DATA, RnsPacket.RESOURCE, payload, null)
-        }
+        sendLinkResource(link, resource.data, requestId = null, isResponse = false, isRequest = false)
     }
 
     private fun sendLinkPacket(
@@ -809,15 +1173,40 @@ object RnsNode {
         context: Int,
         payload: ByteArray,
         interfaceName: String?
-    ) {
-        val encrypted = link.encryptForPacket(packetType, context, payload) ?: return
+    ): ByteArray? {
+        val encrypted = link.encryptForPacket(packetType, context, payload) ?: return null
         val packet = RnsPacket(
             destination = RnsDestination.fromHash(link.linkId, RnsDestination.LINK),
             data = encrypted,
             packetType = packetType,
             context = context
         )
-        send(packet, interfaceName)
+        val raw = packet.pack()
+        val iface = interfaceName?.let { name -> interfaces.firstOrNull { it.name == name } }
+        if (iface != null) {
+            iface.send(raw)
+        } else {
+            interfaces.forEach { it.send(raw) }
+        }
+        return raw
+    }
+
+    private fun sendLinkResource(
+        link: RnsLink,
+        payload: ByteArray,
+        requestId: ByteArray?,
+        isResponse: Boolean,
+        isRequest: Boolean
+    ): Boolean {
+        return linkResourceManager.advertise(
+            resourceData = payload,
+            link = link,
+            requestId = requestId,
+            isResponse = isResponse,
+            isRequest = isRequest
+        ) { packetType, context, data ->
+            sendLinkPacket(link, packetType, context, data, null)
+        }
     }
 
     fun recallIdentity(destinationHash: ByteArray): RnsIdentity? {

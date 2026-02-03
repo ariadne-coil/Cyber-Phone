@@ -82,6 +82,7 @@ import org.fossify.messages.helpers.refreshConversations
 import org.fossify.mesh.MeshConfig
 import org.fossify.mesh.MeshManager
 import org.fossify.mesh.MeshMode
+import org.fossify.mesh.call.MeshCallQuality
 import org.fossify.mesh.rns.RnsNode
 import java.util.Locale
 import kotlin.system.exitProcess
@@ -204,6 +205,7 @@ class SettingsActivity : SimpleActivity() {
         setupDisableSwipeToAnswer()
         setupAlwaysShowFullscreen()
         setupMeshMode()
+        setupMeshCallQuality()
         setupMeshRouting()
         setupMeshStatus()
         setupShowCharacterCounter()
@@ -925,6 +927,22 @@ class SettingsActivity : SimpleActivity() {
         updateMeshStatus(meshConfig)
     }
 
+    private fun setupMeshCallQuality() = binding.apply {
+        val meshConfig = MeshConfig.newInstance(this@SettingsActivity)
+        settingsMeshCallQualityValue.text = getMeshCallQualityLabel(meshConfig.meshCallQuality)
+        settingsMeshCallQualityHolder.setOnClickListener {
+            val items = arrayListOf(
+                RadioItem(MeshCallQuality.LOW.id, getString(R.string.mesh_call_quality_low)),
+                RadioItem(MeshCallQuality.HIGH.id, getString(R.string.mesh_call_quality_high))
+            )
+            RadioGroupDialog(this@SettingsActivity, items, meshConfig.meshCallQuality) {
+                meshConfig.meshCallQuality = it as Int
+                settingsMeshCallQualityValue.text = getMeshCallQualityLabel(meshConfig.meshCallQuality)
+            }
+        }
+        updateMeshRoutingUi(meshConfig)
+    }
+
     private fun setupMeshRouting() = binding.apply {
         val meshConfig = MeshConfig.newInstance(this@SettingsActivity)
         settingsMeshRouting.isChecked = meshConfig.meshRoutingEnabled
@@ -946,6 +964,7 @@ class SettingsActivity : SimpleActivity() {
         val isMeshEnabled = meshConfig.getMeshMode() != MeshMode.STANDARD_ONLY
         settingsMeshRouting.isEnabled = isMeshEnabled
         settingsMeshRoutingHolder.isEnabled = isMeshEnabled
+        settingsMeshCallQualityHolder.isEnabled = isMeshEnabled
         if (!isMeshEnabled && meshConfig.meshRoutingEnabled) {
             meshConfig.meshRoutingEnabled = false
             settingsMeshRouting.isChecked = false
@@ -971,6 +990,13 @@ class SettingsActivity : SimpleActivity() {
             MeshMode.STANDARD_ONLY -> getString(R.string.mesh_mode_standard)
             MeshMode.MESH_WITH_FALLBACK -> getString(R.string.mesh_mode_fallback)
             MeshMode.MESH_ONLY -> getString(R.string.mesh_mode_mesh_only)
+        }
+    }
+
+    private fun getMeshCallQualityLabel(value: Int): String {
+        return when (MeshCallQuality.fromId(value)) {
+            MeshCallQuality.LOW -> getString(R.string.mesh_call_quality_low)
+            MeshCallQuality.HIGH -> getString(R.string.mesh_call_quality_high)
         }
     }
 

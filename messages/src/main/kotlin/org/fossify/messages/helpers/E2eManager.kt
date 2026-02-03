@@ -139,7 +139,7 @@ object E2eManager {
         if (!isThreadEncrypted(context, threadId)) {
             return null
         }
-        if (isKeyExchangeMessage(text) || isEncryptedMessage(text)) {
+        if (isKeyExchangeMessage(text) || isEncryptedMessage(text) || MeshDiscoveryManager.isMeshAddressMessage(text)) {
             return null
         }
 
@@ -179,6 +179,9 @@ object E2eManager {
         text: String,
         messageDateSeconds: Long?
     ): DisplayResult {
+        if (MeshDiscoveryManager.isMeshAddressMessage(text)) {
+            return DisplayResult(context.getString(R.string.mesh_address_exchange_message), false)
+        }
         if (isKeyExchangeMessage(text)) {
             return DisplayResult(context.getString(R.string.e2e_key_exchange_message), false)
         }

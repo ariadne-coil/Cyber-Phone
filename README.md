@@ -1,6 +1,8 @@
 # Cyber Phone
 <img alt="Logo" src="graphics/icon.webp" width="120" />
 
+Changelog: CHANGELOG.md
+
 ## The AntiFragile Communication Suite.
 
 Cyber Phone is a sovereign, privacy-focused communication solution for modern Android. It is designed for High-Entropy Environments where reliance on centralized infrastructure is a liability.
