@@ -28,5 +28,9 @@
 -keep class org.fossify.messages.models.Attachment { *; }
 -keep class org.fossify.messages.models.MessageAttachment { *; }
 
+# Msgpack uses reflection to load MessageBufferU; keep it for release builds.
+-keep class org.msgpack.core.buffer.MessageBufferU { *; }
+
 -dontwarn com.google.auto.value.AutoValue
 -dontwarn com.google.auto.value.AutoValue$Builder
+-dontwarn sun.nio.ch.DirectBuffer

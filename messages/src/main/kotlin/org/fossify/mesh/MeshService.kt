@@ -52,7 +52,10 @@ class MeshService : Service() {
             }
         }
 
-        startForeground(NOTIFICATION_ID, buildNotification())
+        if (!ensureForeground()) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         statusHandler.postDelayed(statusUpdater, STATUS_UPDATE_INTERVAL_MS)
 
         return try {
@@ -93,6 +96,25 @@ class MeshService : Service() {
             .setOngoing(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .build()
+    }
+
+    private fun ensureForeground(): Boolean {
+        return try {
+            startForeground(NOTIFICATION_ID, buildNotification())
+            true
+        } catch (e: Exception) {
+            if (isForegroundStartNotAllowed(e)) {
+                Log.w(TAG, "Foreground service start not allowed", e)
+                return false
+            }
+            Log.e(TAG, "Failed to start foreground service", e)
+            false
+        }
+    }
+
+    private fun isForegroundStartNotAllowed(e: Exception): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+        return e.javaClass.name == "android.app.ForegroundServiceStartNotAllowedException"
     }
 
     private fun updateNotification() {
