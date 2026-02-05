@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+- Mesh: stabilized UDP transport (single socket + multicast join) and made peer unicast port-stable to prevent “works once” delivery failures.
+- Mesh: added LAN unicast probing to bootstrap discovery on networks where broadcast/multicast is blocked.
+- Mesh UX: added in-app QR scanner + save flow (select existing contact or create a new contact) and added a first-class “Mesh link” field in the contact editor.
+- Permissions: marked BLE scan as `neverForLocation` to avoid unnecessary location coupling.
+- Tests: fixed RNS loopback tests and added a UDP peer test to prevent regressions.
+
 ## v0.2.1 (2026-02-03)
 - Moved all mesh controls into Cyber Features and renamed the Profile section.
 - Added Wi‑Fi Direct discovery toggle and status readout (group/role/credentials).
