@@ -16,9 +16,11 @@ import org.fossify.commons.extensions.toast
 import org.fossify.commons.helpers.CONTACT_ID
 import org.fossify.commons.helpers.IS_PRIVATE
 import org.fossify.commons.helpers.PERMISSION_CALL_PHONE
+import org.fossify.commons.helpers.PERMISSION_WRITE_CONTACTS
 import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.models.SimpleContact
+import org.fossify.mesh.MeshContactHelper
 import org.fossify.messages.activities.ConversationDetailsActivity
 import org.fossify.messages.helpers.THREAD_ID
 import java.util.Locale
@@ -104,7 +106,24 @@ fun Activity.startContactDetailsIntent(contact: SimpleContact) {
             )
 
             runOnUiThread {
-                launchViewContactIntent(publicUri)
+                val launchEditor = {
+                    Intent(Intent.ACTION_EDIT).apply {
+                        data = publicUri
+                        putExtra("finishActivityOnSaveCompleted", true)
+                        MeshContactHelper.addMeshPhoneInsertExtras(this)
+                        launchActivityIntent(this)
+                    }
+                }
+                if (this is BaseSimpleActivity && contact.rawId > 0) {
+                    handlePermission(PERMISSION_WRITE_CONTACTS) { granted ->
+                        if (granted) {
+                            MeshContactHelper.ensureMeshPhoneRowForRawContact(this, contact.rawId.toLong())
+                        }
+                        launchEditor()
+                    }
+                } else {
+                    launchEditor()
+                }
             }
         }
     }

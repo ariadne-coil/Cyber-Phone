@@ -49,6 +49,7 @@ import org.fossify.phone.helpers.RecentsHelper
 import org.fossify.phone.helpers.TAB_MESSAGES
 import org.fossify.phone.helpers.tabsList
 import org.fossify.phone.models.Events
+import org.fossify.mesh.MeshManager
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
@@ -121,6 +122,7 @@ class MainActivity : SimpleActivity() {
 
     override fun onResume() {
         super.onResume()
+        MeshManager.sync(this)
         if (storedShowTabs != config.showTabs) {
             config.lastUsedViewPagerPage = 0
             System.exit(0)
@@ -247,6 +249,7 @@ class MainActivity : SimpleActivity() {
                     R.id.create_new_contact -> launchCreateNewContactIntent()
                     R.id.sort -> showSortingDialog(showCustomSorting = getCurrentFragment() is FavoritesFragment)
                     R.id.filter -> showFilterDialog()
+                    R.id.manage_e2e_keys -> launchManageE2eKeys()
                     R.id.settings -> launchSettings()
                     R.id.change_view_type -> changeViewType()
                     R.id.column_count -> changeColumnCount()
@@ -591,6 +594,10 @@ class MainActivity : SimpleActivity() {
 
     private fun launchAbout() {
         startActivity(Intent(this, CyberAboutActivity::class.java))
+    }
+
+    private fun launchManageE2eKeys() {
+        startActivity(Intent(this, org.fossify.messages.activities.ManageE2eKeysActivity::class.java))
     }
 
     private fun showSortingDialog(showCustomSorting: Boolean) {

@@ -47,8 +47,13 @@ fun Context.sendMessageCompat(
     attachments: List<Attachment>,
     messageId: Long? = null
 ) {
-    val threadId = getThreadId(addresses.toSet())
-    val canEncrypt = addresses.none { LxmfAddress.isMeshAddress(it) }
+    val cleanAddresses = addresses.filterNot { LxmfAddress.isMeshLike(it) }
+    if (cleanAddresses.isEmpty()) {
+        toast(id = R.string.mesh_disabled, length = LENGTH_LONG)
+        return
+    }
+    val threadId = getThreadId(cleanAddresses.toSet())
+    val canEncrypt = cleanAddresses.none { LxmfAddress.isMeshAddress(it) }
     val encryptedText = if (canEncrypt) E2eManager.encryptOutgoing(this, threadId, text) else null
     val outgoingText = encryptedText ?: text
     val settings = getSendMessageSettings()
@@ -58,7 +63,7 @@ fun Context.sendMessageCompat(
 
     val messagingUtils = messagingUtils
     val isMms = attachments.isNotEmpty() || isLongMmsMessage(outgoingText, settings)
-            || addresses.size > 1 && settings.group
+            || cleanAddresses.size > 1 && settings.group
     if (isMms) {
         // we send all MMS attachments separately to reduces the chances of hitting provider MMS limit.
         if (attachments.isNotEmpty()) {
@@ -66,20 +71,20 @@ fun Context.sendMessageCompat(
             if (attachments.size > 1) {
                 for (i in 0 until lastIndex) {
                     val attachment = attachments[i]
-                    messagingUtils.sendMmsMessage("", addresses, attachment, settings, messageId)
+                    messagingUtils.sendMmsMessage("", cleanAddresses, attachment, settings, messageId)
                 }
             }
 
             val lastAttachment = attachments[lastIndex]
-            messagingUtils.sendMmsMessage(outgoingText, addresses, lastAttachment, settings, messageId)
+            messagingUtils.sendMmsMessage(outgoingText, cleanAddresses, lastAttachment, settings, messageId)
         } else {
-            messagingUtils.sendMmsMessage(outgoingText, addresses, null, settings, messageId)
+            messagingUtils.sendMmsMessage(outgoingText, cleanAddresses, null, settings, messageId)
         }
     } else {
         try {
             messagingUtils.sendSmsMessage(
                 text = outgoingText,
-                addresses = addresses.toSet(),
+                addresses = cleanAddresses.toSet(),
                 subId = settings.subscriptionId,
                 requireDeliveryReport = settings.deliveryReports,
                 messageId = messageId

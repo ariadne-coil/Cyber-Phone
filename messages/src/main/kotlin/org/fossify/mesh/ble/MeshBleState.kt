@@ -1,11 +1,14 @@
-package org.fossify.mesh.wifiaware
+package org.fossify.mesh.ble
 
-object MeshWifiAwareState {
+object MeshBleState {
+    @Volatile
+    private var bluetoothEnabled = false
+
     @Volatile
     private var active = false
 
     @Volatile
-    private var peers = 0
+    private var connections = 0
 
     @Volatile
     private var lastRxMs = 0L
@@ -13,17 +16,23 @@ object MeshWifiAwareState {
     @Volatile
     private var lastTxMs = 0L
 
+    fun setBluetoothEnabled(value: Boolean) {
+        bluetoothEnabled = value
+    }
+
+    fun isBluetoothEnabled(): Boolean = bluetoothEnabled
+
     fun setActive(value: Boolean) {
         active = value
     }
 
     fun isActive(): Boolean = active
 
-    fun setPeers(value: Int) {
-        peers = value
+    fun setConnections(value: Int) {
+        connections = value
     }
 
-    fun getPeers(): Int = peers
+    fun getConnections(): Int = connections
 
     fun markRx() {
         lastRxMs = System.currentTimeMillis()
@@ -37,3 +46,4 @@ object MeshWifiAwareState {
 
     fun getLastTxMs(): Long = lastTxMs
 }
+

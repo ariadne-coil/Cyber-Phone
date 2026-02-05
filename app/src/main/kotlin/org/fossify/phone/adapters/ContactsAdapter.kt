@@ -35,6 +35,13 @@ import org.fossify.phone.extensions.config
 import org.fossify.phone.extensions.startContactDetailsIntent
 import org.fossify.phone.dialogs.MeshAddressDialog
 import org.fossify.phone.interfaces.RefreshItemsListener
+import org.fossify.messages.activities.ThreadActivity
+import org.fossify.messages.helpers.THREAD_ID
+import org.fossify.messages.helpers.THREAD_NUMBER
+import org.fossify.messages.helpers.THREAD_TITLE
+import org.fossify.mesh.MeshConfig
+import org.fossify.mesh.MeshMode
+import org.fossify.mesh.lxmf.LxmfAddress
 import java.util.Collections
 
 class ContactsAdapter(
@@ -247,19 +254,76 @@ class ContactsAdapter(
     }
 
     private fun sendSMS() {
-        val numbers = ArrayList<String>()
-        getSelectedItems().map { simpleContact ->
-            val contactNumbers = simpleContact.phoneNumbers
-            val primaryNumber = contactNumbers.firstOrNull { it.isPrimary }
-            val normalizedNumber = primaryNumber?.normalizedNumber ?: contactNumbers.firstOrNull()?.normalizedNumber
+        val selected = getSelectedItems()
+        if (selected.isEmpty()) {
+            return
+        }
 
-            if (normalizedNumber != null) {
-                numbers.add(normalizedNumber)
+        // We only support starting a direct mesh conversation from Contacts when a single contact is selected.
+        // Multi-recipient group messaging remains SMS/MMS-only for now.
+        if (selected.size == 1) {
+            val contact = selected.first()
+            val phoneNumber = contact.phoneNumbers.pickBestForSmsOrMesh() ?: return
+            val raw = phoneNumber.value.orEmpty().trim()
+            val candidate = raw.ifEmpty { phoneNumber.normalizedNumber.orEmpty().trim() }
+
+            if (candidate.isNotBlank() && LxmfAddress.isMeshLike(candidate)) {
+                val meshMode = MeshConfig.newInstance(activity).getMeshMode()
+                if (meshMode == MeshMode.STANDARD_ONLY) {
+                    activity.toast(org.fossify.messages.R.string.mesh_disabled)
+                    finishActMode()
+                    return
+                }
+
+                val meshAddress = LxmfAddress.normalize(candidate)
+                val threadId = LxmfAddress.threadIdForAddress(meshAddress)
+                Intent(activity, ThreadActivity::class.java).apply {
+                    putExtra(THREAD_ID, threadId)
+                    putExtra(THREAD_TITLE, contact.getNameToDisplay())
+                    putExtra(THREAD_NUMBER, meshAddress)
+                    activity.startActivity(this)
+                }
+                finishActMode()
+                return
+            }
+        }
+
+        val numbers = ArrayList<String>()
+        selected.forEach { contact ->
+            val phoneNumber = contact.phoneNumbers.pickBestForSmsOrMesh() ?: return@forEach
+            val raw = phoneNumber.value.orEmpty().trim()
+            val candidate = raw.ifEmpty { phoneNumber.normalizedNumber.orEmpty().trim() }
+            if (candidate.isNotBlank() && LxmfAddress.isMeshLike(candidate)) {
+                // Skip mesh-only contacts in multi-recipient SMS/MMS.
+                return@forEach
+            }
+            val normalized = phoneNumber.normalizedNumber.takeIf { it.isNotBlank() } ?: raw
+            if (normalized.isNotBlank()) {
+                numbers.add(normalized)
             }
         }
 
         val recipient = TextUtils.join(";", numbers)
         activity.launchSendSMSIntent(recipient)
+    }
+
+    // Prefer a real phone number for the "Send SMS" action, but allow mesh-only contacts to be handled.
+    private fun ArrayList<org.fossify.commons.models.PhoneNumber>.pickBestForSmsOrMesh(): org.fossify.commons.models.PhoneNumber? {
+        if (isEmpty()) return null
+
+        fun isMesh(p: org.fossify.commons.models.PhoneNumber): Boolean {
+            val raw = p.value.orEmpty().trim()
+            val candidate = raw.ifEmpty { p.normalizedNumber.orEmpty().trim() }
+            return candidate.isNotBlank() && LxmfAddress.isMeshLike(candidate)
+        }
+
+        val primaryNonMesh = firstOrNull { it.isPrimary && !isMesh(it) }
+        if (primaryNonMesh != null) return primaryNonMesh
+
+        val firstNonMesh = firstOrNull { !isMesh(it) }
+        if (firstNonMesh != null) return firstNonMesh
+
+        return firstOrNull { it.isPrimary } ?: firstOrNull()
     }
 
     private fun viewContactDetails() {

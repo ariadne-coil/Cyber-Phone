@@ -26,9 +26,11 @@ import org.fossify.commons.extensions.telecomManager
 import org.fossify.commons.helpers.CONTACT_ID
 import org.fossify.commons.helpers.IS_PRIVATE
 import org.fossify.commons.helpers.PERMISSION_READ_PHONE_STATE
+import org.fossify.commons.helpers.PERMISSION_WRITE_CONTACTS
 import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.models.contacts.Contact
+import org.fossify.mesh.MeshContactHelper
 import org.fossify.phone.BuildConfig
 import org.fossify.phone.activities.DialerActivity
 import org.fossify.phone.activities.SimpleActivity
@@ -82,6 +84,7 @@ fun SimpleActivity.launchCreateNewContactIntent() {
     Intent().apply {
         action = Intent.ACTION_INSERT
         data = ContactsContract.Contacts.CONTENT_URI
+        MeshContactHelper.addMeshPhoneInsertExtras(this)
         launchActivityIntent(this)
     }
 }
@@ -139,7 +142,24 @@ fun Activity.startContactDetailsIntent(contact: Contact) {
             val publicUri =
                 Uri.withAppendedPath(ContactsContract.Contacts.CONTENT_LOOKUP_URI, lookupKey)
             runOnUiThread {
-                launchViewContactIntent(publicUri)
+                val launchEditor = {
+                    Intent(Intent.ACTION_EDIT).apply {
+                        data = publicUri
+                        putExtra("finishActivityOnSaveCompleted", true)
+                        MeshContactHelper.addMeshPhoneInsertExtras(this)
+                        launchActivityIntent(this)
+                    }
+                }
+                if (this is BaseSimpleActivity && contact.rawId > 0) {
+                    handlePermission(PERMISSION_WRITE_CONTACTS) { granted ->
+                        if (granted) {
+                            MeshContactHelper.ensureMeshPhoneRowForRawContact(this, contact.rawId.toLong())
+                        }
+                        launchEditor()
+                    }
+                } else {
+                    launchEditor()
+                }
             }
         }
     }

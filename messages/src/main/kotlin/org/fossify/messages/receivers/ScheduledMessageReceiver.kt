@@ -41,7 +41,10 @@ class ScheduledMessageReceiver : BroadcastReceiver() {
             return
         }
 
-        val addresses = message.participants.getAddresses()
+        val addresses = message.participants.getAddresses().filterNot { org.fossify.mesh.lxmf.LxmfAddress.isMeshLike(it) }
+        if (addresses.isEmpty()) {
+            return
+        }
         val attachments = message.attachment?.attachments ?: emptyList()
 
         try {

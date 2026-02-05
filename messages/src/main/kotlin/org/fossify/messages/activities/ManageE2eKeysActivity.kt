@@ -1,6 +1,7 @@
 package org.fossify.messages.activities
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -14,8 +15,6 @@ import androidx.core.content.ContextCompat
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
 import org.fossify.commons.dialogs.ConfirmationDialog
 import org.fossify.commons.dialogs.RadioGroupDialog
 import org.fossify.commons.extensions.copyToClipboard
@@ -41,6 +40,7 @@ import org.fossify.mesh.MeshContactHelper
 import org.fossify.mesh.rns.RnsNode
 import org.fossify.mesh.MeshMode
 import org.fossify.mesh.call.MeshCallQuality
+import org.fossify.mesh.ble.MeshBleState
 import org.fossify.mesh.wifidirect.MeshWifiDirectState
 import org.fossify.mesh.wifiaware.MeshWifiAwareState
 
@@ -131,20 +131,16 @@ class ManageE2eKeysActivity : SimpleActivity() {
             }
         }
 
-    private val scanQr =
-        registerForActivityResult(ScanContract()) { result ->
-            val contents = result.contents?.trim().orEmpty()
-            if (contents.isBlank()) {
-                return@registerForActivityResult
-            }
-            val meshAddress = MeshDiscoveryManager.extractMeshAddress(contents)
-                ?: if (contents.startsWith("mesh:", ignoreCase = true)) contents.trim() else null
-            if (meshAddress.isNullOrBlank()) {
-                toast(R.string.profile_mesh_invalid)
-                return@registerForActivityResult
-            }
+    private val scanMeshQr =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
+            val meshAddress = result.data
+                ?.getStringExtra(MeshQrScanActivity.EXTRA_MESH_ADDRESS)
+                ?.trim()
+                .orEmpty()
+            if (meshAddress.isBlank()) return@registerForActivityResult
             pendingMeshAddress = meshAddress
-            requestContactForMeshAddress()
+            showMeshSaveDialog()
         }
 
     private val pickContact =
@@ -178,6 +174,14 @@ class ManageE2eKeysActivity : SimpleActivity() {
             pendingMeshAddress = null
         }
 
+    private val createContact =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                toast(R.string.profile_mesh_saved)
+            }
+            pendingMeshAddress = null
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
@@ -186,12 +190,18 @@ class ManageE2eKeysActivity : SimpleActivity() {
         refreshProfile()
         setupActions()
         setupMeshSettings()
+        handleIncomingIntent(intent)
     }
 
     override fun onResume() {
         super.onResume()
         refreshProfile()
         updateMeshStatus(MeshConfig.newInstance(this))
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        handleIncomingIntent(intent)
     }
 
     private fun refreshProfile() {
@@ -359,6 +369,14 @@ class ManageE2eKeysActivity : SimpleActivity() {
     }
 
     private fun updateMeshStatus(meshConfig: MeshConfig) = binding.apply {
+        // If the user enabled mesh, but the runtime isn't running (e.g. service start denied),
+        // attempt to kick it while we are in the foreground.
+        if (meshConfig.getMeshMode() != MeshMode.STANDARD_ONLY && !RnsNode.isRunning()) {
+            MeshManager.sync(this@ManageE2eKeysActivity)
+        }
+
+        val running = if (RnsNode.isRunning()) getString(R.string.profile_running) else getString(R.string.profile_stopped)
+        val ifaceNames = RnsNode.getInterfaceNames().joinToString().ifBlank { getString(R.string.profile_unknown) }
         val neighbors = RnsNode.getDirectNeighborCount()
         val routingStatus = if (meshConfig.meshRoutingEnabled && RnsNode.hasRecentRoutingActivity()) {
             getString(R.string.mesh_routing_in_use)
@@ -366,18 +384,80 @@ class ManageE2eKeysActivity : SimpleActivity() {
             getString(R.string.mesh_routing_idle)
         }
         val rawCount = RnsNode.getRawPacketReceivedCount()
+        val rawSent = RnsNode.getRawPacketSentCount()
         val announceCount = RnsNode.getAnnounceReceivedCount()
         val lastPacketMs = RnsNode.getLastPacketReceivedMs()
+        val lastSentMs = RnsNode.getLastPacketSentMs()
         val lastPacketText = if (lastPacketMs > 0L) {
             android.text.format.DateUtils.getRelativeTimeSpanString(lastPacketMs).toString()
         } else {
             getString(R.string.profile_unknown)
         }
+        val lastSentText = if (lastSentMs > 0L) {
+            android.text.format.DateUtils.getRelativeTimeSpanString(lastSentMs).toString()
+        } else {
+            getString(R.string.profile_unknown)
+        }
         val status = getString(R.string.mesh_service_status, neighbors, routingStatus)
-        val diagnostics = getString(R.string.mesh_diagnostics, rawCount, announceCount, lastPacketText)
+        val diagnostics = getString(R.string.mesh_diagnostics, rawCount, announceCount, lastPacketText) +
+            "\nTX: $rawSent • Last TX: $lastSentText"
         val wifiStatus = buildWifiDirectStatus()
         val awareStatus = buildWifiAwareStatus()
-        profileMeshStatusValue.text = "$status\n$diagnostics\n$wifiStatus\n$awareStatus"
+        val bleStatus = buildBleStatus()
+        profileMeshStatusValue.text = "$status\n$diagnostics\nRuntime: $running\nInterfaces: $ifaceNames\n${buildUdpStatus()}\n$bleStatus\n$wifiStatus\n$awareStatus"
+    }
+
+    private fun buildBleStatus(): String {
+        val enabled = if (MeshBleState.isBluetoothEnabled()) "On" else "Off"
+        val active = if (MeshBleState.isActive()) "Active" else "Inactive"
+        val connections = MeshBleState.getConnections()
+        val rx = MeshBleState.getLastRxMs()
+        val tx = MeshBleState.getLastTxMs()
+        val rxText = if (rx > 0L) android.text.format.DateUtils.getRelativeTimeSpanString(rx).toString() else getString(R.string.profile_unknown)
+        val txText = if (tx > 0L) android.text.format.DateUtils.getRelativeTimeSpanString(tx).toString() else getString(R.string.profile_unknown)
+        return "BLE: $enabled • $active • Connections: $connections • RX: $rxText • TX: $txText"
+    }
+
+    private fun buildUdpStatus(): String {
+        return try {
+            val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+            val dhcp = wifi.dhcpInfo
+            if (dhcp == null || dhcp.ipAddress == 0) {
+                "UDP: " + getString(R.string.profile_unknown)
+            } else {
+                val ipAddr = java.net.InetAddress.getByAddress(
+                    java.nio.ByteBuffer.allocate(4).order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(dhcp.ipAddress).array()
+                )
+                val ip = ipAddr.hostAddress
+
+                val iface = try {
+                    java.net.NetworkInterface.getByInetAddress(ipAddr)
+                } catch (_: Exception) {
+                    null
+                }
+
+                val ifaceAddr = iface?.interfaceAddresses?.firstOrNull { it.address is java.net.Inet4Address && it.address == ipAddr }
+                val broadcastFromIface = ifaceAddr?.broadcast?.hostAddress
+                val broadcast = when {
+                    dhcp.netmask != 0 -> {
+                        val maskAddr = java.net.InetAddress.getByAddress(
+                            java.nio.ByteBuffer.allocate(4).order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(dhcp.netmask).array()
+                        )
+                        val ipInt = java.nio.ByteBuffer.wrap(ipAddr.address).int
+                        val maskInt = java.nio.ByteBuffer.wrap(maskAddr.address).int
+                        val broadcastInt = ipInt or maskInt.inv()
+                        java.net.InetAddress.getByAddress(java.nio.ByteBuffer.allocate(4).putInt(broadcastInt).array()).hostAddress
+                    }
+                    !broadcastFromIface.isNullOrBlank() -> broadcastFromIface
+                    else -> "255.255.255.255"
+                }
+
+                val peers = RnsNode.getUdpPeerCount()
+                "UDP: $ip -> $broadcast:4242 • Peers: $peers"
+            }
+        } catch (_: Exception) {
+            "UDP: " + getString(R.string.profile_unknown)
+        }
     }
 
     private fun getMeshModeLabel(mode: MeshMode): String {
@@ -450,20 +530,47 @@ class ManageE2eKeysActivity : SimpleActivity() {
         } else {
             getString(R.string.mesh_wifiaware_inactive)
         }
-        return getString(R.string.mesh_wifiaware_status, status)
+        val peers = MeshWifiAwareState.getPeers()
+        val rx = MeshWifiAwareState.getLastRxMs()
+        val tx = MeshWifiAwareState.getLastTxMs()
+        val rxText = if (rx > 0L) android.text.format.DateUtils.getRelativeTimeSpanString(rx).toString() else getString(R.string.profile_unknown)
+        val txText = if (tx > 0L) android.text.format.DateUtils.getRelativeTimeSpanString(tx).toString() else getString(R.string.profile_unknown)
+        return getString(R.string.mesh_wifiaware_status, "$status • Peers: $peers • RX: $rxText • TX: $txText")
     }
 
     private fun showQrCode() {
         val address = MeshDiscoveryManager.getLocalMeshAddress(this) ?: return
-        val content = MeshDiscoveryManager.buildMeshAddressMessage(this) ?: address
+        // Use an SMS URI so any scanner opens the default SMS app (Cyber Phone).
+        val content = MeshDiscoveryManager.buildMeshAddressUri(this)
+            ?: MeshDiscoveryManager.buildMeshHttpUri(this)
+            ?: MeshDiscoveryManager.buildMeshSmsUri(this)
+            ?: MeshDiscoveryManager.buildMeshIntentUri(this)
+            ?: ("mesh:" + address)
         val size = resources.getDimensionPixelSize(R.dimen.profile_qr_size)
         val bitmap = createQrBitmap(content, size) ?: return
+        val pad = (16 * resources.displayMetrics.density).toInt()
         val imageView = ImageView(this).apply {
             setImageBitmap(bitmap)
             adjustViewBounds = true
         }
+        val textView = android.widget.TextView(this).apply {
+            text = content
+            setTextIsSelectable(true)
+            setPadding(0, pad, 0, 0)
+        }
+        val container = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(
+                pad,
+                pad,
+                pad,
+                pad
+            )
+            addView(imageView)
+            addView(textView)
+        }
         val dialog = android.app.AlertDialog.Builder(this)
-            .setView(imageView)
+            .setView(container)
             .setPositiveButton(android.R.string.ok, null)
             .create()
         dialog.show()
@@ -474,11 +581,33 @@ class ManageE2eKeysActivity : SimpleActivity() {
             requestCameraPermission.launch(Manifest.permission.CAMERA)
             return
         }
-        val options = ScanOptions()
-            .setPrompt(getString(R.string.profile_mesh_scan_prompt))
-            .setBeepEnabled(false)
-            .setOrientationLocked(true)
-        scanQr.launch(options)
+        scanMeshQr.launch(Intent(this, MeshQrScanActivity::class.java))
+    }
+
+    private fun showMeshSaveDialog() {
+        val meshAddress = pendingMeshAddress ?: return
+        android.app.AlertDialog.Builder(this)
+            .setTitle(R.string.profile_mesh_save_title)
+            .setMessage(meshAddress)
+            .setPositiveButton(R.string.profile_mesh_select_contact) { _, _ ->
+                requestContactForMeshAddress()
+            }
+            .setNeutralButton(R.string.profile_mesh_add_contact) { _, _ ->
+                createNewContactWithMesh(meshAddress)
+            }
+            .setNegativeButton(android.R.string.cancel) { _, _ ->
+                pendingMeshAddress = null
+            }
+            .show()
+    }
+
+    private fun createNewContactWithMesh(meshAddress: String) {
+        Intent().apply {
+            action = Intent.ACTION_INSERT
+            data = ContactsContract.Contacts.CONTENT_URI
+            MeshContactHelper.addMeshPhoneInsertExtras(this, meshAddress)
+            createContact.launch(this)
+        }
     }
 
     private fun requestContactForMeshAddress() {
@@ -508,6 +637,19 @@ class ManageE2eKeysActivity : SimpleActivity() {
         )?.use { cursor ->
             if (cursor.moveToFirst()) cursor.getLong(0) else null
         }
+    }
+
+    private fun handleIncomingIntent(intent: Intent?) {
+        if (intent == null) return
+        val action = intent.action
+        val textExtra = intent.getStringExtra(Intent.EXTRA_TEXT)
+        val dataString = intent.dataString
+        val payload = listOfNotNull(textExtra, dataString).firstOrNull().orEmpty()
+        if (payload.isBlank()) return
+        val meshAddress = MeshDiscoveryManager.extractMeshAddress(payload)
+        if (meshAddress.isNullOrBlank()) return
+        pendingMeshAddress = meshAddress
+        showMeshSaveDialog()
     }
 
     private fun getProfileDisplayName(): String? {

@@ -109,7 +109,15 @@
             android:configChanges="orientation"
             android:exported="false"
             android:label="@string/manage_e2e_keys"
-            android:parentActivityName=".activities.MainActivity" />
+            android:parentActivityName=".activities.MainActivity">
+        </activity>
+
+        <activity
+            android:name=".activities.MeshQrScanActivity"
+            android:configChanges="orientation"
+            android:exported="false"
+            android:label="@string/profile_mesh_scan_prompt"
+            android:parentActivityName=".activities.ManageE2eKeysActivity" />
 
         <activity
             android:name="org.fossify.commons.activities.AboutActivity"

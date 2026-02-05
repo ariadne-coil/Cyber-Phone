@@ -6,12 +6,18 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.net.wifi.WifiManager
+import java.net.Inet4Address
+import java.net.InetAddress
+import java.net.NetworkInterface
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationCompat
 import org.fossify.messages.R
@@ -26,6 +32,7 @@ import org.fossify.mesh.ble.MeshBleController
 import org.fossify.mesh.rns.RnsInterface
 import org.fossify.mesh.wifiaware.MeshWifiAwareController
 import org.fossify.mesh.wifiaware.MeshWifiAwareState
+import org.fossify.mesh.rns.RnsNetworkConfig
 
 class MeshService : Service() {
     companion object {
@@ -76,7 +83,8 @@ class MeshService : Service() {
             acquireMulticastLock()
             MeshIdentityStore.getOrCreate(this)
             val routingEnabled = MeshConfig.newInstance(this).meshRoutingEnabled
-            RnsNode.start(this, routingEnabled)
+            val networkConfig = buildNetworkConfig()
+            RnsNode.start(this, routingEnabled, networkConfig)
             LxmfRouter.start(this)
             LxmfRouter.addListener(lxmfListener)
             RnsNode.announceAll()
@@ -121,7 +129,15 @@ class MeshService : Service() {
 
     private fun ensureForeground(): Boolean {
         return try {
-            startForeground(NOTIFICATION_ID, buildNotification())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    buildNotification(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, buildNotification())
+            }
             true
         } catch (e: Exception) {
             if (isForegroundStartNotAllowed(e)) {
@@ -153,6 +169,63 @@ class MeshService : Service() {
             getString(R.string.mesh_routing_idle)
         }
         return getString(R.string.mesh_service_status, neighbors, routingStatus)
+    }
+
+    private fun buildNetworkConfig(): RnsNetworkConfig? {
+        val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        val dhcp = wifi.dhcpInfo ?: return null
+        if (dhcp.ipAddress == 0) return null
+        val ipAddr = inetFromDhcpInt(dhcp.ipAddress)
+        val iface = try { NetworkInterface.getByInetAddress(ipAddr) } catch (_: Exception) { null }
+        val ifaceAddr = iface?.interfaceAddresses?.firstOrNull { it.address is Inet4Address && it.address == ipAddr }
+
+        val broadcastFromIface = ifaceAddr?.broadcast ?: run {
+            val prefix = ifaceAddr?.networkPrefixLength?.toInt() ?: -1
+            if (prefix in 0..32) {
+                computeBroadcast(ipAddr as Inet4Address, prefix)
+            } else {
+                null
+            }
+        }
+
+        val netmaskAddr = if (dhcp.netmask != 0) {
+            inetFromDhcpInt(dhcp.netmask)
+        } else {
+            null
+        }
+
+        val broadcastAddr = when {
+            netmaskAddr != null -> computeBroadcast(ipAddr, netmaskAddr)
+            broadcastFromIface != null -> broadcastFromIface
+            else -> InetAddress.getByName("255.255.255.255")
+        }
+
+        return RnsNetworkConfig(
+            localAddress = ipAddr,
+            broadcastAddress = broadcastAddr,
+            netmask = netmaskAddr,
+            networkPrefixLength = ifaceAddr?.networkPrefixLength?.toInt(),
+            multicastInterface = iface
+        )
+    }
+
+    private fun inetFromDhcpInt(value: Int): InetAddress {
+        val bytes = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(value).array()
+        return InetAddress.getByAddress(bytes)
+    }
+
+    private fun computeBroadcast(address: InetAddress, mask: InetAddress): InetAddress {
+        val addrInt = ByteBuffer.wrap(address.address).int
+        val maskInt = ByteBuffer.wrap(mask.address).int
+        val broadcastInt = addrInt or maskInt.inv()
+        return InetAddress.getByAddress(ByteBuffer.allocate(4).putInt(broadcastInt).array())
+    }
+
+    private fun computeBroadcast(address: Inet4Address, prefixLength: Int): InetAddress {
+        val addrInt = ByteBuffer.wrap(address.address).int
+        val mask = if (prefixLength == 0) 0 else -1 shl (32 - prefixLength)
+        val broadcastInt = addrInt or mask.inv()
+        return InetAddress.getByAddress(ByteBuffer.allocate(4).putInt(broadcastInt).array())
     }
 
     private fun ensureNotificationChannel() {
@@ -207,12 +280,14 @@ class MeshService : Service() {
                     name = "udp-wfd",
                     listenPort = 4243,
                     forwardAddress = "192.168.49.255",
-                    forwardPort = 4243
-                ) { raw, ifaceRef ->
-                    RnsNode.handleIncomingFromInterface(raw, ifaceRef)
-                }
+                    forwardPort = 4243,
+                    inboundHandler = { raw, ifaceRef ->
+                        RnsNode.handleIncomingFromInterface(raw, ifaceRef)
+                    }
+                )
                 RnsNode.addInterface(iface)
                 wifiDirectInterfaceAdded = true
+                RnsNode.announceAll()
             }
         }
         wifiDirectController?.start()
@@ -232,17 +307,34 @@ class MeshService : Service() {
         val config = MeshConfig.newInstance(this)
         if (!config.meshBleEnabled) return
         if (bleController != null) return
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            android.Manifest.permission.BLUETOOTH_CONNECT
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val needed = listOf(
+                android.Manifest.permission.BLUETOOTH_SCAN,
+                android.Manifest.permission.BLUETOOTH_CONNECT,
+                android.Manifest.permission.BLUETOOTH_ADVERTISE
+            )
+            if (needed.any { ContextCompat.checkSelfPermission(this, it) != android.content.pm.PackageManager.PERMISSION_GRANTED }) {
+                return
+            }
         } else {
-            android.Manifest.permission.ACCESS_FINE_LOCATION
+            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                return
+            }
         }
-        if (ContextCompat.checkSelfPermission(this, permission) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+        bleController = MeshBleController(
+            context = this,
+            onPayload = { raw ->
+                bleInterface?.let { RnsNode.handleIncomingFromInterface(raw, it) }
+            },
+            onPeerConnected = {
+                // Kick an announce as soon as we have a neighbor over BLE.
+                RnsNode.announceAll()
+            }
+        ).also { it.start() }
+        if (!org.fossify.mesh.ble.MeshBleState.isActive()) {
+            bleController = null
             return
         }
-        bleController = MeshBleController(this) { raw ->
-            bleInterface?.let { RnsNode.handleIncomingFromInterface(raw, it) }
-        }.also { it.start() }
         bleInterface = object : RnsInterface {
             override val name: String = "ble"
             override fun start() {}
@@ -252,6 +344,7 @@ class MeshService : Service() {
             }
         }
         bleInterface?.let { RnsNode.addInterface(it) }
+        RnsNode.announceAll()
     }
 
     private fun stopBle() {
@@ -274,9 +367,16 @@ class MeshService : Service() {
         if (ContextCompat.checkSelfPermission(this, permission) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             return
         }
-        wifiAwareController = MeshWifiAwareController(this) { raw ->
-            wifiAwareInterface?.let { RnsNode.handleIncomingFromInterface(raw, it) }
-        }.also { it.start() }
+        wifiAwareController = MeshWifiAwareController(
+            context = this,
+            onPayload = { raw ->
+                wifiAwareInterface?.let { RnsNode.handleIncomingFromInterface(raw, it) }
+            },
+            onPeerDiscovered = {
+                // Ensure peers receive our announce quickly after discovery, not only on the long interval.
+                RnsNode.announceAll()
+            }
+        ).also { it.start() }
         wifiAwareInterface = object : RnsInterface {
             override val name: String = "wifiaware"
             override fun start() {}
@@ -286,6 +386,7 @@ class MeshService : Service() {
             }
         }
         wifiAwareInterface?.let { RnsNode.addInterface(it) }
+        RnsNode.announceAll()
     }
 
     private fun stopWifiAware() {

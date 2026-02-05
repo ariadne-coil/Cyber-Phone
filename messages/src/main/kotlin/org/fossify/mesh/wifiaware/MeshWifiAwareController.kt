@@ -11,11 +11,13 @@ import android.net.wifi.aware.SubscribeDiscoverySession
 import android.net.wifi.aware.WifiAwareManager
 import android.util.Log
 import java.nio.ByteBuffer
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.ConcurrentHashMap
 
 class MeshWifiAwareController(
     private val context: Context,
-    private val onPayload: (ByteArray) -> Unit
+    private val onPayload: (ByteArray) -> Unit,
+    private val onPeerDiscovered: (() -> Unit)? = null
 ) {
     companion object {
         private const val TAG = "MeshWifiAware"
@@ -29,6 +31,7 @@ class MeshWifiAwareController(
     private var subscribeSession: SubscribeDiscoverySession? = null
     private val peers = ConcurrentHashMap<String, PeerHandle>()
     private val buffers = ConcurrentHashMap<String, ByteBuffer>()
+    private val messageCounter = AtomicInteger(1)
 
     fun start() {
         val aware = manager ?: return
@@ -49,15 +52,30 @@ class MeshWifiAwareController(
         publishSession?.close()
         subscribeSession?.close()
         MeshWifiAwareState.setActive(false)
+        MeshWifiAwareState.setPeers(0)
+        peers.clear()
     }
 
     fun send(raw: ByteArray) {
+        MeshWifiAwareState.markTx()
         val framed = ByteBuffer.allocate(2 + raw.size)
         framed.putShort(raw.size.toShort())
         framed.put(raw)
         val payload = framed.array()
+        val session = publishSession ?: subscribeSession
+        if (session == null) return
+
         peers.values.forEach { peer ->
-            publishSession?.sendMessage(peer, 0, payload)
+            var offset = 0
+            while (offset < payload.size) {
+                val end = (offset + MAX_CHUNK).coerceAtMost(payload.size)
+                val chunk = payload.copyOfRange(offset, end)
+                try {
+                    session.sendMessage(peer, messageCounter.getAndIncrement(), chunk)
+                } catch (_: Exception) {
+                }
+                offset = end
+            }
         }
     }
 
@@ -75,7 +93,15 @@ class MeshWifiAwareController(
             }
 
             override fun onServiceDiscovered(peerHandle: PeerHandle, serviceSpecificInfo: ByteArray?, matchFilter: MutableList<ByteArray>?) {
-                peers[peerHandle.hashCode().toString()] = peerHandle
+                val key = peerHandle.hashCode().toString()
+                val isNew = peers.put(key, peerHandle) == null
+                MeshWifiAwareState.setPeers(peers.size)
+                if (isNew) {
+                    try {
+                        onPeerDiscovered?.invoke()
+                    } catch (_: Exception) {
+                    }
+                }
             }
         }, null)
     }
@@ -90,7 +116,15 @@ class MeshWifiAwareController(
             }
 
             override fun onServiceDiscovered(peerHandle: PeerHandle, serviceSpecificInfo: ByteArray?, matchFilter: MutableList<ByteArray>?) {
-                peers[peerHandle.hashCode().toString()] = peerHandle
+                val key = peerHandle.hashCode().toString()
+                val isNew = peers.put(key, peerHandle) == null
+                MeshWifiAwareState.setPeers(peers.size)
+                if (isNew) {
+                    try {
+                        onPeerDiscovered?.invoke()
+                    } catch (_: Exception) {
+                    }
+                }
             }
 
             override fun onMessageReceived(peerHandle: PeerHandle, message: ByteArray) {
@@ -116,6 +150,7 @@ class MeshWifiAwareController(
             }
             val payload = ByteArray(len)
             buffer.get(payload)
+            MeshWifiAwareState.markRx()
             onPayload(payload)
         }
         val remaining = ByteArray(buffer.remaining())

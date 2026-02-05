@@ -35,6 +35,11 @@
         android:title="@string/column_count"
         app:showAsAction="never" />
     <item
+        android:id="@+id/manage_e2e_keys"
+        android:icon="@drawable/ic_key_vector"
+        android:title="@string/manage_e2e_keys"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/settings"
         android:icon="@drawable/ic_settings_cog_vector"
         android:title="@string/settings"

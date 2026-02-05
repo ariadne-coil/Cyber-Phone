@@ -108,6 +108,7 @@ import org.fossify.commons.helpers.isSPlus
 import org.fossify.commons.models.PhoneNumber
 import org.fossify.commons.models.RadioItem
 import org.fossify.commons.models.SimpleContact
+import org.fossify.mesh.MeshContactHelper
 import org.fossify.messages.R
 import org.fossify.messages.adapters.AttachmentsAdapter
 import org.fossify.messages.adapters.AutoCompleteTextViewAdapter
@@ -671,6 +672,18 @@ class ThreadActivity : SimpleActivity() {
 
     private fun setupCachedMessages(callback: () -> Unit) {
         ensureBackgroundThread {
+            // For mesh threads we may be opening a brand new conversation (no messages yet).
+            // Ensure it exists before we try resolving participants via conversationsDB.
+            if (conversation == null) {
+                conversation = conversationsDB.getConversationWithThreadId(threadId)
+            }
+            if (conversation == null && LxmfAddress.isMeshThreadId(threadId)) {
+                val addressFromIntent = intent.getStringExtra(THREAD_NUMBER)
+                if (!addressFromIntent.isNullOrBlank() && LxmfAddress.isMeshAddress(addressFromIntent)) {
+                    conversation = LxmfStore.ensureConversation(this, addressFromIntent)
+                }
+            }
+
             messages = try {
                 if (isRecycleBin) {
                     messagesDB.getThreadMessagesFromRecycleBin(threadId)
@@ -1637,6 +1650,7 @@ class ThreadActivity : SimpleActivity() {
             action = Intent.ACTION_INSERT_OR_EDIT
             type = "vnd.android.cursor.item/contact"
             putExtra(KEY_PHONE, phoneNumber)
+            MeshContactHelper.addMeshPhoneInsertExtras(this)
             launchActivityIntent(this)
         }
     }
@@ -1983,7 +1997,7 @@ class ThreadActivity : SimpleActivity() {
             }
             val attachments = getAttachmentSelections()
             val allowFallback = meshMode == MeshMode.MESH_WITH_FALLBACK
-            val fallbackNumber = participants.getAddresses().firstOrNull { !LxmfAddress.isMeshAddress(it) }
+            val fallbackNumber = participants.getAddresses().firstOrNull { !LxmfAddress.isMeshLike(it) }
             if (attachments.isNotEmpty()) {
                 sendMeshMessageWithAttachments(
                     destination = meshAddress,
@@ -1998,7 +2012,14 @@ class ThreadActivity : SimpleActivity() {
                 if (sent || meshMode == MeshMode.MESH_ONLY) {
                     return
                 }
+                if (fallbackNumber.isNullOrBlank()) {
+                    showErrorToast(getString(R.string.mesh_delivery_failed))
+                    return
+                }
             }
+        } else if (!meshAddress.isNullOrBlank() && meshMode == MeshMode.STANDARD_ONLY) {
+            showErrorToast(getString(R.string.mesh_disabled))
+            return
         }
 
         val subscriptionId = availableSIMCards.getOrNull(currentSIMCardIndex)?.subscriptionId
@@ -2040,16 +2061,17 @@ class ThreadActivity : SimpleActivity() {
             return false
         }
 
-        val timestamp = (System.currentTimeMillis() / 1000L).toInt()
+        val nowMs = System.currentTimeMillis()
+        val timestamp = (nowMs / 1000L).toInt()
         val messageId = LxmfAddress.messageIdForHash(
-            normalized.toByteArray(Charsets.UTF_8) + timestamp.toString().toByteArray()
+            normalized.toByteArray(Charsets.UTF_8) + nowMs.toString().toByteArray()
         )
         val sent = LxmfRouter.sendText(destinationHash, text) {
             LxmfStore.markDelivered(this, messageId)
         }
         if (!sent) {
             if (allowFallback) {
-                val fallbackAllowed = fallbackNumber != null || !LxmfAddress.isMeshAddress(destination)
+                val fallbackAllowed = fallbackNumber != null && !LxmfAddress.isMeshLike(destination)
                 if (fallbackAllowed) {
                     sendNormalMessage(text, SmsManager.getDefaultSmsSubscriptionId())
                     return true
@@ -2089,9 +2111,10 @@ class ThreadActivity : SimpleActivity() {
             return
         }
 
-        val timestamp = (System.currentTimeMillis() / 1000L).toInt()
+        val nowMs = System.currentTimeMillis()
+        val timestamp = (nowMs / 1000L).toInt()
         val messageId = LxmfAddress.messageIdForHash(
-            normalized.toByteArray(Charsets.UTF_8) + timestamp.toString().toByteArray()
+            normalized.toByteArray(Charsets.UTF_8) + nowMs.toString().toByteArray()
         )
 
         ensureBackgroundThread {
@@ -2180,7 +2203,11 @@ class ThreadActivity : SimpleActivity() {
     }
 
     private fun sendNormalMessage(text: String, subscriptionId: Int) {
-        val addresses = participants.getAddresses()
+        val addresses = participants.getAddresses().filterNot { LxmfAddress.isMeshLike(it) }
+        if (addresses.isEmpty()) {
+            showErrorToast(getString(R.string.mesh_disabled))
+            return
+        }
         val attachments = buildMessageAttachments()
 
         try {

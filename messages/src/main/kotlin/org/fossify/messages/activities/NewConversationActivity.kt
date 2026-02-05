@@ -33,6 +33,7 @@ import org.fossify.commons.helpers.NavigationIcon
 import org.fossify.commons.helpers.PERMISSION_READ_CONTACTS
 import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.commons.helpers.ensureBackgroundThread
+import org.fossify.commons.models.PhoneNumber
 import org.fossify.commons.models.SimpleContact
 import org.fossify.messages.R
 import org.fossify.messages.adapters.ContactsAdapter
@@ -48,6 +49,7 @@ import org.fossify.messages.helpers.THREAD_NUMBER
 import org.fossify.messages.helpers.THREAD_TEXT
 import org.fossify.messages.helpers.THREAD_TITLE
 import org.fossify.messages.messaging.isShortCodeWithLetters
+import org.fossify.mesh.lxmf.LxmfAddress
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.util.Locale
@@ -196,7 +198,7 @@ class NewConversationActivity : SimpleActivity() {
                 hideKeyboard()
                 val contact = it as SimpleContact
                 maybeShowNumberPickerDialog(contact.phoneNumbers) { number ->
-                    launchThreadActivity(number.normalizedNumber, contact.name)
+                    launchThreadActivity(getConversationAddress(number), contact.name)
                 }
             }.apply {
                 binding.contactsList.adapter = this
@@ -239,8 +241,13 @@ class NewConversationActivity : SimpleActivity() {
                                 )
                                 binding.suggestionsHolder.addView(root)
                                 root.setOnClickListener {
+                                    val defaultNumber = contact.phoneNumbers.firstOrNull {
+                                        val raw = it.value.orEmpty().trim()
+                                        raw.isNotEmpty() && !LxmfAddress.isMeshLike(raw)
+                                    }
+                                        ?: contact.phoneNumbers.firstOrNull()
                                     launchThreadActivity(
-                                        contact.phoneNumbers.first().normalizedNumber,
+                                        defaultNumber?.let { getConversationAddress(it) }.orEmpty(),
                                         contact.name
                                     )
                                 }
@@ -290,5 +297,15 @@ class NewConversationActivity : SimpleActivity() {
 
             startActivity(this)
         }
+    }
+
+    private fun getConversationAddress(phoneNumber: PhoneNumber): String {
+        val raw = phoneNumber.value.orEmpty().trim()
+        val candidate = raw.ifEmpty { phoneNumber.normalizedNumber.orEmpty().trim() }
+        if (candidate.isNotEmpty() && LxmfAddress.isMeshLike(candidate)) {
+            // Do not use normalizedNumber for mesh addresses; it can be digits-only after phone normalization.
+            return LxmfAddress.normalize(candidate)
+        }
+        return phoneNumber.normalizedNumber.takeIf { it.isNotBlank() } ?: raw
     }
 }

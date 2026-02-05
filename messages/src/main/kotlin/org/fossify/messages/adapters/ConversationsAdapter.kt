@@ -11,6 +11,7 @@ import org.fossify.commons.extensions.notificationManager
 import org.fossify.commons.helpers.KEY_PHONE
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.views.MyRecyclerView
+import org.fossify.mesh.MeshContactHelper
 import org.fossify.messages.R
 import org.fossify.messages.activities.SimpleActivity
 import org.fossify.messages.dialogs.RenameConversationDialog
@@ -363,6 +364,7 @@ class ConversationsAdapter(
             action = Intent.ACTION_INSERT_OR_EDIT
             type = "vnd.android.cursor.item/contact"
             putExtra(KEY_PHONE, conversation.phoneNumber)
+            MeshContactHelper.addMeshPhoneInsertExtras(this)
             activity.launchActivityIntent(this)
         }
     }

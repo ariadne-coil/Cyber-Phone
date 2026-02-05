@@ -25,7 +25,6 @@ class App : FossifyApp() {
         }
         MeshCallAccount.register(this)
         MeshCallController.init(this)
-        MeshManager.sync(this)
         if (hasPermission(PERMISSION_READ_CONTACTS)) {
             listOf(
                 ContactsContract.Contacts.CONTENT_URI,

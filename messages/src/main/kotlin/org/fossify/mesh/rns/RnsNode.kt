@@ -8,6 +8,9 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
+import java.net.Inet4Address
+import java.net.InetAddress
+import java.nio.ByteBuffer
 
 object RnsNode {
     private const val DEFAULT_UDP_PORT = 4242
@@ -81,37 +84,49 @@ object RnsNode {
     private val announceScheduler = Executors.newSingleThreadScheduledExecutor()
     private var announceFuture: ScheduledFuture<*>? = null
 
+    private val unicastProbeScheduler = Executors.newSingleThreadScheduledExecutor()
+    private var unicastProbeFuture: ScheduledFuture<*>? = null
+    @Volatile
+    private var unicastProbeCursor = 0
+
+    @Volatile
+    private var networkConfig: RnsNetworkConfig? = null
+    private var udpInterfaceRef: RnsUdpInterface? = null
+
     private var routingEnabled = false
     private val announceReceivedCount = AtomicLong(0L)
     private val lastPacketReceivedMs = AtomicLong(0L)
     private val rawPacketReceivedCount = AtomicLong(0L)
+    private val lastPacketSentMs = AtomicLong(0L)
+    private val rawPacketSentCount = AtomicLong(0L)
 
-    fun start(context: Context, routing: Boolean) {
+    fun start(context: Context, routing: Boolean, networkConfig: RnsNetworkConfig? = null) {
         if (running.setIfFalse()) {
             routingEnabled = routing
+            this.networkConfig = networkConfig
+            val broadcastAddress = networkConfig?.broadcastAddress?.hostAddress ?: "255.255.255.255"
+            val preferredMcastInterface = networkConfig?.multicastInterface
             val udpInterface = RnsUdpInterface(
                 name = "udp",
                 listenPort = DEFAULT_UDP_PORT,
-                forwardAddress = "255.255.255.255",
-                forwardPort = DEFAULT_UDP_PORT
-            ) { raw, iface ->
-                handleIncoming(raw, iface)
-            }
-            val multicastInterface = RnsUdpInterface(
-                name = "udp-mcast",
-                listenPort = DEFAULT_UDP_PORT,
-                forwardAddress = DEFAULT_MULTICAST_GROUP,
-                forwardPort = DEFAULT_UDP_PORT
-            ) { raw, iface ->
-                handleIncoming(raw, iface)
-            }
+                forwardAddress = broadcastAddress,
+                forwardPort = DEFAULT_UDP_PORT,
+                inboundHandler = { raw, iface ->
+                    handleIncoming(raw, iface)
+                },
+                preferredMulticastInterface = preferredMcastInterface,
+                extraForwardAddresses = if (broadcastAddress != "255.255.255.255") listOf("255.255.255.255") else emptyList(),
+                multicastGroupAddress = DEFAULT_MULTICAST_GROUP
+            )
+            udpInterfaceRef = udpInterface
             interfaces.add(udpInterface)
-            interfaces.add(multicastInterface)
             interfaces.forEach { it.start() }
             registerPathRequestDestination()
             startAnnounceScheduler()
+            startUnicastProbeScheduler()
         } else {
             routingEnabled = routing
+            this.networkConfig = networkConfig
         }
     }
 
@@ -141,6 +156,19 @@ object RnsNode {
             rawPacketReceivedCount.set(0L)
             announceFuture?.cancel(true)
             announceFuture = null
+            unicastProbeFuture?.cancel(true)
+            unicastProbeFuture = null
+            unicastProbeCursor = 0
+            udpInterfaceRef = null
+            networkConfig = null
+        }
+    }
+
+    fun isRunning(): Boolean = running.get()
+
+    fun getInterfaceNames(): List<String> {
+        synchronized(interfaces) {
+            return interfaces.map { it.name }.toList()
         }
     }
 
@@ -296,6 +324,107 @@ object RnsNode {
         )
     }
 
+    private fun startUnicastProbeScheduler() {
+        unicastProbeFuture?.cancel(true)
+        // Small, battery-friendly LAN unicast probing to bootstrap in networks where broadcast/multicast is blocked.
+        unicastProbeFuture = unicastProbeScheduler.scheduleAtFixedRate(
+            { unicastProbeTick() },
+            5_000L,
+            3_000L,
+            TimeUnit.MILLISECONDS
+        )
+    }
+
+    private fun unicastProbeTick() {
+        if (!isRunning()) return
+        // Only probe when we have no known direct neighbors yet.
+        if (getDirectNeighborCount() > 0) return
+        val udp = udpInterfaceRef ?: return
+        if (udp.getPeerCount() > 0) return
+        val cfg = networkConfig ?: return
+        val local = cfg.localAddress as? Inet4Address ?: return
+        val prefix = cfg.networkPrefixLength
+            ?: cfg.netmask?.let { mask -> prefixLengthFromNetmask(mask) }
+            ?: 24
+        val effectivePrefix = if (prefix in 0..32) {
+            // Avoid scanning huge subnets; most home networks are /24.
+            prefix.coerceAtLeast(24)
+        } else {
+            24
+        }
+
+        val targets = computeSubnetTargets(local, effectivePrefix)
+        if (targets.isEmpty()) return
+
+        val rawAnnounces = buildLocalAnnouncePacketsRaw()
+        if (rawAnnounces.isEmpty()) return
+
+        // Probe a handful of hosts per tick.
+        repeat(8) {
+            val idx = (unicastProbeCursor++ % targets.size)
+            val addr = targets[idx]
+            rawAnnounces.forEach { raw ->
+                lastPacketSentMs.set(System.currentTimeMillis())
+                rawPacketSentCount.incrementAndGet()
+                udp.sendTo(raw, addr, DEFAULT_UDP_PORT)
+            }
+        }
+    }
+
+    private fun computeSubnetTargets(local: Inet4Address, prefixLength: Int): List<InetAddress> {
+        val ipInt = ByteBuffer.wrap(local.address).int
+        val mask = if (prefixLength == 0) 0 else -1 shl (32 - prefixLength)
+        val network = ipInt and mask
+        val broadcast = network or mask.inv()
+
+        // effectivePrefix ensures we never scan massive networks.
+        val out = ArrayList<InetAddress>(254)
+        val start = network + 1
+        val end = broadcast - 1
+        var candidate = start
+        while (candidate <= end) {
+            if (candidate != ipInt) {
+                out.add(InetAddress.getByAddress(ByteBuffer.allocate(4).putInt(candidate).array()))
+            }
+            candidate++
+        }
+        // Prioritize nearby IPs first for faster discovery on typical networks.
+        out.sortBy { addr ->
+            kotlin.math.abs(ByteBuffer.wrap(addr.address).int - ipInt)
+        }
+        return out
+    }
+
+    private fun prefixLengthFromNetmask(mask: InetAddress): Int? {
+        val bytes = mask.address
+        if (bytes.size != 4) return null
+        var count = 0
+        for (b in bytes) {
+            val v = b.toInt() and 0xFF
+            for (i in 7 downTo 0) {
+                if ((v and (1 shl i)) != 0) count++ else return count
+            }
+        }
+        return count
+    }
+
+    private fun buildLocalAnnouncePacketsRaw(): List<ByteArray> {
+        val packets = ArrayList<ByteArray>()
+        localDestinations.values.forEach { local ->
+            val dest = local.destination
+            if (dest.identity == null || dest.type != RnsDestination.SINGLE) return@forEach
+            val config = local.announceProvider?.invoke()
+            val packet = RnsAnnounce.build(dest, config?.appData, config?.ratchetPublic, RnsPacket.NONE)
+            try {
+                packets.add(packet.pack())
+            } catch (_: Exception) {
+            }
+        }
+        return packets
+    }
+
+    fun getUdpPeerCount(): Int = udpInterfaceRef?.getPeerCount() ?: 0
+
     fun getDirectNeighborCount(timeoutMs: Long = DIRECT_NEIGHBOR_TIMEOUT_MS): Int {
         val now = System.currentTimeMillis()
         return pathTable.values.count { entry ->
@@ -308,6 +437,10 @@ object RnsNode {
     fun getLastPacketReceivedMs(): Long = lastPacketReceivedMs.get()
 
     fun getRawPacketReceivedCount(): Long = rawPacketReceivedCount.get()
+
+    fun getLastPacketSentMs(): Long = lastPacketSentMs.get()
+
+    fun getRawPacketSentCount(): Long = rawPacketSentCount.get()
 
     fun getActiveLinkCount(): Int = activeLinksById.size
 
@@ -514,6 +647,8 @@ object RnsNode {
     }
 
     fun send(packet: RnsPacket, interfaceName: String? = null) {
+        lastPacketSentMs.set(System.currentTimeMillis())
+        rawPacketSentCount.incrementAndGet()
         val raw = packet.pack()
         val iface = interfaceName?.let { name -> interfaces.firstOrNull { it.name == name } }
         if (iface != null) {
@@ -929,7 +1064,8 @@ object RnsNode {
     }
 
     private fun shouldCacheResource(resource: RnsResource): Boolean {
-        return routingEnabled || isLocalDestination(resource.destinationHash)
+        // Cache inbound resources for us, and cache resources we originate so we can serve requests.
+        return routingEnabled || isLocalDestination(resource.destinationHash) || isLocalDestination(resource.sourceHash)
     }
 
     private fun isLocalDestination(destinationHash: ByteArray): Boolean {
@@ -1148,6 +1284,8 @@ object RnsNode {
                 }
             }
         }
+
+        fun get(): Boolean = value
     }
 
     private fun decryptPayload(packet: RnsPacket, destination: RnsDestination): ByteArray? {

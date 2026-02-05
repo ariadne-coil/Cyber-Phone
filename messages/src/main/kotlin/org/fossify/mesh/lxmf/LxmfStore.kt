@@ -77,9 +77,10 @@ object LxmfStore {
     ): Long {
         val normalized = LxmfAddress.normalize(destinationAddress)
         val threadId = LxmfAddress.threadIdForAddress(normalized)
-        val timestamp = timestampOverride ?: (System.currentTimeMillis() / 1000L).toInt()
+        val nowMs = System.currentTimeMillis()
+        val timestamp = timestampOverride ?: (nowMs / 1000L).toInt()
         val messageId = messageIdOverride ?: LxmfAddress.messageIdForHash(
-            normalized.toByteArray(Charsets.UTF_8) + timestamp.toString().toByteArray()
+            normalized.toByteArray(Charsets.UTF_8) + nowMs.toString().toByteArray()
         )
         val contact = MeshContactHelper.getSimpleContactForMeshAddress(context, normalized)
         val participant = contact ?: buildMeshParticipant(normalized)

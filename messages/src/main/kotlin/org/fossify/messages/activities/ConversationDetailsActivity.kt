@@ -33,6 +33,7 @@ import org.fossify.messages.extensions.renameConversation
 import org.fossify.messages.extensions.startContactDetailsIntent
 import org.fossify.messages.helpers.THREAD_ID
 import org.fossify.messages.models.Conversation
+import org.fossify.mesh.lxmf.LxmfAddress
 
 class ConversationDetailsActivity : SimpleActivity() {
 
@@ -167,7 +168,10 @@ class ConversationDetailsActivity : SimpleActivity() {
     private fun setupParticipants() {
         val adapter = ContactsAdapter(this, participants, binding.participantsRecyclerview) {
             val contact = it as SimpleContact
-            val address = contact.phoneNumbers.first().normalizedNumber
+            val defaultNumber =
+                contact.phoneNumbers.firstOrNull { !LxmfAddress.isMeshAddress(LxmfAddress.normalize(it.normalizedNumber)) }
+                    ?: contact.phoneNumbers.firstOrNull()
+            val address = defaultNumber?.normalizedNumber.orEmpty()
             getContactFromAddress(address) { simpleContact ->
                 if (simpleContact != null) {
                     startContactDetailsIntent(simpleContact)

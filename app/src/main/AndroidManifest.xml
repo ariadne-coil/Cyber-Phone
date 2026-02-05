@@ -14,7 +14,9 @@
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_AWARE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -32,6 +34,7 @@
     <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -79,6 +82,70 @@
                 <action android:name="android.intent.action.VIEW" />
                 <data android:mimeType="vnd.android.cursor.dir/calls" />
                 <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".activities.MeshLinkActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:label="@string/app_launcher_name">
+
+            <!-- Custom Mesh Schemes (Opaque: mesh:address) -->
+            <intent-filter android:label="Open Mesh Address">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mesh" />
+                <data android:scheme="meshaddr1" />
+                <data android:scheme="lxm" />
+                <data android:scheme="lxmf" />
+            </intent-filter>
+
+            <!-- Custom Mesh Schemes (Hierarchical: mesh://address) -->
+            <intent-filter android:label="Open Mesh Address">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mesh" />
+                <data android:scheme="meshaddr1" />
+                <data android:scheme="lxm" />
+                <data android:scheme="lxmf" />
+                <data android:host="*" />
+                <data android:pathPattern=".*" />
+            </intent-filter>
+
+            <!-- Web Links (App Links) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="cyberphone.local" android:pathPrefix="/mesh" />
+                <data android:scheme="http" android:host="cyberphone.local" android:pathPrefix="/mesh" />
+            </intent-filter>
+
+            <!-- vCard handling -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="text/x-vcard" />
+                <data android:mimeType="text/vcard" />
+            </intent-filter>
+
+            <!-- Sharing and Raw text -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/x-vcard" />
+                <data android:mimeType="text/vcard" />
             </intent-filter>
         </activity>
 
@@ -231,7 +298,7 @@
         <service
             android:name="org.fossify.mesh.MeshService"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="connectedDevice" />
 
         <receiver
             android:name=".receivers.CallActionReceiver"

@@ -10,13 +10,21 @@ import androidx.core.graphics.drawable.IconCompat
 import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.commons.models.SimpleContact
 import androidx.core.net.toUri
+import org.fossify.mesh.lxmf.LxmfAddress
 
 fun ArrayList<SimpleContact>.getThreadTitle(): String {
     return TextUtils.join(", ", map { it.name }.toTypedArray()).orEmpty()
 }
 
 fun ArrayList<SimpleContact>.getAddresses(): List<String> {
-    return flatMap { it.phoneNumbers }.map { it.normalizedNumber }
+    return flatMap { it.phoneNumbers }.mapNotNull { phoneNumber ->
+        val rawValue = phoneNumber.value.orEmpty().trim()
+        if (rawValue.isNotEmpty() && LxmfAddress.isMeshLike(rawValue)) {
+            LxmfAddress.normalize(rawValue)
+        } else {
+            phoneNumber.normalizedNumber.takeIf { it.isNotBlank() } ?: rawValue.takeIf { it.isNotBlank() }
+        }
+    }
 }
 
 fun SimpleContact.toPerson(context: Context? = null): Person {
@@ -49,4 +57,3 @@ fun SimpleContact.loadIcon(context: Context): IconCompat {
         )
     }
 }
-

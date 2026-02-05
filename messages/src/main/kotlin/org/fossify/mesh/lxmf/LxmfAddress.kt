@@ -9,6 +9,7 @@ object LxmfAddress {
     private const val ALT_PREFIX = "lxm:"
     private const val ALT_PREFIX_SCHEME = "lxm://"
     private const val HASH_BYTES = 16
+    private val HEX_REGEX = Regex("^[0-9a-fA-F]{32}$")
 
     fun encode(hash: ByteArray): String {
         require(hash.size == HASH_BYTES) { "LXMF destination hash must be 16 bytes" }
@@ -29,6 +30,9 @@ object LxmfAddress {
 
     fun normalize(address: String): String {
         val trimmed = address.trim().lowercase()
+        if (HEX_REGEX.matches(trimmed)) {
+            return PREFIX + trimmed
+        }
         val normalized = when {
             trimmed.startsWith(ALT_PREFIX_SCHEME) -> ALT_PREFIX + trimmed.removePrefix(ALT_PREFIX_SCHEME)
             trimmed.startsWith(ALT_PREFIX) -> trimmed
@@ -44,6 +48,16 @@ object LxmfAddress {
 
     fun isMeshAddress(address: String): Boolean {
         return decode(address) != null
+    }
+
+    fun isMeshLike(address: String): Boolean {
+        val trimmed = address.trim().lowercase()
+        return HEX_REGEX.matches(trimmed) ||
+            trimmed.startsWith(PREFIX) ||
+            trimmed.startsWith(ALT_PREFIX) ||
+            trimmed.startsWith("lxmf:") ||
+            trimmed.startsWith("meshaddr1:") ||
+            trimmed.startsWith(ALT_PREFIX_SCHEME)
     }
 
     fun threadIdForAddress(address: String): Long {

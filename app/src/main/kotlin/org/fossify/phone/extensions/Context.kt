@@ -10,6 +10,7 @@ import android.media.AudioManager
 import android.net.Uri
 import android.os.PowerManager
 import android.telecom.TelecomManager
+import org.fossify.mesh.MeshContactHelper
 import org.fossify.commons.extensions.launchActivityIntent
 import org.fossify.commons.extensions.telecomManager
 import org.fossify.commons.helpers.KEY_PHONE
@@ -92,6 +93,7 @@ fun Activity.startAddContactIntent(phoneNumber: String) {
         action = Intent.ACTION_INSERT_OR_EDIT
         type = "vnd.android.cursor.item/contact"
         putExtra(KEY_PHONE, phoneNumber)
+        MeshContactHelper.addMeshPhoneInsertExtras(this)
         launchActivityIntent(this)
     }
 }

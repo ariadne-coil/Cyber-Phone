@@ -143,7 +143,7 @@
     <string name="manage_blocked_keywords">Manage blocked keywords</string>
     <string name="not_blocking_keywords">You are not blocking any keywords. You may add keywords here to block all messages containing them.</string>
     <string name="add_a_blocked_keyword">Add a blocked keyword</string>
-    <string name="manage_e2e_keys">Profile</string>
+    <string name="manage_e2e_keys">Cyber Features</string>
     <string name="e2e_public_key_label">Public key</string>
     <string name="e2e_private_key_label">Private key</string>
     <string name="e2e_copy_public_key">Copy public key</string>
@@ -172,6 +172,8 @@
     <string name="profile_phone_label">Phone number</string>
     <string name="profile_mesh_address_label">Mesh address</string>
     <string name="profile_unknown">Not set</string>
+    <string name="profile_running">Running</string>
+    <string name="profile_stopped">Stopped</string>
     <string name="profile_mesh_announce">Announce mesh presence</string>
     <string name="profile_mesh_announced">Mesh announce sent.</string>
     <string name="profile_show_qr">Show QR code</string>
@@ -182,6 +184,9 @@
     <string name="profile_mesh_invalid">Invalid mesh address.</string>
     <string name="profile_mesh_scan_prompt">Scan a mesh address QR code</string>
     <string name="profile_mesh_scan_denied">Camera permission is required to scan QR codes.</string>
+    <string name="profile_mesh_save_title">Save mesh address</string>
+    <string name="profile_mesh_select_contact">Select a contact</string>
+    <string name="profile_mesh_add_contact">Add a new contact</string>
     <string name="messages_category_main">Main</string>
     <string name="messages_category_otp">OTP</string>
     <string name="messages_category_spam">Spam</string>

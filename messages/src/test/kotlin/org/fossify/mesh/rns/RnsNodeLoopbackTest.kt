@@ -4,6 +4,8 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
 class RnsNodeLoopbackTest {
@@ -38,11 +40,6 @@ class RnsNodeLoopbackTest {
         }
 
         RnsNode.registerDestination(localDestination, { _, _ -> })
-        val handlerMethod = RnsNode::class.java.getDeclaredMethod(
-            "handleIncoming",
-            ByteArray::class.java,
-            RnsInterface::class.java
-        ).apply { isAccessible = true }
 
         val remoteLinkRef = AtomicReference<RnsLink?>(null)
         lateinit var loopbackInterface: RnsInterface
@@ -58,7 +55,7 @@ class RnsNodeLoopbackTest {
                     val remoteLink = RnsLink.fromIncomingRequest(remoteDestination, packet, raw) ?: return
                     remoteLinkRef.set(remoteLink)
                     val proof = remoteLink.buildProofPacket() ?: return
-                    handlerMethod.invoke(RnsNode, proof.pack(), this)
+                    RnsNode.handleIncomingFromInterface(proof.pack(), this)
                     return
                 }
 
@@ -73,18 +70,23 @@ class RnsNodeLoopbackTest {
                             val requestId = RnsHash.truncatedHash(
                                 RnsHash.sha256(RnsPacket.getHashablePart(raw))
                             )
-                            remoteLink.handleRequest(payload, remoteDestination, requestId) { link, packetType, context, data ->
-                                val encrypted = link.encryptForPacket(packetType, context, data) ?: return@handleRequest
-                                val responsePacket = RnsPacket(
-                                    destination = RnsDestination.fromHash(link.linkId, RnsDestination.LINK),
-                                    data = encrypted,
-                                    packetType = packetType,
-                                    context = context
-                                )
-                                kotlin.concurrent.thread(start = true, name = "rns-loopback-response") {
-                                    handlerMethod.invoke(RnsNode, responsePacket.pack(), loopbackInterface)
+                            remoteLink.handleRequest(
+                                payload = payload,
+                                destination = remoteDestination,
+                                requestId = requestId,
+                                sendPacket = { link, packetType, context, data ->
+                                    val encrypted = link.encryptForPacket(packetType, context, data) ?: return@handleRequest
+                                    val responsePacket = RnsPacket(
+                                        destination = RnsDestination.fromHash(link.linkId, RnsDestination.LINK),
+                                        data = encrypted,
+                                        packetType = packetType,
+                                        context = context
+                                    )
+                                    kotlin.concurrent.thread(start = true, name = "rns-loopback-response") {
+                                        RnsNode.handleIncomingFromInterface(responsePacket.pack(), loopbackInterface)
+                                    }
                                 }
-                            }
+                            )
                         }
                     }
                 }
@@ -92,27 +94,37 @@ class RnsNodeLoopbackTest {
         }
 
         loopbackInterface = loopback
-        val interfacesField = RnsNode::class.java.getDeclaredField("interfaces").apply { isAccessible = true }
-        @Suppress("UNCHECKED_CAST")
-        val interfaces = interfacesField.get(RnsNode) as MutableList<RnsInterface>
-        interfaces.clear()
-        interfaces.add(loopback)
+        RnsNode.addInterface(loopback)
+
+        val responseRef = AtomicReference<Any?>(null)
+        val responseLatch = CountDownLatch(1)
 
         val deadline = System.currentTimeMillis() + 3000
         var receipt: RnsRequestReceipt? = null
         while (receipt == null && System.currentTimeMillis() < deadline) {
-            receipt = RnsNode.requestOverLink(localDestination, remoteDestination, "/probe", listOf(0))
+            receipt = RnsNode.requestOverLink(
+                owner = localDestination,
+                destination = remoteDestination,
+                path = "/probe",
+                data = listOf(0),
+                onResponse = { r ->
+                    responseRef.set(r.response)
+                    responseLatch.countDown()
+                },
+                onFailure = {
+                    responseLatch.countDown()
+                }
+            )
             if (receipt == null) {
                 Thread.sleep(50)
             }
         }
         assertNotNull(receipt)
+        assertNotNull("Receipt should have a requestId", receipt?.requestId)
+        val gotResponse = responseLatch.await(3, TimeUnit.SECONDS)
+        assertEquals("Expected response callback to fire", true, gotResponse)
 
-        while (receipt?.response == null && System.currentTimeMillis() < deadline) {
-            Thread.sleep(50)
-        }
-
-        val responseValue = receipt?.response as? Number
+        val responseValue = responseRef.get() as? Number
         assertNotNull(responseValue)
         assertEquals(1, responseValue?.toInt())
     }

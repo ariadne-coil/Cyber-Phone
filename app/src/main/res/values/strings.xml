@@ -136,6 +136,7 @@
     <string name="mesh_call_quality_low">Low (16 kHz)</string>
     <string name="mesh_call_quality_high">High (48 kHz)</string>
     <string name="mesh_call_account_label">Mesh calls</string>
+    <string name="manage_e2e_keys">Cyber Features</string>
 
     <!-- FAQ -->
     <string name="faq_1_title">I hear incoming calls, but the screen doesn\'t turn on. What can I do?</string>
