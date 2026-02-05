@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.2 (2026-02-05)
 - Mesh: stabilized UDP transport (single socket + multicast join) and made peer unicast port-stable to prevent “works once” delivery failures.
 - Mesh: added LAN unicast probing to bootstrap discovery on networks where broadcast/multicast is blocked.
 - Mesh UX: added in-app QR scanner + save flow (select existing contact or create a new contact) and added a first-class “Mesh link” field in the contact editor.
