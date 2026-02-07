@@ -11,6 +11,7 @@ import org.fossify.commons.extensions.*
 import org.fossify.commons.helpers.REQUEST_CODE_SET_DEFAULT_DIALER
 import org.fossify.phone.R
 import org.fossify.phone.extensions.getHandleToUse
+import org.fossify.mesh.MeshManager
 import org.fossify.mesh.MeshConfig
 import org.fossify.mesh.MeshMode
 import org.fossify.mesh.call.MeshCallQuality
@@ -52,14 +53,22 @@ class DialerActivity : SimpleActivity() {
 
             val meshConfig = MeshConfig.newInstance(this)
             val meshMode = meshConfig.getMeshMode()
+            val isMeshLike = LxmfAddress.isMeshLike(rawNumber)
             val meshAddress = if (meshMode != MeshMode.STANDARD_ONLY) {
-                MeshCallContactHelper.getMeshAddressForNumber(this, rawNumber)
-            } else {
-                null
-            }
+                // If the user is explicitly calling a mesh address (no PSTN number), use it directly.
+                // Otherwise, look up the mesh address for a regular phone number contact.
+                if (isMeshLike) {
+                    LxmfAddress.normalize(rawNumber)
+                } else {
+                    MeshCallContactHelper.getMeshAddressForNumber(this, rawNumber)
+                }
+            } else null
 
             if (!meshAddress.isNullOrBlank() && meshMode != MeshMode.STANDARD_ONLY) {
-                attemptMeshCall(rawNumber, meshAddress, meshMode)
+                // Ensure the mesh backend is running before probing, otherwise we may always fall back.
+                MeshManager.ensureRunning(this)
+                // Do not fall back to PSTN when the "number" is actually a mesh address.
+                attemptMeshCall(rawNumber, meshAddress, meshMode, allowTelFallback = !isMeshLike)
                 return
             } else if (meshMode == MeshMode.MESH_ONLY) {
                 toast(R.string.mesh_delivery_failed)
@@ -74,10 +83,15 @@ class DialerActivity : SimpleActivity() {
         }
     }
 
-    private fun attemptMeshCall(phoneNumber: String, meshAddress: String, meshMode: MeshMode) {
+    private fun attemptMeshCall(
+        phoneNumber: String,
+        meshAddress: String,
+        meshMode: MeshMode,
+        allowTelFallback: Boolean
+    ) {
         val destinationHash = LxmfAddress.decode(meshAddress)
         if (destinationHash == null) {
-            if (meshMode == MeshMode.MESH_WITH_FALLBACK) {
+            if (allowTelFallback && meshMode == MeshMode.MESH_WITH_FALLBACK) {
                 placeTelCall()
             } else {
                 toast(R.string.mesh_invalid_address)
@@ -108,7 +122,7 @@ class DialerActivity : SimpleActivity() {
                     )
                     finish()
                 } else {
-                    if (meshMode == MeshMode.MESH_WITH_FALLBACK) {
+                    if (allowTelFallback && meshMode == MeshMode.MESH_WITH_FALLBACK) {
                         placeTelCall()
                     } else {
                         toast(R.string.mesh_delivery_failed)
