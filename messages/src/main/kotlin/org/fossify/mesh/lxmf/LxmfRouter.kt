@@ -355,12 +355,13 @@ object LxmfRouter {
             stampCost = stampCost
         )
         val packed = message.pack()
-        val resource = createResourceForMessage(destinationHash, packed)
-        if (resource != null) {
-            RnsNode.advertiseResource(resource)
-        }
-        if (packed.size > RnsConstants.MDU) {
+        val requiresResource = packed.size > RnsConstants.MDU
+        val resource = if (requiresResource) createResourceForMessage(destinationHash, packed) else null
+        if (requiresResource) {
             if (resource == null) return false
+            // Avoid duplicate deliveries for small packets: only advertise resources if we are actually going
+            // to use resource transfer (segmented or link-resource), not for direct-packet messages.
+            RnsNode.advertiseResource(resource)
             val sentViaLink = RnsNode.sendResourceViaLink(local, remoteDestination, resource)
             if (sentViaLink) return true
             return sendPropagationCopy(packed, destinationHash, remoteIdentity)

@@ -62,8 +62,17 @@ fun Context.sendMessageCompat(
     }
 
     val messagingUtils = messagingUtils
-    val isMms = attachments.isNotEmpty() || isLongMmsMessage(outgoingText, settings)
-            || cleanAddresses.size > 1 && settings.group
+    // Some carriers/devices are unreliable with "text-only MMS" conversions, especially when the
+    // message contains URLs (common for link shares). Prefer segmented SMS for URL-containing text.
+    val forceSmsForLink = attachments.isEmpty() &&
+        cleanAddresses.size == 1 &&
+        Patterns.WEB_URL.matcher(outgoingText).find()
+
+    val isMms = !forceSmsForLink && (
+        attachments.isNotEmpty() ||
+            isLongMmsMessage(outgoingText, settings) ||
+            cleanAddresses.size > 1 && settings.group
+        )
     if (isMms) {
         // we send all MMS attachments separately to reduces the chances of hitting provider MMS limit.
         if (attachments.isNotEmpty()) {

@@ -51,7 +51,12 @@ object LxmfStore {
                 senderPhotoUri = participant.photoUri,
                 subscriptionId = -1
             )
-            context.messagesDB.insertOrIgnore(messageModel)
+            // Mesh can deliver the same LXMF payload through multiple paths (direct packet, resource transfer,
+            // propagation). Only notify/update unread counts if this is a *new* message for us.
+            val inserted = context.messagesDB.insertOrIgnore(messageModel)
+            if (inserted == -1L) {
+                return@ensureBackgroundThread
+            }
             upsertConversation(context, threadId, participant, body, timestamp, read = false)
             val bitmap = context.getNotificationBitmap(participant.photoUri)
             context.showReceivedMessageNotification(

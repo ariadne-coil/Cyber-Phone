@@ -1864,13 +1864,14 @@ class ThreadActivity : SimpleActivity() {
         val isImage = mimeType.isImageMimeType()
         val isGif = mimeType.isGifMimeType()
         if (isGif || !isImage) {
-            val meshMode = MeshConfig.newInstance(this).getMeshMode()
             val meshAddress = if (!isMeshThread() && participants.size == 1 && !isSpecialNumber() && !isRecycleBin) {
                 MeshDiscoveryManager.getMeshAddressForContact(this, participants.first())
             } else {
                 null
             }
-            val bypassLimit = isMeshThread() || (!meshAddress.isNullOrBlank() && meshMode != MeshMode.STANDARD_ONLY)
+            // For mesh-capable recipients, allow larger attachments than MMS would permit.
+            // Whether it will actually be sent via mesh depends on Mesh Mode at send time.
+            val bypassLimit = isMeshThread() || !meshAddress.isNullOrBlank()
             if (!bypassLimit) {
                 // is it assumed that images will always be compressed below the max MMS size limit
                 val fileSize = getFileSizeFromUri(uri)
