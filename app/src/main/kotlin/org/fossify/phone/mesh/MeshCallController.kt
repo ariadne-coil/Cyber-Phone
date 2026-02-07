@@ -10,12 +10,14 @@ import org.fossify.mesh.call.MeshCallQuality
 import org.fossify.mesh.call.MeshCallRouter
 import org.fossify.mesh.lxmf.LxmfAddress
 import org.fossify.mesh.rns.RnsHex
+import android.util.Log
 import java.util.zip.CRC32
 import java.util.concurrent.ConcurrentHashMap
 
 object MeshCallController : MeshCallRouter.Listener {
     private val sessions = ConcurrentHashMap<String, MeshCallSessionState>()
     private var appContext: Context? = null
+    private const val TAG = "MeshCallController"
 
     data class MeshCallSessionState(
         val session: MeshCallRouter.MeshCallSession,
@@ -44,7 +46,13 @@ object MeshCallController : MeshCallRouter.Listener {
         quality: MeshCallQuality,
         displayName: String?,
         phoneNumber: String?
-    ) {
+    ): Boolean {
+        // Safety net: if our PhoneAccount is not enabled, placeCall() can fall back to a carrier
+        // call (dialing the pseudo TEL number), which is worse than failing fast.
+        if (!MeshCallAccount.isEnabled(context)) {
+            Log.w(TAG, "Mesh PhoneAccount is not enabled; refusing to place outgoing mesh call")
+            return false
+        }
         val session = MeshCallRouter.createOutgoingSession(
             remoteDeliveryHash = remoteDeliveryHash,
             remoteCallHash = remoteCallHash,
@@ -68,6 +76,7 @@ object MeshCallController : MeshCallRouter.Listener {
         val telecom = context.getSystemService(Context.TELECOM_SERVICE) as TelecomManager
         telecom.placeCall(uri, extras)
         MeshCallRouter.sendInvite(session)
+        return true
     }
 
     private fun pseudoTelNumber(remoteDeliveryHash: ByteArray): String {

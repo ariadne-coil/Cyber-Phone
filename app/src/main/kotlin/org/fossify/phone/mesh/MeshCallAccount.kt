@@ -13,6 +13,16 @@ object MeshCallAccount {
         return PhoneAccountHandle(component, MeshCallConstants.PHONE_ACCOUNT_ID)
     }
 
+    fun isEnabled(context: Context): Boolean {
+        val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as TelecomManager
+        val handle = getHandle(context)
+        return try {
+            telecomManager.callCapablePhoneAccounts.contains(handle)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     fun register(context: Context) {
         val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as TelecomManager
         val handle = getHandle(context)

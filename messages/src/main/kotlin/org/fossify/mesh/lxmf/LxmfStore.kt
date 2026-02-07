@@ -19,6 +19,20 @@ import org.fossify.mesh.MeshContactHelper
 import java.io.File
 
 object LxmfStore {
+    private fun looksLikeGif(payload: LxmfAttachmentPayload): Boolean {
+        val name = payload.filename.lowercase()
+        if (name.endsWith(".gif")) return true
+        val data = payload.data
+        if (data.size < 6) return false
+        // GIF87a / GIF89a
+        return data[0] == 'G'.code.toByte() &&
+            data[1] == 'I'.code.toByte() &&
+            data[2] == 'F'.code.toByte() &&
+            data[3] == '8'.code.toByte() &&
+            (data[4] == '7'.code.toByte() || data[4] == '9'.code.toByte()) &&
+            data[5] == 'a'.code.toByte()
+    }
+
     fun storeIncoming(context: Context, message: LxmfMessage) {
         val sourceHash = message.sourceHash
         val address = LxmfAddress.encode(sourceHash)
@@ -233,13 +247,18 @@ object LxmfStore {
                 }
                 val file = File(dir, fileName)
                 file.outputStream().use { it.write(payload.data) }
+                val normalizedMime = if (payload.mimeType.lowercase().startsWith("image") && looksLikeGif(payload)) {
+                    "image/gif"
+                } else {
+                    payload.mimeType
+                }
                 stored.add(
                     org.fossify.messages.models.Attachment(
                         id = null,
                         messageId = messageId,
                         // Use FileProvider so tapping the attachment does not crash with FileUriExposedException.
                         uriString = context.getMyFileUri(file).toString(),
-                        mimetype = payload.mimeType,
+                        mimetype = normalizedMime,
                         width = 0,
                         height = 0,
                         filename = safeBaseName

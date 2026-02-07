@@ -28,6 +28,7 @@ import com.bumptech.glide.load.resource.bitmap.FitCenter
 import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.Target
+import com.bumptech.glide.load.resource.gif.GifDrawable
 import org.fossify.commons.adapters.MyRecyclerViewListAdapter
 import org.fossify.commons.dialogs.ConfirmationDialog
 import org.fossify.commons.extensions.applyColorFilter
@@ -526,42 +527,83 @@ class ThreadAdapter(
     private fun setupImageView(holder: ViewHolder, binding: ItemMessageBinding, message: Message, attachment: Attachment) = binding.apply {
         val mimetype = attachment.mimetype
         val uri = attachment.getUri()
-        val isGif = mimetype.isGifMimeType()
+        val isGif = mimetype.isGifMimeType() || attachment.filename.lowercase().endsWith(".gif")
 
         val imageView = ItemAttachmentImageBinding.inflate(layoutInflater)
         threadMessageAttachmentsHolder.addView(imageView.root)
 
         val placeholderDrawable = Color.TRANSPARENT.toDrawable()
         val baseOptions = RequestOptions()
-            .diskCacheStrategy(DiskCacheStrategy.RESOURCE)
+            .diskCacheStrategy(if (isGif) DiskCacheStrategy.DATA else DiskCacheStrategy.RESOURCE)
             .placeholder(placeholderDrawable)
 
-        val request = if (isGif) {
+        if (isGif) {
             imageView.attachmentImage.scaleType = ImageView.ScaleType.FIT_CENTER
-            // Avoid bitmap transformations for GIFs, otherwise Glide may render only the first frame.
             Glide.with(root.context)
+                .asGif()
                 .load(uri)
                 .apply(baseOptions)
+                .dontAnimate()
+                .override(maxChatBubbleWidth, maxChatBubbleWidth * MAX_MEDIA_HEIGHT_RATIO)
+                .listener(object : RequestListener<GifDrawable> {
+                    override fun onLoadFailed(
+                        e: GlideException?,
+                        model: Any?,
+                        target: Target<GifDrawable>,
+                        isFirstResource: Boolean
+                    ): Boolean {
+                        // Fallback: still show something even if the file isn't a real GIF.
+                        Glide.with(root.context)
+                            .load(uri)
+                            .apply(baseOptions.transform(FitCenter()))
+                            .dontAnimate()
+                            .override(maxChatBubbleWidth, maxChatBubbleWidth * MAX_MEDIA_HEIGHT_RATIO)
+                            .downsample(DownsampleStrategy.AT_MOST)
+                            .listener(object : RequestListener<Drawable> {
+                                override fun onLoadFailed(
+                                    e2: GlideException?,
+                                    model2: Any?,
+                                    target2: Target<Drawable>,
+                                    isFirstResource2: Boolean
+                                ): Boolean {
+                                    threadMessagePlayOutline.beGone()
+                                    threadMessageAttachmentsHolder.removeView(imageView.root)
+                                    return false
+                                }
+
+                                override fun onResourceReady(dr: Drawable, a: Any, t: Target<Drawable>, d: DataSource, i: Boolean) = false
+                            })
+                            .into(imageView.attachmentImage)
+                        return true
+                    }
+
+                    override fun onResourceReady(
+                        resource: GifDrawable,
+                        model: Any,
+                        target: Target<GifDrawable>,
+                        dataSource: DataSource,
+                        isFirstResource: Boolean
+                    ): Boolean = false
+                })
+                .into(imageView.attachmentImage)
         } else {
             Glide.with(root.context)
                 .load(uri)
                 .apply(baseOptions.transform(FitCenter()))
+                .dontAnimate()
+                .override(maxChatBubbleWidth, maxChatBubbleWidth * MAX_MEDIA_HEIGHT_RATIO)
+                .downsample(DownsampleStrategy.AT_MOST)
+                .listener(object : RequestListener<Drawable> {
+                    override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>, isFirstResource: Boolean): Boolean {
+                        threadMessagePlayOutline.beGone()
+                        threadMessageAttachmentsHolder.removeView(imageView.root)
+                        return false
+                    }
+
+                    override fun onResourceReady(dr: Drawable, a: Any, t: Target<Drawable>, d: DataSource, i: Boolean) = false
+                })
+                .into(imageView.attachmentImage)
         }
-
-        request
-            .dontAnimate()
-            .override(maxChatBubbleWidth, maxChatBubbleWidth * MAX_MEDIA_HEIGHT_RATIO)
-            .downsample(DownsampleStrategy.AT_MOST)
-            .listener(object : RequestListener<Drawable> {
-                override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>, isFirstResource: Boolean): Boolean {
-                    threadMessagePlayOutline.beGone()
-                    threadMessageAttachmentsHolder.removeView(imageView.root)
-                    return false
-                }
-
-                override fun onResourceReady(dr: Drawable, a: Any, t: Target<Drawable>, d: DataSource, i: Boolean) = false
-            })
-            .into(imageView.attachmentImage)
 
         imageView.attachmentImage.updateLayoutParams<ViewGroup.LayoutParams> {
             width = maxChatBubbleWidth

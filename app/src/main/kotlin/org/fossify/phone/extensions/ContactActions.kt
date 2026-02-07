@@ -137,7 +137,7 @@ private fun SimpleActivity.attemptMeshCall(
         runOnUiThread {
             val destination = result.remoteDestination
             if (result.success && destination != null) {
-                MeshCallController.placeMeshCall(
+                val placed = MeshCallController.placeMeshCall(
                     context = this,
                     remoteDeliveryHash = destinationHash,
                     remoteCallHash = result.remoteCallHash,
@@ -146,6 +146,14 @@ private fun SimpleActivity.attemptMeshCall(
                     displayName = contact.getNameToDisplay(),
                     phoneNumber = fallbackNumber
                 )
+                if (!placed) {
+                    toast(R.string.mesh_call_account_disabled)
+                    if (canLaunchAccountsConfiguration()) {
+                        ConfirmationDialog(this, getString(R.string.mesh_call_account_open_settings)) {
+                            launchAccountsConfiguration()
+                        }
+                    }
+                }
             } else {
                 if (!fallbackNumber.isNullOrBlank() && meshMode == MeshMode.MESH_WITH_FALLBACK) {
                     startCallWithConfirmationCheck(fallbackNumber, contact.getNameToDisplay())

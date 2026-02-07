@@ -1919,10 +1919,17 @@ class ThreadActivity : SimpleActivity() {
             return
         }
 
-        val mimeType = contentResolver.getType(uri)
+        var mimeType = contentResolver.getType(uri)
         if (mimeType == null) {
             toast(org.fossify.commons.R.string.unknown_error_occurred)
             return
+        }
+
+        // Some providers return wildcard-ish image types for GIFs. Use filename as a hint to keep
+        // GIFs out of the image compression pipeline.
+        val filenameHint = getFilenameFromUri(uri).lowercase()
+        if (mimeType.lowercase().startsWith("image") && !mimeType.isGifMimeType() && filenameHint.endsWith(".gif")) {
+            mimeType = "image/gif"
         }
         val isImage = mimeType.isImageMimeType()
         val isGif = mimeType.isGifMimeType()

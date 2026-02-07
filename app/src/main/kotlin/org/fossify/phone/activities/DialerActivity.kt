@@ -7,10 +7,13 @@ import android.os.Bundle
 import android.provider.Settings
 import android.telecom.TelecomManager
 import android.widget.Toast
+import org.fossify.commons.dialogs.ConfirmationDialog
 import org.fossify.commons.extensions.*
 import org.fossify.commons.helpers.REQUEST_CODE_SET_DEFAULT_DIALER
 import org.fossify.phone.R
+import org.fossify.phone.extensions.canLaunchAccountsConfiguration
 import org.fossify.phone.extensions.getHandleToUse
+import org.fossify.phone.extensions.launchAccountsConfiguration
 import org.fossify.mesh.MeshManager
 import org.fossify.mesh.MeshConfig
 import org.fossify.mesh.MeshMode
@@ -111,7 +114,7 @@ class DialerActivity : SimpleActivity() {
                 val destination = result.remoteDestination
                 if (result.success && destination != null) {
                     val displayName = MeshCallContactHelper.getContactName(this, phoneNumber)
-                    MeshCallController.placeMeshCall(
+                    val placed = MeshCallController.placeMeshCall(
                         context = this,
                         remoteDeliveryHash = destinationHash,
                         remoteCallHash = result.remoteCallHash,
@@ -120,7 +123,19 @@ class DialerActivity : SimpleActivity() {
                         displayName = displayName,
                         phoneNumber = phoneNumber
                     )
-                    finish()
+                    if (placed) {
+                        finish()
+                    } else {
+                        toast(R.string.mesh_call_account_disabled)
+                        if (canLaunchAccountsConfiguration()) {
+                            ConfirmationDialog(this@DialerActivity, getString(R.string.mesh_call_account_open_settings)) {
+                                launchAccountsConfiguration()
+                                finish()
+                            }
+                        } else {
+                            finish()
+                        }
+                    }
                 } else {
                     if (allowTelFallback && meshMode == MeshMode.MESH_WITH_FALLBACK) {
                         placeTelCall()
