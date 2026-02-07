@@ -47,6 +47,7 @@ fun Context.sendMessageCompat(
     attachments: List<Attachment>,
     messageId: Long? = null
 ) {
+    val maxLinkSmsParts = 6
     val cleanAddresses = addresses.filterNot { LxmfAddress.isMeshLike(it) }
     if (cleanAddresses.isEmpty()) {
         toast(id = R.string.mesh_disabled, length = LENGTH_LONG)
@@ -64,8 +65,10 @@ fun Context.sendMessageCompat(
     val messagingUtils = messagingUtils
     // Some carriers/devices are unreliable with "text-only MMS" conversions, especially when the
     // message contains URLs (common for link shares). Prefer segmented SMS for URL-containing text.
+    val smsParts = SmsMessage.calculateLength(outgoingText, false).first()
     val forceSmsForLink = attachments.isEmpty() &&
         cleanAddresses.size == 1 &&
+        smsParts <= maxLinkSmsParts &&
         Patterns.WEB_URL.matcher(outgoingText).find()
 
     val isMms = !forceSmsForLink && (
