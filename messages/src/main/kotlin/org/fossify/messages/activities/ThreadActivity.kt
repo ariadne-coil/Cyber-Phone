@@ -139,6 +139,7 @@ import org.fossify.messages.extensions.getSmsDraft
 import org.fossify.messages.extensions.getThreadId
 import org.fossify.messages.extensions.getThreadParticipants
 import org.fossify.messages.extensions.getThreadTitle
+import org.fossify.messages.extensions.getExtensionFromMimeType
 import org.fossify.messages.extensions.indexOfFirstOrNull
 import org.fossify.messages.extensions.isGifMimeType
 import org.fossify.messages.extensions.isImageMimeType
@@ -218,6 +219,7 @@ import org.fossify.mesh.lxmf.LxmfAddress
 import org.fossify.mesh.lxmf.LxmfAttachmentPayload
 import org.fossify.mesh.lxmf.LxmfAttachments
 import org.fossify.mesh.lxmf.LxmfRouter
+import org.fossify.messages.views.RichContentEditText
 import org.fossify.mesh.lxmf.LxmfStore
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
@@ -1156,6 +1158,9 @@ class ThreadActivity : SimpleActivity() {
             threadCharacterCounter.setTextSize(TypedValue.COMPLEX_UNIT_PX, getTextSize())
 
             threadTypeMessage.setTextSize(TypedValue.COMPLEX_UNIT_PX, getTextSize())
+            (threadTypeMessage as? RichContentEditText)?.onCommitContent = { uri, mimeType ->
+                handleCommittedContent(uri, mimeType)
+            }
             threadSendMessage.setOnClickListener {
                 sendMessage()
             }
@@ -1775,6 +1780,29 @@ class ThreadActivity : SimpleActivity() {
         return File(cacheDir, "attachments").apply {
             if (!exists()) {
                 mkdirs()
+            }
+        }
+    }
+
+    private fun handleCommittedContent(uri: Uri, mimeType: String?) {
+        // IMEs can grant ephemeral URI permissions. Copy the content into our cache so sending works
+        // reliably and doesn't trigger share-sheet / app chooser fallbacks.
+        ensureBackgroundThread {
+            try {
+                val resolvedMime = mimeType ?: contentResolver.getType(uri)
+                val suffix = (resolvedMime ?: "application/octet-stream").getExtensionFromMimeType()
+                val outFile = File.createTempFile("attachment_", suffix, getAttachmentsDir())
+                contentResolver.openInputStream(uri)?.use { input ->
+                    outFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                } ?: return@ensureBackgroundThread
+
+                val cachedUri = getMyFileUri(outFile)
+                runOnUiThread {
+                    addAttachment(cachedUri)
+                }
+            } catch (_: Exception) {
             }
         }
     }
