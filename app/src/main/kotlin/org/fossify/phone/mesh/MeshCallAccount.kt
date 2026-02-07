@@ -21,7 +21,10 @@ object MeshCallAccount {
         }
         val account = PhoneAccount.builder(handle, context.getString(R.string.mesh_call_account_label))
             .setCapabilities(PhoneAccount.CAPABILITY_CALL_PROVIDER)
-            .setSupportedUriSchemes(listOf("mesh"))
+            // Telecom is inconsistent across OEM builds with custom schemes on outgoing calls.
+            // Supporting tel ensures outgoing mesh calls can be placed reliably while we still
+            // route them to this account explicitly via EXTRA_PHONE_ACCOUNT_HANDLE.
+            .setSupportedUriSchemes(listOf(PhoneAccount.SCHEME_TEL, "mesh"))
             .build()
         telecomManager.registerPhoneAccount(account)
     }
