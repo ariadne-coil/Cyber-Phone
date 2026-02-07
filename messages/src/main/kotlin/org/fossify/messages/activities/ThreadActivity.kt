@@ -1871,7 +1871,8 @@ class ThreadActivity : SimpleActivity() {
             }
             // For mesh-capable recipients, allow larger attachments than MMS would permit.
             // Whether it will actually be sent via mesh depends on Mesh Mode at send time.
-            val bypassLimit = isMeshThread() || !meshAddress.isNullOrBlank()
+            val meshMode = MeshConfig.newInstance(this).getMeshMode()
+            val bypassLimit = isMeshThread() || (!meshAddress.isNullOrBlank() && meshMode != MeshMode.STANDARD_ONLY)
             if (!bypassLimit) {
                 // is it assumed that images will always be compressed below the max MMS size limit
                 val fileSize = getFileSizeFromUri(uri)
@@ -2000,11 +2001,14 @@ class ThreadActivity : SimpleActivity() {
             val allowFallback = meshMode == MeshMode.MESH_WITH_FALLBACK
             val fallbackNumber = participants.getAddresses().firstOrNull { !LxmfAddress.isMeshLike(it) }
             if (attachments.isNotEmpty()) {
+                // If attachments exceed MMS limits, fallback cannot deliver them. Still try mesh delivery,
+                // but avoid a futile (and confusing) carrier fallback attempt.
+                val allowFallbackForAttachments = allowFallback && areAttachmentsWithinMmsLimit(attachments)
                 sendMeshMessageWithAttachments(
                     destination = meshAddress,
                     text = text,
                     attachments = attachments,
-                    allowFallback = allowFallback,
+                    allowFallback = allowFallbackForAttachments,
                     fallbackNumber = fallbackNumber
                 )
                 return
@@ -2018,9 +2022,6 @@ class ThreadActivity : SimpleActivity() {
                     return
                 }
             }
-        } else if (!meshAddress.isNullOrBlank() && meshMode == MeshMode.STANDARD_ONLY) {
-            showErrorToast(getString(R.string.mesh_disabled))
-            return
         }
 
         val subscriptionId = availableSIMCards.getOrNull(currentSIMCardIndex)?.subscriptionId
@@ -2145,6 +2146,25 @@ class ThreadActivity : SimpleActivity() {
             LxmfStore.storeOutgoing(this, normalized, text, timestamp, messageId, payloads)
             runOnUiThread { clearCurrentMessage() }
         }
+    }
+
+    private fun areAttachmentsWithinMmsLimit(selections: List<AttachmentSelection>): Boolean {
+        val limit = config.mmsFileSizeLimit
+        if (limit == FILE_SIZE_NONE) return true
+        selections.forEach { selection ->
+            val mimeType = selection.mimetype
+            val isImage = mimeType.isImageMimeType()
+            val isGif = mimeType.isGifMimeType()
+            if (!isGif && isImage) {
+                // Images are compressed by our pipeline; don't block fallback on their current size.
+                return@forEach
+            }
+            val fileSize = getFileSizeFromUri(selection.uri)
+            if (fileSize != FILE_SIZE_NONE && fileSize > limit) {
+                return false
+            }
+        }
+        return true
     }
 
     private fun buildMeshAttachmentPayloads(selections: List<AttachmentSelection>): List<LxmfAttachmentPayload> {
