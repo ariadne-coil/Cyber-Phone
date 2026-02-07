@@ -5,13 +5,11 @@ import android.net.Uri
 import android.os.Bundle
 import android.telecom.DisconnectCause
 import android.telecom.TelecomManager
-import android.telecom.PhoneAccount
 import org.fossify.mesh.call.MeshCallQuality
 import org.fossify.mesh.call.MeshCallRouter
 import org.fossify.mesh.lxmf.LxmfAddress
 import org.fossify.mesh.rns.RnsHex
 import android.util.Log
-import java.util.zip.CRC32
 import java.util.concurrent.ConcurrentHashMap
 
 object MeshCallController : MeshCallRouter.Listener {
@@ -60,10 +58,9 @@ object MeshCallController : MeshCallRouter.Listener {
             quality = quality
         )
         sessions[RnsHex.encode(session.sessionId)] = MeshCallSessionState(session)
-        // Some Telecom implementations reject non-tel URIs as "No valid number entered" even if
-        // a PhoneAccount advertises a custom scheme. Place the call with a deterministic pseudo
-        // tel number, and rely on extras + ConnectionService for actual mesh routing.
-        val uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, pseudoTelNumber(remoteDeliveryHash), null)
+        // Use a mesh: URI to avoid carrier fallback calls. If an OEM build does not support
+        // placing outgoing calls with custom schemes, we fail fast instead of misdialing.
+        val uri = Uri.parse(LxmfAddress.encode(remoteDeliveryHash))
         val extras = Bundle().apply {
             putByteArray(MeshCallConstants.EXTRA_SESSION_ID, session.sessionId)
             putByteArray(MeshCallConstants.EXTRA_REMOTE_CALL_HASH, remoteCallHash)
@@ -74,15 +71,15 @@ object MeshCallController : MeshCallRouter.Listener {
             putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, MeshCallAccount.getHandle(context))
         }
         val telecom = context.getSystemService(Context.TELECOM_SERVICE) as TelecomManager
-        telecom.placeCall(uri, extras)
-        MeshCallRouter.sendInvite(session)
-        return true
-    }
-
-    private fun pseudoTelNumber(remoteDeliveryHash: ByteArray): String {
-        val crc = CRC32().apply { update(remoteDeliveryHash) }.value
-        // 10 digits, stable, and always valid for tel: parsing.
-        return String.format(java.util.Locale.US, "%010d", crc)
+        return try {
+            telecom.placeCall(uri, extras)
+            MeshCallRouter.sendInvite(session)
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to place outgoing mesh call via Telecom", e)
+            sessions.remove(RnsHex.encode(session.sessionId))
+            false
+        }
     }
 
     fun attachConnection(sessionId: ByteArray, connection: MeshCallConnection) {

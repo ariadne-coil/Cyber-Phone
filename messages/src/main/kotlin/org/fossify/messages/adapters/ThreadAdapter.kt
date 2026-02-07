@@ -531,16 +531,16 @@ class ThreadAdapter(
 
         val imageView = ItemAttachmentImageBinding.inflate(layoutInflater)
         threadMessageAttachmentsHolder.addView(imageView.root)
+        val glide = Glide.with(imageView.attachmentImage)
 
         val placeholderDrawable = Color.TRANSPARENT.toDrawable()
         val baseOptions = RequestOptions()
-            .diskCacheStrategy(if (isGif) DiskCacheStrategy.DATA else DiskCacheStrategy.RESOURCE)
+            .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
             .placeholder(placeholderDrawable)
 
         if (isGif) {
             imageView.attachmentImage.scaleType = ImageView.ScaleType.FIT_CENTER
-            Glide.with(root.context)
-                .asGif()
+            glide.asGif()
                 .load(uri)
                 .apply(baseOptions)
                 .dontAnimate()
@@ -549,58 +549,37 @@ class ThreadAdapter(
                     override fun onLoadFailed(
                         e: GlideException?,
                         model: Any?,
-                        target: Target<GifDrawable>,
+                        target: Target<GifDrawable>?,
                         isFirstResource: Boolean
                     ): Boolean {
-                        // Fallback: still show something even if the file isn't a real GIF.
-                        Glide.with(root.context)
-                            .load(uri)
-                            .apply(baseOptions.transform(FitCenter()))
-                            .dontAnimate()
-                            .override(maxChatBubbleWidth, maxChatBubbleWidth * MAX_MEDIA_HEIGHT_RATIO)
-                            .downsample(DownsampleStrategy.AT_MOST)
-                            .listener(object : RequestListener<Drawable> {
-                                override fun onLoadFailed(
-                                    e2: GlideException?,
-                                    model2: Any?,
-                                    target2: Target<Drawable>,
-                                    isFirstResource2: Boolean
-                                ): Boolean {
-                                    threadMessagePlayOutline.beGone()
-                                    threadMessageAttachmentsHolder.removeView(imageView.root)
-                                    return false
-                                }
-
-                                override fun onResourceReady(dr: Drawable, a: Any, t: Target<Drawable>, d: DataSource, i: Boolean) = false
-                            })
-                            .into(imageView.attachmentImage)
-                        return true
+                        threadMessagePlayOutline.beGone()
+                        threadMessageAttachmentsHolder.removeView(imageView.root)
+                        return false
                     }
 
                     override fun onResourceReady(
                         resource: GifDrawable,
                         model: Any,
-                        target: Target<GifDrawable>,
+                        target: Target<GifDrawable>?,
                         dataSource: DataSource,
                         isFirstResource: Boolean
                     ): Boolean = false
                 })
                 .into(imageView.attachmentImage)
         } else {
-            Glide.with(root.context)
-                .load(uri)
+            glide.load(uri)
                 .apply(baseOptions.transform(FitCenter()))
                 .dontAnimate()
                 .override(maxChatBubbleWidth, maxChatBubbleWidth * MAX_MEDIA_HEIGHT_RATIO)
                 .downsample(DownsampleStrategy.AT_MOST)
                 .listener(object : RequestListener<Drawable> {
-                    override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>, isFirstResource: Boolean): Boolean {
+                    override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>?, isFirstResource: Boolean): Boolean {
                         threadMessagePlayOutline.beGone()
                         threadMessageAttachmentsHolder.removeView(imageView.root)
                         return false
                     }
 
-                    override fun onResourceReady(dr: Drawable, a: Any, t: Target<Drawable>, d: DataSource, i: Boolean) = false
+                    override fun onResourceReady(dr: Drawable, a: Any, t: Target<Drawable>?, d: DataSource, i: Boolean) = false
                 })
                 .into(imageView.attachmentImage)
         }
