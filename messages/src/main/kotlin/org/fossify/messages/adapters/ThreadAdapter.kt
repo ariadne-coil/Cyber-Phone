@@ -9,6 +9,7 @@ import android.util.TypedValue
 import android.view.Menu
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
 import androidx.appcompat.content.res.AppCompatResources
@@ -62,6 +63,7 @@ import org.fossify.messages.dialogs.MessageDetailsDialog
 import org.fossify.messages.dialogs.SelectTextDialog
 import org.fossify.messages.extensions.config
 import org.fossify.messages.extensions.getContactFromAddress
+import org.fossify.messages.extensions.isGifMimeType
 import org.fossify.messages.extensions.isImageMimeType
 import org.fossify.messages.extensions.isVCardMimeType
 import org.fossify.messages.extensions.isVideoMimeType
@@ -524,19 +526,29 @@ class ThreadAdapter(
     private fun setupImageView(holder: ViewHolder, binding: ItemMessageBinding, message: Message, attachment: Attachment) = binding.apply {
         val mimetype = attachment.mimetype
         val uri = attachment.getUri()
+        val isGif = mimetype.isGifMimeType()
 
         val imageView = ItemAttachmentImageBinding.inflate(layoutInflater)
         threadMessageAttachmentsHolder.addView(imageView.root)
 
         val placeholderDrawable = Color.TRANSPARENT.toDrawable()
-        val options = RequestOptions()
+        val baseOptions = RequestOptions()
             .diskCacheStrategy(DiskCacheStrategy.RESOURCE)
             .placeholder(placeholderDrawable)
-            .transform(FitCenter())
 
-        Glide.with(root.context)
-            .load(uri)
-            .apply(options)
+        val request = if (isGif) {
+            imageView.attachmentImage.scaleType = ImageView.ScaleType.FIT_CENTER
+            // Avoid bitmap transformations for GIFs, otherwise Glide may render only the first frame.
+            Glide.with(root.context)
+                .load(uri)
+                .apply(baseOptions)
+        } else {
+            Glide.with(root.context)
+                .load(uri)
+                .apply(baseOptions.transform(FitCenter()))
+        }
+
+        request
             .dontAnimate()
             .override(maxChatBubbleWidth, maxChatBubbleWidth * MAX_MEDIA_HEIGHT_RATIO)
             .downsample(DownsampleStrategy.AT_MOST)

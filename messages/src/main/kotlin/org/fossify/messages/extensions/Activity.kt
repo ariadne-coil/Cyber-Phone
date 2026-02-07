@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.ContactsContract
 import org.fossify.commons.activities.BaseSimpleActivity
+import org.fossify.commons.extensions.getMyFileUri
 import org.fossify.commons.extensions.getMimeType
 import org.fossify.commons.extensions.hideKeyboard
 import org.fossify.commons.extensions.isPackageInstalled
@@ -23,6 +24,7 @@ import org.fossify.commons.models.SimpleContact
 import org.fossify.mesh.MeshContactHelper
 import org.fossify.messages.activities.ConversationDetailsActivity
 import org.fossify.messages.helpers.THREAD_ID
+import java.io.File
 import java.util.Locale
 
 fun BaseSimpleActivity.dialNumber(phoneNumber: String, callback: (() -> Unit)? = null) {
@@ -45,9 +47,40 @@ fun BaseSimpleActivity.dialNumber(phoneNumber: String, callback: (() -> Unit)? =
 }
 
 fun Activity.launchViewIntent(uri: Uri, mimetype: String, filename: String) {
+    // Older stored attachments (and some mesh attachments) might still be persisted as file:// URIs.
+    // Convert them to FileProvider content:// URIs to avoid FileUriExposedException on modern Android.
+    val safeUri = if (uri.scheme == "file") {
+        val filePath = uri.path
+        if (!filePath.isNullOrBlank()) {
+            val file = File(filePath)
+            try {
+                if (file.exists()) getMyFileUri(file) else uri
+            } catch (_: Exception) {
+                // Fallback: try copying into cache/attachments which is always part of provider_paths.xml
+                try {
+                    val outDir = File(cacheDir, "attachments").apply { mkdirs() }
+                    val ext = filename.substringAfterLast('.', "").lowercase(Locale.getDefault()).takeIf { it.matches(Regex("[a-z0-9]{1,8}")) }
+                    val suffix = if (ext != null) ".${ext}" else ".bin"
+                    val outFile = File.createTempFile("view_", suffix, outDir)
+                    file.inputStream().use { input ->
+                        outFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    getMyFileUri(outFile)
+                } catch (_: Exception) {
+                    uri
+                }
+            }
+        } else {
+            uri
+        }
+    } else {
+        uri
+    }
     Intent().apply {
         action = Intent.ACTION_VIEW
-        setDataAndType(uri, mimetype.lowercase(Locale.getDefault()))
+        setDataAndType(safeUri, mimetype.lowercase(Locale.getDefault()))
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
         try {
@@ -56,7 +89,7 @@ fun Activity.launchViewIntent(uri: Uri, mimetype: String, filename: String) {
         } catch (_: ActivityNotFoundException) {
             val newMimetype = filename.getMimeType()
             if (newMimetype.isNotEmpty() && mimetype != newMimetype) {
-                launchViewIntent(uri, newMimetype, filename)
+                launchViewIntent(safeUri, newMimetype, filename)
             } else {
                 toast(org.fossify.commons.R.string.no_app_found)
             }

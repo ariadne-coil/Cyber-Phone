@@ -41,6 +41,7 @@ import android.view.animation.OvershootInterpolator
 import android.view.inputmethod.EditorInfo
 import android.widget.RelativeLayout
 import android.widget.Toast
+import android.webkit.MimeTypeMap
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.appcompat.content.res.AppCompatResources
@@ -1789,19 +1790,53 @@ class ThreadActivity : SimpleActivity() {
         // reliably and doesn't trigger share-sheet / app chooser fallbacks.
         ensureBackgroundThread {
             try {
-                val resolvedMime = mimeType ?: contentResolver.getType(uri)
-                val suffix = (resolvedMime ?: "application/octet-stream").getExtensionFromMimeType()
-                val outFile = File.createTempFile("attachment_", suffix, getAttachmentsDir())
+                val displayName = getFilenameFromUri(uri)
+                val extFromName = displayName
+                    .substringAfterLast('.', "")
+                    .lowercase()
+                    .takeIf { it.matches(Regex("[a-z0-9]{1,8}")) }
+
+                // Prefer explicit, non-wildcard MIME types. Some IMEs report image/* for GIFs.
+                val explicitMime = sequenceOf(mimeType, contentResolver.getType(uri))
+                    .mapNotNull { it?.trim()?.takeIf { m -> !m.contains("*") && m.isNotBlank() } }
+                    .firstOrNull()
+
                 contentResolver.openInputStream(uri)?.use { input ->
+                    val header = ByteArray(12)
+                    val read = input.read(header)
+                    val sig = if (read >= 6) String(header, 0, 6, Charsets.US_ASCII) else ""
+                    val isGif = sig == "GIF87a" || sig == "GIF89a" || extFromName == "gif" || explicitMime == "image/gif"
+
+                    val finalMime = when {
+                        isGif -> "image/gif"
+                        explicitMime != null -> explicitMime
+                        extFromName != null -> MimeTypeMap.getSingleton().getMimeTypeFromExtension(extFromName)
+                        else -> null
+                    }
+
+                    val suffix = when {
+                        isGif -> ".gif"
+                        extFromName != null -> ".${extFromName}"
+                        finalMime != null -> MimeTypeMap.getSingleton()
+                            .getExtensionFromMimeType(finalMime)
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { ".${it}" }
+                        else -> null
+                    } ?: ".jpg"
+
+                    val outFile = File.createTempFile("attachment_", suffix, getAttachmentsDir())
                     outFile.outputStream().use { output ->
+                        if (read > 0) {
+                            output.write(header, 0, read)
+                        }
                         input.copyTo(output)
                     }
-                } ?: return@ensureBackgroundThread
 
-                val cachedUri = getMyFileUri(outFile)
-                runOnUiThread {
-                    addAttachment(cachedUri)
-                }
+                    val cachedUri = getMyFileUri(outFile)
+                    runOnUiThread {
+                        addAttachment(cachedUri)
+                    }
+                } ?: return@ensureBackgroundThread
             } catch (_: Exception) {
             }
         }

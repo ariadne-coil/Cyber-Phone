@@ -2,4 +2,6 @@
 <paths>
     <cache-path name="compressed_files" path="compressed/"/>
     <cache-path name="attachment_files" path="attachments/"/>
+    <!-- Persisted mesh attachments are stored under filesDir/mesh_attachments -->
+    <files-path name="mesh_attachment_files" path="mesh_attachments/"/>
 </paths>

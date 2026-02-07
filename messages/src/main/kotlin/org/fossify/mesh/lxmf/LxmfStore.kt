@@ -3,7 +3,7 @@ package org.fossify.mesh.lxmf
 import android.content.Context
 import android.provider.Telephony
 import android.webkit.MimeTypeMap
-import androidx.core.net.toUri
+import org.fossify.commons.extensions.getMyFileUri
 import org.fossify.commons.models.PhoneNumber
 import org.fossify.commons.models.SimpleContact
 import org.fossify.commons.helpers.ensureBackgroundThread
@@ -216,14 +216,20 @@ object LxmfStore {
         val stored = ArrayList<org.fossify.messages.models.Attachment>()
         attachments.forEachIndexed { index, payload ->
             try {
+                // Attachment filenames come from untrusted peers. Keep them in-bounds and filesystem-safe.
                 val baseName = payload.filename.ifBlank { "attachment_$index" }
+                val safeBaseName = baseName
+                    .replace(Regex("[\\\\/]+"), "_")
+                    .replace("..", "_")
+                    .trim()
+                    .ifBlank { "attachment_$index" }
                 val extension = MimeTypeMap.getSingleton()
                     .getExtensionFromMimeType(payload.mimeType)
                     ?.takeIf { it.isNotBlank() }
-                val fileName = if (extension != null && !baseName.endsWith(".$extension")) {
-                    "${messageId}_${index}_$baseName.$extension"
+                val fileName = if (extension != null && !safeBaseName.endsWith(".$extension")) {
+                    "${messageId}_${index}_$safeBaseName.$extension"
                 } else {
-                    "${messageId}_${index}_$baseName"
+                    "${messageId}_${index}_$safeBaseName"
                 }
                 val file = File(dir, fileName)
                 file.outputStream().use { it.write(payload.data) }
@@ -231,11 +237,12 @@ object LxmfStore {
                     org.fossify.messages.models.Attachment(
                         id = null,
                         messageId = messageId,
-                        uriString = file.toUri().toString(),
+                        // Use FileProvider so tapping the attachment does not crash with FileUriExposedException.
+                        uriString = context.getMyFileUri(file).toString(),
                         mimetype = payload.mimeType,
                         width = 0,
                         height = 0,
-                        filename = baseName
+                        filename = safeBaseName
                     )
                 )
             } catch (_: Exception) {
