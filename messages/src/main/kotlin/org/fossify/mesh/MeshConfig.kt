@@ -43,7 +43,9 @@ class MeshConfig(context: Context) : BaseConfig(context) {
         set(value) = prefs.edit().putString(MESH_OUTBOUND_STAMP_COSTS, value).apply()
 
     var meshWifiDirectEnabled: Boolean
-        get() = prefs.getBoolean(MESH_WIFI_DIRECT_ENABLED, true)
+        // Default to OFF. Some OEM builds show disruptive system dialogs when apps engage
+        // Wi‑Fi Direct in the background. Users can explicitly enable it from Cyber Features.
+        get() = prefs.getBoolean(MESH_WIFI_DIRECT_ENABLED, false)
         set(value) = prefs.edit().putBoolean(MESH_WIFI_DIRECT_ENABLED, value).apply()
 
     var meshBleEnabled: Boolean
