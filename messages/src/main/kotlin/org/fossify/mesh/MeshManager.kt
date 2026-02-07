@@ -18,6 +18,18 @@ object MeshManager {
         }
     }
 
+    /**
+     * Like [sync], but will never stop the service. This avoids start/stop churn when the app
+     * simply resumes, which on some OEM builds can trigger disruptive system dialogs related to
+     * Wi‑Fi Direct / sharing teardown.
+     */
+    fun ensureRunning(context: Context) {
+        val appContext = context.applicationContext
+        if (shouldRun(appContext)) {
+            start(appContext)
+        }
+    }
+
     fun restart(context: Context) {
         val appContext = context.applicationContext
         stop(appContext)

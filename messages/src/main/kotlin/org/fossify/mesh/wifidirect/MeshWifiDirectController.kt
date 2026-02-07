@@ -41,11 +41,18 @@ class MeshWifiDirectController(
 
     fun stop() {
         if (manager == null || channel == null) return
+        unregisterReceiver()
+        // Be conservative on teardown. Some OEM stacks show disruptive user dialogs when we try to
+        // forcibly remove the current P2P group ("Turn off Wi‑Fi Direct?" / "Turn off Sharing?").
+        // Stopping discovery and canceling connect is sufficient to quiesce the controller.
         try {
-            manager.removeGroup(channel, null)
+            manager.stopPeerDiscovery(channel, null)
         } catch (_: Exception) {
         }
-        unregisterReceiver()
+        try {
+            manager.cancelConnect(channel, null)
+        } catch (_: Exception) {
+        }
     }
 
     private fun registerReceiver() {

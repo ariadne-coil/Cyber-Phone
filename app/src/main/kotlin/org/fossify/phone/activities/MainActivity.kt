@@ -122,7 +122,9 @@ class MainActivity : SimpleActivity() {
 
     override fun onResume() {
         super.onResume()
-        MeshManager.sync(this)
+        // Only start mesh if needed. Do not stop it here, as stopping Wi‑Fi Direct / sharing
+        // components on resume can trigger disruptive OEM/system dialogs.
+        MeshManager.ensureRunning(this)
         if (storedShowTabs != config.showTabs) {
             config.lastUsedViewPagerPage = 0
             System.exit(0)
