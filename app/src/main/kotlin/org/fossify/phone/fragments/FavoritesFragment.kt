@@ -28,6 +28,7 @@ import org.fossify.phone.adapters.ContactsAdapter
 import org.fossify.phone.databinding.FragmentFavoritesBinding
 import org.fossify.phone.databinding.FragmentLettersLayoutBinding
 import org.fossify.phone.extensions.config
+import org.fossify.phone.extensions.showContactActionsDialog
 import org.fossify.phone.extensions.setupWithContacts
 import org.fossify.phone.extensions.startCallWithConfirmationCheck
 import org.fossify.phone.extensions.startContactDetailsIntent
@@ -127,7 +128,7 @@ class FavoritesFragment(context: Context, attributeSet: AttributeSet) : MyViewPa
                 showDeleteButton = false,
                 enableDrag = true,
                 itemClick = {
-                    activity?.startCallWithConfirmationCheck(it as Contact)
+                    (activity as? SimpleActivity)?.showContactActionsDialog(it as Contact)
                 },
                 profileIconClick = {
                     activity?.startContactDetailsIntent(it as Contact)
