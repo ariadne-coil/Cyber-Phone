@@ -19,7 +19,7 @@ eventbus = "3.3.1"
 #Room
 room = "2.8.4"
 #Fossify
-commons = "5.13.1"
+commons = "6.1.3"
 commons-compress = "1.26.2"
 mmslib = "1.0.0"
 indicator-fast-scroll = "4524cd0b61"
