@@ -1187,9 +1187,8 @@ class ThreadActivity : SimpleActivity() {
                 threadCharacterCounter.text = "${messageLength[2]}/${messageLength[0]}"
             }
 
-            if (isMeshThread()) {
-                threadAddAttachment.beGone()
-            }
+            // Mesh threads support attachments (sent via Reticulum/LXMF resources), so keep the same "+" UX
+            // as SMS/MMS threads.
 
             if (config.sendOnEnter) {
                 threadTypeMessage.inputType = EditorInfo.TYPE_TEXT_FLAG_CAP_SENTENCES
@@ -1574,8 +1573,12 @@ class ThreadActivity : SimpleActivity() {
     }
 
     private fun dialNumber() {
-        val phoneNumber = participants.first().phoneNumbers.first().normalizedNumber
-        dialNumber(phoneNumber)
+        val address = participants.getAddresses().firstOrNull()
+        if (address.isNullOrBlank()) {
+            toast(R.string.no_phone_numbers_found)
+            return
+        }
+        dialNumber(address)
     }
 
     private fun copyNumberToClipboard() {
@@ -1954,6 +1957,31 @@ class ThreadActivity : SimpleActivity() {
             }
         }
 
+        // Some providers grant temporary URI permissions or serve content through ephemeral streams.
+        // Cache GIFs locally so sending via mesh can reliably read the data and won't create empty
+        // messages if the original URI becomes unreadable.
+        val localAuthority = "${packageName}.provider"
+        if (isGif && uri.authority != localAuthority) {
+            ensureBackgroundThread {
+                try {
+                    val outFile = File.createTempFile("attachment_", ".gif", getAttachmentsDir())
+                    contentResolver.openInputStream(uri)?.use { input ->
+                        outFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    } ?: run {
+                        runOnUiThread { showErrorToast(getString(R.string.mesh_attachment_load_failed)) }
+                        return@ensureBackgroundThread
+                    }
+                    val cachedUri = getMyFileUri(outFile)
+                    runOnUiThread { addAttachment(cachedUri) }
+                } catch (_: Exception) {
+                    runOnUiThread { showErrorToast(getString(R.string.mesh_attachment_load_failed)) }
+                }
+            }
+            return
+        }
+
         var adapter = getAttachmentsAdapter()
         if (adapter == null) {
             adapter = AttachmentsAdapter(
@@ -2191,6 +2219,10 @@ class ThreadActivity : SimpleActivity() {
 
         ensureBackgroundThread {
             val payloads = buildMeshAttachmentPayloads(attachments)
+            if (payloads.size != attachments.size) {
+                runOnUiThread { showErrorToast(getString(R.string.mesh_attachment_load_failed)) }
+                return@ensureBackgroundThread
+            }
             val fields = LxmfAttachments.encode(payloads)
             val sent = LxmfRouter.sendText(destinationHash, text, fields) {
                 LxmfStore.markDelivered(this, messageId)

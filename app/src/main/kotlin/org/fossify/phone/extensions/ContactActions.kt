@@ -19,12 +19,9 @@ import org.fossify.messages.helpers.THREAD_ID
 import org.fossify.messages.helpers.THREAD_NUMBER
 import org.fossify.messages.helpers.THREAD_TITLE
 import org.fossify.mesh.MeshConfig
-import org.fossify.mesh.MeshManager
 import org.fossify.mesh.MeshMode
-import org.fossify.mesh.call.MeshCallQuality
-import org.fossify.mesh.call.MeshCallRouter
 import org.fossify.mesh.lxmf.LxmfAddress
-import org.fossify.phone.mesh.MeshCallController
+import org.fossify.phone.extensions.startCallWithConfirmationCheck
 
 private const val ACTION_CALL = 1
 private const val ACTION_MESSAGE = 2
@@ -67,19 +64,20 @@ private fun SimpleActivity.handleContactCall(contact: Contact) {
     val meshAddress = if (meshMode != MeshMode.STANDARD_ONLY) contact.pickBestMeshAddress() else null
     val number = contact.pickBestPhoneNumberForCall()
 
-    // Prefer mesh calling if mesh is enabled and we have a mesh address. Fall back to PSTN only if
-    // we have a phone number and the user's mode allows it.
-    if (!meshAddress.isNullOrBlank() && meshMode != MeshMode.STANDARD_ONLY) {
-        attemptMeshCall(contact = contact, meshAddress = meshAddress, fallbackNumber = number, meshMode = meshMode)
+    // Prefer mesh calling if enabled and available. The actual call is handled in-app (VoIP),
+    // and we keep the exact same UI surface as PSTN calls.
+    val target = when {
+        !meshAddress.isNullOrBlank() && meshMode != MeshMode.STANDARD_ONLY -> meshAddress
+        !number.isNullOrBlank() -> number
+        else -> null
+    }
+
+    if (target == null) {
+        toast(R.string.no_phone_numbers_found)
         return
     }
 
-    if (!number.isNullOrBlank()) {
-        startCallWithConfirmationCheck(number, contact.getNameToDisplay())
-        return
-    }
-
-    toast(R.string.no_phone_numbers_found)
+    startCallWithConfirmationCheck(target, contact.getNameToDisplay())
 }
 
 private fun SimpleActivity.handleContactMessage(contact: Contact) {
@@ -108,62 +106,7 @@ private fun SimpleActivity.handleContactMessage(contact: Contact) {
     }
 }
 
-private fun SimpleActivity.attemptMeshCall(
-    contact: Contact,
-    meshAddress: String,
-    fallbackNumber: String?,
-    meshMode: MeshMode
-) {
-    // Make sure the mesh service is running before we probe/place calls.
-    MeshManager.ensureRunning(this)
-
-    val destinationHash = LxmfAddress.decode(meshAddress)
-    if (destinationHash == null) {
-        if (!fallbackNumber.isNullOrBlank() && meshMode == MeshMode.MESH_WITH_FALLBACK) {
-            startCallWithConfirmationCheck(fallbackNumber, contact.getNameToDisplay())
-        } else {
-            toast(R.string.mesh_invalid_address)
-        }
-        return
-    }
-
-    val preferredQuality = MeshCallQuality.fromId(MeshConfig.newInstance(this).meshCallQuality)
-    MeshCallRouter.probe(
-        context = this,
-        remoteDeliveryHash = destinationHash,
-        preferredQuality = preferredQuality,
-        timeoutMs = 4000L
-    ) { result ->
-        runOnUiThread {
-            val destination = result.remoteDestination
-            if (result.success && destination != null) {
-                val placed = MeshCallController.placeMeshCall(
-                    context = this,
-                    remoteDeliveryHash = destinationHash,
-                    remoteCallHash = result.remoteCallHash,
-                    remoteDestination = destination,
-                    quality = result.quality,
-                    displayName = contact.getNameToDisplay(),
-                    phoneNumber = fallbackNumber
-                )
-                if (!placed) {
-                    toast(R.string.mesh_call_account_disabled)
-                    if (canLaunchAccountsConfiguration()) {
-                        ConfirmationDialog(this, getString(R.string.mesh_call_account_open_settings)) {
-                            launchAccountsConfiguration()
-                        }
-                    }
-                }
-            } else {
-                if (!fallbackNumber.isNullOrBlank() && meshMode == MeshMode.MESH_WITH_FALLBACK) {
-                    startCallWithConfirmationCheck(fallbackNumber, contact.getNameToDisplay())
-                } else {
-                    toast(R.string.mesh_delivery_failed)
-                }
-            }
-        }
-    }
-}
+// Telecom mesh calling has been intentionally removed in favor of in-app VoIP calls.
 
 private fun SimpleActivity.toggleContactFavorite(contact: Contact) {
     handlePermission(PERMISSION_WRITE_CONTACTS) { granted ->

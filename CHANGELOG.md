@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.0 (2026-02-08)
+- Mesh Calls: fully functional voice calls over the mesh (in-app VoIP + Opus) with a native incoming call UI.
+- Mesh Calls: major reliability improvements (link-request retries, INVITE/ACCEPT retries, implicit connect on first audio, and robust remote hangup propagation).
+- Audio: low-latency playback (no queued stale audio), bounded jitter buffering, urgent-audio thread priorities, and Bluetooth headset routing with dynamic connect/disconnect handling.
+- Mesh Files: file and media transfers over the mesh using Reticulum-compatible segmented resources, integrated with the standard attachment picker and thread rendering.
+- Messages: the thread call button now chooses Mesh vs Telecom based on user mesh mode + stored mesh address, with optional fallback to PSTN.
+
 ## v0.2.2 (2026-02-05)
 - Mesh: stabilized UDP transport (single socket + multicast join) and made peer unicast port-stable to prevent “works once” delivery failures.
 - Mesh: added LAN unicast probing to bootstrap discovery on networks where broadcast/multicast is blocked.

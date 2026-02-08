@@ -138,6 +138,9 @@
     <string name="mesh_call_account_label">Mesh calls</string>
     <string name="mesh_call_account_disabled">Enable "Mesh calls" in system Phone Accounts to place mesh calls.</string>
     <string name="mesh_call_account_open_settings">Open phone accounts settings?</string>
+    <string name="mesh_call_account_settings_unavailable">Couldn\'t open phone accounts settings.</string>
+    <string name="mesh_call_failed">Could not start mesh call.</string>
+    <string name="mesh_call_declined">Call declined.</string>
 
     <!-- Contact action menu -->
     <string name="contact_action_call">Call</string>

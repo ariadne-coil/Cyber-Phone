@@ -203,6 +203,8 @@ class RnsLink private constructor(
         return packet
     }
 
+    fun getLastRequestTimeMs(): Long = requestTimeMs
+
     fun buildProofPacket(): RnsPacket? {
         if (initiator) return null
         if (linkId.isEmpty()) return null

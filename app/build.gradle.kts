@@ -154,6 +154,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.slf4j.android)
     implementation(libs.work.runtime)
+    implementation(libs.androidx.lifecycle.process)
     implementation(libs.concentus)
     detektPlugins(libs.compose.detekt)
     implementation(project(":messages"))

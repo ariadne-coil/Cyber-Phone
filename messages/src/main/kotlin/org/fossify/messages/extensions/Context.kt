@@ -92,6 +92,7 @@ import org.fossify.mesh.lxmf.LxmfAddress
 import org.fossify.mesh.lxmf.LxmfStore
 import org.xmlpull.v1.XmlPullParserException
 import java.io.FileNotFoundException
+import java.nio.charset.Charset
 
 val Context.config: Config
     get() = Config.newInstance(applicationContext)
@@ -691,12 +692,18 @@ fun Context.getMmsAttachment(id: Long): MessageAttachment {
                 .orEmpty()
         } else if (mimetype.startsWith("image/") || mimetype.startsWith("video/")) {
             val fileUri = Uri.withAppendedPath(uri, partId.toString())
+            val effectiveMime = if (mimetype.startsWith("image/") && !mimetype.isGifMimeType() && fileUri.isGifMmsPart(contentResolver)) {
+                // Some carriers/providers mislabel GIF parts as generic "image/*", which breaks downstream handling.
+                "image/gif"
+            } else {
+                mimetype
+            }
             messageAttachment.attachments.add(
                 Attachment(
                     id = partId,
                     messageId = id,
                     uriString = fileUri.toString(),
-                    mimetype = mimetype,
+                    mimetype = effectiveMime,
                     width = 0,
                     height = 0,
                     filename = ""
@@ -727,6 +734,24 @@ fun Context.getMmsAttachment(id: Long): MessageAttachment {
     }
 
     return messageAttachment
+}
+
+private fun Uri.isGifMmsPart(contentResolver: ContentResolver): Boolean {
+    return try {
+        contentResolver.openInputStream(this)?.use { input ->
+            val header = ByteArray(6)
+            val read = input.read(header)
+            if (read != 6) {
+                false
+            } else {
+                // GIF headers are ASCII "GIF87a" or "GIF89a"
+                val s = header.toString(Charset.forName("US-ASCII"))
+                s == "GIF87a" || s == "GIF89a"
+            }
+        } ?: false
+    } catch (_: Exception) {
+        false
+    }
 }
 
 fun Context.getLatestMMS(): Message? {

@@ -17,11 +17,9 @@ import org.fossify.phone.extensions.launchAccountsConfiguration
 import org.fossify.mesh.MeshManager
 import org.fossify.mesh.MeshConfig
 import org.fossify.mesh.MeshMode
-import org.fossify.mesh.call.MeshCallQuality
-import org.fossify.mesh.call.MeshCallRouter
 import org.fossify.mesh.lxmf.LxmfAddress
 import org.fossify.phone.mesh.MeshCallContactHelper
-import org.fossify.phone.mesh.MeshCallController
+import org.fossify.phone.mesh.voip.MeshVoipCallActivity
 
 class DialerActivity : SimpleActivity() {
     private var callNumber: Uri? = null
@@ -68,10 +66,20 @@ class DialerActivity : SimpleActivity() {
             } else null
 
             if (!meshAddress.isNullOrBlank() && meshMode != MeshMode.STANDARD_ONLY) {
-                // Ensure the mesh backend is running before probing, otherwise we may always fall back.
                 MeshManager.ensureRunning(this)
-                // Do not fall back to PSTN when the "number" is actually a mesh address.
-                attemptMeshCall(rawNumber, meshAddress, meshMode, allowTelFallback = !isMeshLike)
+                val displayName = if (!isMeshLike) {
+                    MeshCallContactHelper.getContactName(this, rawNumber)
+                } else {
+                    null
+                }
+                MeshVoipCallActivity.startOutgoing(
+                    context = this,
+                    meshAddress = meshAddress,
+                    displayName = displayName,
+                    fallbackNumber = if (!isMeshLike) rawNumber else null,
+                    allowFallback = !isMeshLike && meshMode == MeshMode.MESH_WITH_FALLBACK
+                )
+                finish()
                 return
             } else if (meshMode == MeshMode.MESH_ONLY) {
                 toast(R.string.mesh_delivery_failed)
@@ -86,67 +94,7 @@ class DialerActivity : SimpleActivity() {
         }
     }
 
-    private fun attemptMeshCall(
-        phoneNumber: String,
-        meshAddress: String,
-        meshMode: MeshMode,
-        allowTelFallback: Boolean
-    ) {
-        val destinationHash = LxmfAddress.decode(meshAddress)
-        if (destinationHash == null) {
-            if (allowTelFallback && meshMode == MeshMode.MESH_WITH_FALLBACK) {
-                placeTelCall()
-            } else {
-                toast(R.string.mesh_invalid_address)
-                finish()
-            }
-            return
-        }
-
-        val preferredQuality = MeshCallQuality.fromId(MeshConfig.newInstance(this).meshCallQuality)
-        MeshCallRouter.probe(
-            context = this,
-            remoteDeliveryHash = destinationHash,
-            preferredQuality = preferredQuality,
-            timeoutMs = 4000L
-        ) { result ->
-            runOnUiThread {
-                val destination = result.remoteDestination
-                if (result.success && destination != null) {
-                    val displayName = MeshCallContactHelper.getContactName(this, phoneNumber)
-                    val placed = MeshCallController.placeMeshCall(
-                        context = this,
-                        remoteDeliveryHash = destinationHash,
-                        remoteCallHash = result.remoteCallHash,
-                        remoteDestination = destination,
-                        quality = result.quality,
-                        displayName = displayName,
-                        phoneNumber = phoneNumber
-                    )
-                    if (placed) {
-                        finish()
-                    } else {
-                        toast(R.string.mesh_call_account_disabled)
-                        if (canLaunchAccountsConfiguration()) {
-                            ConfirmationDialog(this@DialerActivity, getString(R.string.mesh_call_account_open_settings)) {
-                                launchAccountsConfiguration()
-                                finish()
-                            }
-                        } else {
-                            finish()
-                        }
-                    }
-                } else {
-                    if (allowTelFallback && meshMode == MeshMode.MESH_WITH_FALLBACK) {
-                        placeTelCall()
-                    } else {
-                        toast(R.string.mesh_delivery_failed)
-                        finish()
-                    }
-                }
-            }
-        }
-    }
+    // Telecom-based mesh calling has been removed in favor of in-app VoIP mesh calls.
 
     private fun placeTelCall() {
         getHandleToUse(intent, callNumber.toString()) { handle ->

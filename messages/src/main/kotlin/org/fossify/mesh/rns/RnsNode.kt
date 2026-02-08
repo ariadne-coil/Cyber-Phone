@@ -15,6 +15,7 @@ import java.nio.ByteBuffer
 object RnsNode {
     private const val DEFAULT_UDP_PORT = 4242
     private const val DEFAULT_MULTICAST_GROUP = "239.255.0.1"
+    private const val LINK_REQUEST_RETRY_MS = 1_500L
     private const val MAX_HOPS = 128
     private const val ANNOUNCE_CACHE_LIMIT = 256
     private const val RESOURCE_CACHE_LIMIT = 256
@@ -571,6 +572,23 @@ object RnsNode {
             queueLinkPacket(link, packetType, context, payload)
         }
         return true
+    }
+
+    /**
+     * Best-effort send over a link, without ever queueing payload for later delivery.
+     *
+     * This is useful for real-time traffic (voice) where stale packets are worse than loss.
+     */
+    fun trySendPacketViaLink(
+        owner: RnsDestination,
+        destination: RnsDestination,
+        payload: ByteArray,
+        context: Int = RnsPacket.NONE,
+        packetType: Int = RnsPacket.DATA
+    ): Boolean {
+        val link = ensureLink(owner, destination) ?: return false
+        if (!link.isActive()) return false
+        return sendLinkPacket(link, packetType, context, payload, null) != null
     }
 
     fun sendPacketOnLink(
@@ -1304,7 +1322,20 @@ object RnsNode {
         if (active != null) return active
         val pendingId = pendingLinksByDestination[destKey]
         val pending = pendingId?.let { pendingLinksById[it] }
-        if (pending != null) return pending
+        if (pending != null) {
+            // Link requests are sent over lossy transports. If the initial request gets dropped,
+            // we must retry or the link will never become active.
+            if (pending.initiator) {
+                val age = System.currentTimeMillis() - pending.getLastRequestTimeMs()
+                if (age > LINK_REQUEST_RETRY_MS) {
+                    try {
+                        send(pending.buildLinkRequestPacket())
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+            return pending
+        }
 
         val link = RnsLink.createOutgoing(owner, destination) ?: return null
         val requestPacket = link.buildLinkRequestPacket()

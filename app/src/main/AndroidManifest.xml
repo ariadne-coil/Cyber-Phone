@@ -217,6 +217,15 @@
             android:showOnLockScreen="true" />
 
         <activity
+            android:name=".mesh.voip.MeshVoipCallActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:label="@string/ongoing_call"
+            android:launchMode="singleTask"
+            android:screenOrientation="portrait"
+            android:showOnLockScreen="true" />
+
+        <activity
             android:name=".activities.DialpadActivity"
             android:exported="true"
             android:label="@string/dialpad"

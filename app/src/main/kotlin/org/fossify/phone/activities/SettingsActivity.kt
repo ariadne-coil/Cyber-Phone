@@ -158,8 +158,6 @@ class SettingsActivity : SimpleActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
-        setupOptionsMenu()
-        refreshMenuItems()
 
         binding.apply {
             setupEdgeToEdge(padBottomSystem = listOf(settingsNestedScrollview))
@@ -253,21 +251,8 @@ class SettingsActivity : SimpleActivity() {
         return super.onCreateOptionsMenu(menu)
     }
 
-    private fun setupOptionsMenu() {
-        binding.settingsToolbar.setOnMenuItemClickListener { menuItem ->
-            when (menuItem.itemId) {
-                R.id.calling_accounts -> launchAccountsConfiguration()
-                else -> return@setOnMenuItemClickListener false
-            }
-            return@setOnMenuItemClickListener true
-        }
-    }
-
-    private fun refreshMenuItems() {
-        binding.settingsToolbar.menu.apply {
-            findItem(R.id.calling_accounts).isVisible = canLaunchAccountsConfiguration()
-        }
-    }
+    // Telecom-based mesh calling has been removed in favor of in-app VoIP calls. There are no
+    // longer any "phone account" settings to expose.
 
     private fun setupCustomizeColors() {
         binding.settingsColorCustomizationHolder.setOnClickListener {

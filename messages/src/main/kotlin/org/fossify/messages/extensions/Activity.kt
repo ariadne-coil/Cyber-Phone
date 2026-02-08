@@ -21,14 +21,66 @@ import org.fossify.commons.helpers.PERMISSION_WRITE_CONTACTS
 import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.models.SimpleContact
+import org.fossify.mesh.MeshConfig
+import org.fossify.mesh.MeshMode
 import org.fossify.mesh.MeshContactHelper
 import org.fossify.messages.activities.ConversationDetailsActivity
+import org.fossify.messages.helpers.MeshDiscoveryManager
 import org.fossify.messages.helpers.THREAD_ID
+import org.fossify.mesh.lxmf.LxmfAddress
 import java.io.File
 import java.util.Locale
 
 fun BaseSimpleActivity.dialNumber(phoneNumber: String, callback: (() -> Unit)? = null) {
     hideKeyboard()
+
+    // If mesh is enabled and we have a mesh address for this contact/number, prefer mesh calling.
+    // This is used by the Messages thread call button, so it must decide between mesh and PSTN.
+    val meshMode = try {
+        MeshConfig.newInstance(this).getMeshMode()
+    } catch (_: Exception) {
+        MeshMode.STANDARD_ONLY
+    }
+
+    if (meshMode != MeshMode.STANDARD_ONLY) {
+        val meshAddress = try {
+            when {
+                LxmfAddress.isMeshLike(phoneNumber) -> LxmfAddress.normalize(phoneNumber)
+                else -> MeshDiscoveryManager.getMeshAddressForPhoneNumber(this, phoneNumber)
+            }
+        } catch (_: Exception) {
+            null
+        }
+
+        if (!meshAddress.isNullOrBlank()) {
+            // MeshVoipCallActivity lives in the app module. Avoid a module dependency cycle by
+            // launching it via an explicit class name.
+            val allowFallback = meshMode == MeshMode.MESH_WITH_FALLBACK && !LxmfAddress.isMeshLike(phoneNumber)
+            val fallbackNumber = phoneNumber.takeIf { allowFallback }
+            val intent = Intent().apply {
+                setClassName(packageName, "org.fossify.phone.mesh.voip.MeshVoipCallActivity")
+                putExtra("mesh_voip_incoming", false)
+                putExtra("mesh_voip_mesh_address", meshAddress)
+                putExtra("mesh_voip_display_name", null as String?)
+                putExtra("mesh_voip_fallback_number", fallbackNumber)
+                putExtra("mesh_voip_allow_fallback", allowFallback)
+            }
+            try {
+                startActivity(intent)
+                callback?.invoke()
+            } catch (e: Exception) {
+                showErrorToast(e)
+            }
+            return
+        }
+
+        if (meshMode == MeshMode.MESH_ONLY) {
+            toast(org.fossify.messages.R.string.mesh_delivery_failed)
+            callback?.invoke()
+            return
+        }
+    }
+
     handlePermission(PERMISSION_CALL_PHONE) {
         val action = if (it) Intent.ACTION_CALL else Intent.ACTION_DIAL
         Intent(action).apply {

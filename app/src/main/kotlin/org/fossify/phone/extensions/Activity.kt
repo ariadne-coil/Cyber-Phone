@@ -23,6 +23,7 @@ import org.fossify.commons.extensions.launchViewContactIntent
 import org.fossify.commons.extensions.openFullScreenIntentSettings
 import org.fossify.commons.extensions.openNotificationSettings
 import org.fossify.commons.extensions.telecomManager
+import org.fossify.commons.extensions.toast
 import org.fossify.commons.helpers.CONTACT_ID
 import org.fossify.commons.helpers.IS_PRIVATE
 import org.fossify.commons.helpers.PERMISSION_READ_PHONE_STATE
@@ -31,15 +32,36 @@ import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.models.contacts.Contact
 import org.fossify.mesh.MeshContactHelper
+import org.fossify.mesh.MeshConfig
+import org.fossify.mesh.MeshMode
+import org.fossify.mesh.lxmf.LxmfAddress
 import org.fossify.phone.BuildConfig
 import org.fossify.phone.activities.DialerActivity
 import org.fossify.phone.activities.SimpleActivity
 import org.fossify.phone.dialogs.SelectSIMDialog
+import org.fossify.phone.mesh.voip.MeshVoipCallActivity
 
 fun SimpleActivity.startCallIntent(
     recipient: String,
     forceSimSelector: Boolean = false
 ) {
+    val meshMode = MeshConfig.newInstance(this).getMeshMode()
+    if (LxmfAddress.isMeshLike(recipient)) {
+        if (meshMode == MeshMode.STANDARD_ONLY) {
+            toast(org.fossify.messages.R.string.mesh_disabled)
+            return
+        }
+        // Mesh calls are handled in-app (VoIP) without Telecom.
+        MeshVoipCallActivity.startOutgoing(
+            context = this,
+            meshAddress = LxmfAddress.normalize(recipient),
+            displayName = null,
+            fallbackNumber = null,
+            allowFallback = false
+        )
+        return
+    }
+
     if (isDefaultDialer()) {
         getHandleToUse(
             intent = null,
@@ -58,12 +80,36 @@ fun SimpleActivity.startCallWithConfirmationCheck(
     name: String,
     forceSimSelector: Boolean = false
 ) {
+    val meshMode = MeshConfig.newInstance(this).getMeshMode()
+    val isMesh = meshMode != MeshMode.STANDARD_ONLY && LxmfAddress.isMeshLike(recipient)
+
     if (config.showCallConfirmation) {
         CallConfirmationDialog(this, name) {
-            startCallIntent(recipient, forceSimSelector)
+            if (isMesh) {
+                MeshVoipCallActivity.startOutgoing(
+                    context = this,
+                    meshAddress = LxmfAddress.normalize(recipient),
+                    displayName = name,
+                    fallbackNumber = null,
+                    allowFallback = false
+                )
+            } else {
+                startCallIntent(recipient, forceSimSelector)
+            }
         }
     } else {
-        startCallIntent(recipient, forceSimSelector)
+        // Pass along the display name for mesh calls so they look consistent.
+        if (isMesh) {
+            MeshVoipCallActivity.startOutgoing(
+                context = this,
+                meshAddress = LxmfAddress.normalize(recipient),
+                displayName = name,
+                fallbackNumber = null,
+                allowFallback = false
+            )
+        } else {
+            startCallIntent(recipient, forceSimSelector)
+        }
     }
 }
 

@@ -10,6 +10,7 @@ import org.fossify.mesh.rns.RnsHex
 import org.fossify.mesh.rns.RnsIdentity
 import org.fossify.mesh.rns.RnsNode
 import org.fossify.mesh.rns.RnsPacket
+import org.fossify.mesh.lxmf.LxmfConstants
 import org.msgpack.core.MessagePack
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
@@ -59,6 +60,7 @@ object MeshCallRouter {
     private val sessions = ConcurrentHashMap<String, MeshCallSession>()
     private var callDestination: RnsDestination? = null
     private var localIdentity: RnsIdentity? = null
+    private var localDeliveryHash: ByteArray? = null
 
     fun start(context: Context) {
         if (callDestination != null) return
@@ -66,6 +68,7 @@ object MeshCallRouter {
         val identity = meshIdentity.privateKey?.let { RnsIdentity.fromPrivate(it) }
             ?: RnsIdentity.fromPublic(meshIdentity.publicKey)
         localIdentity = identity
+        localDeliveryHash = RnsDestination.hash(identity, LxmfConstants.APP_NAME, listOf("delivery"))
         val destination = RnsDestination.create(
             identity = identity,
             direction = RnsDestination.IN,
@@ -80,12 +83,15 @@ object MeshCallRouter {
         RnsNode.registerDestination(destination, { packet, payload ->
             handleCallPacket(packet, payload)
         })
+        // Announce our call destination so peers can discover a routable path for mesh calls.
+        RnsNode.announce(destination)
     }
 
     fun stop() {
         callDestination?.let { RnsNode.unregisterDestination(it.hash) }
         callDestination = null
         localIdentity = null
+        localDeliveryHash = null
         sessions.clear()
     }
 
@@ -136,6 +142,17 @@ object MeshCallRouter {
         timeoutMs: Long
     ): ProbeResult {
         val start = SystemClock.elapsedRealtime()
+        // MeshService startup is async. If the UI triggers a call immediately after enabling mesh,
+        // ensure the backend is actually running before we attempt path/link operations.
+        val readyDeadline = start + timeoutMs.coerceAtMost(2_000L)
+        while (SystemClock.elapsedRealtime() < readyDeadline) {
+            if (RnsNode.isRunning() && callDestination != null && localIdentity != null) break
+            Thread.sleep(50)
+        }
+        if (!RnsNode.isRunning() || callDestination == null || localIdentity == null) {
+            return ProbeResult(success = false)
+        }
+
         var identity = RnsNode.recallIdentity(remoteDeliveryHash)
         if (identity == null) {
             RnsNode.requestPath(remoteDeliveryHash)
@@ -149,7 +166,8 @@ object MeshCallRouter {
             return ProbeResult(success = false)
         }
 
-        val remoteCallDestination = buildCallDestination(identity, remoteDeliveryHash)
+        val remoteCallHash = RnsDestination.hash(identity, APP_NAME, listOf("call"))
+        val remoteCallDestination = buildCallDestination(identity, remoteCallHash)
         val owner = callDestination ?: return ProbeResult(success = false)
         val local = localIdentity ?: return ProbeResult(success = false)
 
@@ -198,24 +216,26 @@ object MeshCallRouter {
         return chosen.id
     }
 
-    private fun buildCallDestination(identity: RnsIdentity, deliveryHash: ByteArray): RnsDestination {
+    private fun buildCallDestination(identity: RnsIdentity, callHash: ByteArray): RnsDestination {
         return RnsDestination.createWithHash(
             identity = identity,
             direction = RnsDestination.OUT,
             type = RnsDestination.SINGLE,
             appName = APP_NAME,
             aspects = listOf("call"),
-            hashOverride = RnsDestination.hash(identity, APP_NAME, listOf("call"))
+            hashOverride = callHash
         )
     }
 
     fun sendInvite(session: MeshCallSession) {
+        val callerDeliveryHash = localDeliveryHash ?: ByteArray(0)
+        val callerCallHash = callDestination?.hash ?: ByteArray(0)
         val payload = buildControlPayload(
             CMD_INVITE,
             session.sessionId,
             session.quality.id,
-            session.remoteDeliveryHash,
-            session.remoteCallHash
+            callerDeliveryHash,
+            callerCallHash
         )
         sendControlPayload(session, payload)
     }
@@ -235,7 +255,24 @@ object MeshCallRouter {
     fun sendEnd(sessionId: ByteArray) {
         val session = getSession(sessionId) ?: return
         val payload = buildControlPayload(CMD_END, session.sessionId, session.quality.id)
+        // END is critical. Send a few times to survive lossy transports and interface switching.
         sendControlPayload(session, payload)
+        // Also send directly to the remote call destination (non-link), as a fallback if the link
+        // is flapping; this is low frequency so the extra crypto cost is fine.
+        try {
+            RnsNode.send(RnsPacket(destination = session.remoteDestination, data = payload))
+        } catch (_: Exception) {
+        }
+        thread(name = "mesh-call-end-retry", start = true) {
+            repeat(2) {
+                Thread.sleep(200)
+                try {
+                    sendControlPayload(session, payload)
+                    RnsNode.send(RnsPacket(destination = session.remoteDestination, data = payload))
+                } catch (_: Exception) {
+                }
+            }
+        }
         sessions.remove(RnsHex.encode(sessionId))
     }
 
@@ -253,7 +290,9 @@ object MeshCallRouter {
             return
         }
         val owner = callDestination ?: return
-        RnsNode.sendPacketViaLink(owner, session.remoteDestination, payload, RnsPacket.NONE)
+        // Do not queue audio. If the link/path isn't ready, drop frames to avoid building up
+        // seconds of latency ("slow-mo" audio) when the link becomes active again.
+        RnsNode.trySendPacketViaLink(owner, session.remoteDestination, payload, RnsPacket.NONE)
     }
 
     private fun sendControlPayload(session: MeshCallSession, payload: ByteArray) {
@@ -325,11 +364,18 @@ object MeshCallRouter {
             }
             unpacker.close()
             updateSessionLink(sessionId, linkId)
+            val sessionKey = RnsHex.encode(sessionId)
             when (cmd) {
                 CMD_INVITE -> handleInvite(sessionId, qualityId, deliveryHash, callHash, linkId)
                 CMD_ACCEPT -> listeners.forEach { it.onCallAccepted(sessionId) }
-                CMD_DECLINE -> listeners.forEach { it.onCallDeclined(sessionId) }
-                CMD_END -> listeners.forEach { it.onCallEnded(sessionId) }
+                CMD_DECLINE -> {
+                    listeners.forEach { it.onCallDeclined(sessionId) }
+                    sessions.remove(sessionKey)
+                }
+                CMD_END -> {
+                    listeners.forEach { it.onCallEnded(sessionId) }
+                    sessions.remove(sessionKey)
+                }
             }
         } catch (_: Exception) {
         }
@@ -343,13 +389,17 @@ object MeshCallRouter {
         linkId: ByteArray?
     ) {
         if (sessionId.size != SESSION_ID_SIZE || callHash.isEmpty()) return
+        val key = RnsHex.encode(sessionId)
+        // Invites can be retried by the caller. Don't spam the UI / create multiple "incoming call"
+        // presentations for the same session.
+        if (sessions.containsKey(key)) return
         val identity = if (deliveryHash.isNotEmpty()) {
             RnsNode.recallIdentity(deliveryHash)
         } else {
             null
         }
         val remoteDest = if (identity != null) {
-            buildCallDestination(identity, deliveryHash)
+            buildCallDestination(identity, callHash)
         } else {
             RnsDestination.fromHash(callHash, RnsDestination.PLAIN)
         }
@@ -363,7 +413,7 @@ object MeshCallRouter {
             outgoing = false,
             linkId = linkId
         )
-        sessions[RnsHex.encode(sessionId)] = session
+        sessions[key] = session
         listeners.forEach { it.onIncomingInvite(session) }
     }
 

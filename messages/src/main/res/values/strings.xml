@@ -45,6 +45,7 @@
     <string name="mesh_invalid_address">Invalid mesh address.</string>
     <string name="mesh_disabled">Mesh messaging is disabled.</string>
     <string name="mesh_delivery_failed">Could not deliver via mesh.</string>
+    <string name="mesh_attachment_load_failed">Could not load attachment.</string>
     <string name="mesh_address_exchange">Exchange mesh address</string>
     <string name="mesh_address_exchange_sent">Mesh address sent.</string>
     <string name="mesh_address_exchange_message">Mesh address exchange</string>
@@ -94,6 +95,8 @@
     <string name="mesh_wifiaware_active">Active</string>
     <string name="mesh_wifiaware_inactive">Inactive</string>
     <string name="mesh_wifiaware_unsupported">Unsupported</string>
+
+    <string name="no_phone_numbers_found">No phone numbers found</string>
     <string name="ai_spam_classification">AI spam classification</string>
     <string name="ai_spam_model_source">AI model</string>
     <string name="ai_spam_model_update">Update AI model</string>

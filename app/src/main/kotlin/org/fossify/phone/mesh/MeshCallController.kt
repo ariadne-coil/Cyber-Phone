@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.telecom.DisconnectCause
+import android.telecom.PhoneAccount
 import android.telecom.TelecomManager
 import org.fossify.mesh.call.MeshCallQuality
 import org.fossify.mesh.call.MeshCallRouter
@@ -45,11 +46,11 @@ object MeshCallController : MeshCallRouter.Listener {
         displayName: String?,
         phoneNumber: String?
     ): Boolean {
-        // Safety net: if our PhoneAccount is not enabled, placeCall() can fall back to a carrier
-        // call (dialing the pseudo TEL number), which is worse than failing fast.
-        if (!MeshCallAccount.isEnabled(context)) {
-            Log.w(TAG, "Mesh PhoneAccount is not enabled; refusing to place outgoing mesh call")
-            return false
+        // Ensure the PhoneAccount is registered for this build/install. Some OEM builds can end up
+        // with a stale registration after an update until we re-register.
+        try {
+            MeshCallAccount.register(context)
+        } catch (_: Exception) {
         }
         val session = MeshCallRouter.createOutgoingSession(
             remoteDeliveryHash = remoteDeliveryHash,
@@ -58,9 +59,12 @@ object MeshCallController : MeshCallRouter.Listener {
             quality = quality
         )
         sessions[RnsHex.encode(session.sessionId)] = MeshCallSessionState(session)
-        // Use a mesh: URI to avoid carrier fallback calls. If an OEM build does not support
-        // placing outgoing calls with custom schemes, we fail fast instead of misdialing.
-        val uri = Uri.parse(LxmfAddress.encode(remoteDeliveryHash))
+        // Always use a tel: URI when placing calls via Telecom.
+        // Many OEM builds reject custom schemes at the Telecom entrypoint with "no valid number entered",
+        // even if the PhoneAccount declares support for them. We still route to our PhoneAccount explicitly
+        // via EXTRA_PHONE_ACCOUNT_HANDLE, and the ConnectionService uses the session extras (not the URI)
+        // to set the real mesh address/caller info.
+        val uri = Uri.fromParts(PhoneAccount.SCHEME_TEL, "0000000000", null)
         val extras = Bundle().apply {
             putByteArray(MeshCallConstants.EXTRA_SESSION_ID, session.sessionId)
             putByteArray(MeshCallConstants.EXTRA_REMOTE_CALL_HASH, remoteCallHash)

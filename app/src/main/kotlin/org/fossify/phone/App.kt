@@ -12,8 +12,7 @@ import org.fossify.mesh.MeshManager
 import org.fossify.messages.extensions.config
 import org.fossify.messages.helpers.MessagingCache
 import org.fossify.phone.blocking.YacbSiaManager
-import org.fossify.phone.mesh.MeshCallAccount
-import org.fossify.phone.mesh.MeshCallController
+import org.fossify.phone.mesh.voip.MeshVoipCallHandler
 
 class App : FossifyApp() {
     override val isAppLockFeatureAvailable = true
@@ -23,8 +22,7 @@ class App : FossifyApp() {
         if (config.yacbCommunityEnabled) {
             YacbSiaManager.init(this)
         }
-        MeshCallAccount.register(this)
-        MeshCallController.init(this)
+        MeshVoipCallHandler.init(this)
         if (hasPermission(PERMISSION_READ_CONTACTS)) {
             listOf(
                 ContactsContract.Contacts.CONTENT_URI,

@@ -5,7 +5,8 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
-import java.util.concurrent.ConcurrentLinkedQueue
+import android.os.Build
+import android.os.Process
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 import org.concentus.OpusApplication
@@ -20,12 +21,15 @@ class MeshAudioEngine(
     private val isRunning = AtomicBoolean(false)
     private var recordThread: Thread? = null
     private var playbackThread: Thread? = null
-    private val incomingFrames = ConcurrentLinkedQueue<ByteArray>()
+    private val incomingLock = Any()
+    private val incomingFrames = ArrayDeque<ByteArray>()
     private var audioRecord: AudioRecord? = null
     private var audioTrack: AudioTrack? = null
     private var encoder: OpusEncoder? = null
     private var decoder: OpusDecoder? = null
     private val frameSize = quality.sampleRate / 50 // 20ms frames
+    private val maxQueuedFrames = 15 // cap latency; drop oldest when exceeded (~300ms at 20ms frames)
+    private val trimToFrames = 8
 
     fun start() {
         if (!isRunning.compareAndSet(false, true)) return
@@ -47,12 +51,23 @@ class MeshAudioEngine(
         audioTrack = null
         encoder = null
         decoder = null
-        incomingFrames.clear()
+        synchronized(incomingLock) {
+            incomingFrames.clear()
+        }
     }
 
     fun enqueueFrame(opusFrame: ByteArray) {
         if (!isRunning.get()) return
-        incomingFrames.add(opusFrame)
+        synchronized(incomingLock) {
+            // If the network delivers bursts or duplicates (multiple interfaces), keep latency bounded
+            // by dropping the oldest frames.
+            if (incomingFrames.size >= maxQueuedFrames) {
+                while (incomingFrames.size > trimToFrames) {
+                    incomingFrames.removeFirstOrNull() ?: break
+                }
+            }
+            incomingFrames.addLast(opusFrame)
+        }
     }
 
     private fun setupCodec() {
@@ -95,7 +110,13 @@ class MeshAudioEngine(
                     .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                     .build()
             )
+            .setTransferMode(AudioTrack.MODE_STREAM)
             .setBufferSizeInBytes(minOut * 2)
+            .apply {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+                }
+            }
             .build()
     }
 
@@ -104,6 +125,10 @@ class MeshAudioEngine(
         val enc = encoder ?: return
         record.startRecording()
         recordThread = thread(start = true, name = "mesh-audio-record") {
+            try {
+                Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
+            } catch (_: Exception) {
+            }
             val pcm = ShortArray(frameSize)
             val output = ByteArray(4000)
             while (isRunning.get()) {
@@ -123,11 +148,15 @@ class MeshAudioEngine(
         val dec = decoder ?: return
         track.play()
         playbackThread = thread(start = true, name = "mesh-audio-playback") {
+            try {
+                Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
+            } catch (_: Exception) {
+            }
             val pcm = ShortArray(frameSize * 2)
             while (isRunning.get()) {
-                val frame = incomingFrames.poll()
+                val frame = synchronized(incomingLock) { incomingFrames.removeFirstOrNull() }
                 if (frame == null) {
-                    Thread.sleep(10)
+                    Thread.sleep(5)
                     continue
                 }
                 val decoded = dec.decode(frame, 0, frame.size, pcm, 0, frameSize, false)
