@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.4.0 (2026-02-15)
+- Wallet: introduced a full in-app wallet tab with federation selection, balance view, USD rate display, payment history scaffolding, and send/receive actions.
+- Wallet: added dual-backend support for LDK (Bitcoin on-chain + Lightning) and Fedimint (Lightning + e-cash token flows), including runtime federation switching.
+- Wallet: added contact-integrated wallet actions (pay, request, destination field) and message-thread wallet flows.
+- Wallet: added encrypted wallet backups/restores (v2), federation-aware restore handling, and passphrase-gated import/export.
+- Wallet: enforced sender-side policy controls, including secure-channel requirements for high-value flows and a hard 100 BTC single-transaction cap.
+- Wallet: hardened federation directory handling (URL trust restrictions, certificate pinning, payload limits, rollback guards, and metadata integrity tracking).
+- Wallet: improved Fedimint integration robustness with startup/retry hardening, compatibility handling, and sender-side spend-cancel scheduling.
+
 ## v0.3.0 (2026-02-08)
 - Mesh Calls: fully functional voice calls over the mesh (in-app VoIP + Opus) with a native incoming call UI.
 - Mesh Calls: major reliability improvements (link-request retries, INVITE/ACCEPT retries, implicit connect on first audio, and robust remote hangup propagation).

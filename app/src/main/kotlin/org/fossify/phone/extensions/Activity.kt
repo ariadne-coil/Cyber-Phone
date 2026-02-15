@@ -40,6 +40,7 @@ import org.fossify.phone.activities.DialerActivity
 import org.fossify.phone.activities.SimpleActivity
 import org.fossify.phone.dialogs.SelectSIMDialog
 import org.fossify.phone.mesh.voip.MeshVoipCallActivity
+import org.fossify.phone.wallet.WalletContactHelper
 
 fun SimpleActivity.startCallIntent(
     recipient: String,
@@ -131,6 +132,7 @@ fun SimpleActivity.launchCreateNewContactIntent() {
         action = Intent.ACTION_INSERT
         data = ContactsContract.Contacts.CONTENT_URI
         MeshContactHelper.addMeshPhoneInsertExtras(this)
+        WalletContactHelper.addWalletInsertExtras(this)
         launchActivityIntent(this)
     }
 }
@@ -193,6 +195,7 @@ fun Activity.startContactDetailsIntent(contact: Contact) {
                         data = publicUri
                         putExtra("finishActivityOnSaveCompleted", true)
                         MeshContactHelper.addMeshPhoneInsertExtras(this)
+                        WalletContactHelper.addWalletInsertExtras(this)
                         launchActivityIntent(this)
                     }
                 }
@@ -200,6 +203,7 @@ fun Activity.startContactDetailsIntent(contact: Contact) {
                     handlePermission(PERMISSION_WRITE_CONTACTS) { granted ->
                         if (granted) {
                             MeshContactHelper.ensureMeshPhoneRowForRawContact(this, contact.rawId.toLong())
+                            WalletContactHelper.ensureWalletDestinationRowForRawContact(this, contact.rawId.toLong())
                         }
                         launchEditor()
                     }

@@ -14,6 +14,7 @@ androidx-constraintlayout = "2.2.1"
 androidx-swiperefreshlayout = "1.2.0"
 androidx-lifecycleprocess = "2.10.0"
 androidx-documentfile = "1.1.0"
+androidx-webkit = "1.15.0"
 #Eventbus
 eventbus = "3.3.1"
 #Room
@@ -24,7 +25,7 @@ commons-compress = "1.26.2"
 mmslib = "1.0.0"
 indicator-fast-scroll = "4524cd0b61"
 #Gradle
-gradlePlugins-agp = "9.0.0"
+gradlePlugins-agp = "9.0.1"
 #Helpers
 ez-vcard = "0.12.1"
 #Other
@@ -41,6 +42,7 @@ zxingCore = "3.5.3"
 zxingEmbedded = "4.3.0"
 concentus = "6c2328dc19"
 junit = "4.13.2"
+ldkNode = "0.6.1"
 #build
 app-build-compileSDKVersion = "36"
 app-build-targetSDK = "36"
@@ -54,6 +56,7 @@ androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayo
 androidx-lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.ref = "androidx-lifecycleprocess" }
 androidx-swiperefreshlayout = { module = "androidx.swiperefreshlayout:swiperefreshlayout", version.ref = "androidx-swiperefreshlayout" }
 androidx-documentfile = { module = "androidx.documentfile:documentfile", version.ref = "androidx-documentfile" }
+androidx-webkit = { module = "androidx.webkit:webkit", version.ref = "androidx-webkit" }
 #Room
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
@@ -87,6 +90,7 @@ zxing-core = { module = "com.google.zxing:core", version.ref = "zxingCore" }
 zxing-embedded = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxingEmbedded" }
 concentus = { module = "com.github.lostromb:concentus", version.ref = "concentus" }
 junit = { module = "junit:junit", version.ref = "junit" }
+ldk-node-android = { module = "org.lightningdevkit:ldk-node-android", version.ref = "ldkNode" }
 
 [bundles]
 room = [

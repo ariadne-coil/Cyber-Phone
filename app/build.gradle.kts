@@ -111,6 +111,14 @@ android {
         generateLocaleConfig = true
     }
 
+    packaging {
+        // ldk-node-android uses JNA internally. Some devices/ROMs require legacy native library
+        // packaging to ensure the dispatch/native libs are loadable from the filesystem.
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     tasks.withType<KotlinCompile> {
         compilerOptions.jvmTarget.set(
             JvmTarget.fromTarget(project.libs.versions.app.build.kotlinJVMTarget.get())
@@ -153,11 +161,15 @@ dependencies {
     implementation(libs.libphonenumberinfo)
     implementation(libs.okhttp)
     implementation(libs.slf4j.android)
+    implementation(libs.androidx.swiperefreshlayout)
+    implementation(libs.androidx.webkit)
     implementation(libs.work.runtime)
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.concentus)
+    implementation(libs.ldk.node.android)
     detektPlugins(libs.compose.detekt)
     implementation(project(":messages"))
+    testImplementation(libs.junit)
 }
 
 tasks.register("testClasses") {

@@ -182,6 +182,7 @@ import org.fossify.messages.helpers.PICK_PHOTO_INTENT
 import org.fossify.messages.helpers.PICK_SAVE_DIR_INTENT
 import org.fossify.messages.helpers.PICK_SAVE_FILE_INTENT
 import org.fossify.messages.helpers.PICK_VIDEO_INTENT
+import org.fossify.messages.helpers.WALLET_SEND_TOKEN_INTENT
 import org.fossify.messages.helpers.SEARCHED_MESSAGE_ID
 import org.fossify.messages.helpers.THREAD_ATTACHMENT_URI
 import org.fossify.messages.helpers.THREAD_ATTACHMENT_URIS
@@ -189,6 +190,8 @@ import org.fossify.messages.helpers.THREAD_ID
 import org.fossify.messages.helpers.THREAD_NUMBER
 import org.fossify.messages.helpers.THREAD_TEXT
 import org.fossify.messages.helpers.THREAD_TITLE
+import org.fossify.messages.helpers.EXTRA_WALLET_SECURE_CHANNEL
+import org.fossify.messages.helpers.EXTRA_WALLET_TOKEN_TEXT
 import org.fossify.messages.helpers.MessageCategorizer
 import org.fossify.messages.helpers.ReactionHelper
 import org.fossify.messages.helpers.ReactionType
@@ -653,6 +656,15 @@ class ThreadActivity : SimpleActivity() {
 
     private fun handleActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
         if (resultCode != Activity.RESULT_OK) return
+        if (requestCode == WALLET_SEND_TOKEN_INTENT) {
+            val token = resultData?.getStringExtra(EXTRA_WALLET_TOKEN_TEXT)?.trim().orEmpty()
+            if (token.isNotBlank()) {
+                binding.messageHolder.threadTypeMessage.setText(token)
+                // Token generation already performed any necessary confirmations.
+                sendMessage()
+            }
+            return
+        }
         val data = resultData?.data
         messageToResend = null
 
@@ -2733,43 +2745,46 @@ class ThreadActivity : SimpleActivity() {
         .map { Attachment(null, messageId, it.uri.toString(), it.mimetype, 0, 0, it.filename) }
         .toArrayList()
 
-    private fun setupAttachmentPickerView() = binding.messageHolder.attachmentPicker.apply {
-        val buttonColors = arrayOf(
-            org.fossify.commons.R.color.md_red_500,
-            org.fossify.commons.R.color.md_brown_500,
-            org.fossify.commons.R.color.md_pink_500,
-            org.fossify.commons.R.color.md_purple_500,
-            org.fossify.commons.R.color.md_teal_500,
-            org.fossify.commons.R.color.md_green_500,
-            org.fossify.commons.R.color.md_indigo_500,
-            org.fossify.commons.R.color.md_blue_500
-        ).map { ResourcesCompat.getColor(resources, it, theme) }
-        arrayOf(
-            choosePhotoIcon,
-            chooseVideoIcon,
-            takePhotoIcon,
-            recordVideoIcon,
-            recordAudioIcon,
-            pickFileIcon,
-            pickContactIcon,
-            scheduleMessageIcon
-        ).forEachIndexed { index, icon ->
-            val iconColor = buttonColors[index]
-            icon.background.applyColorFilter(iconColor)
-            icon.applyColorFilter(iconColor.getContrastColor())
-        }
+	    private fun setupAttachmentPickerView() = binding.messageHolder.attachmentPicker.apply {
+	        val buttonColors = arrayOf(
+	            org.fossify.commons.R.color.md_red_500,
+	            org.fossify.commons.R.color.md_brown_500,
+	            org.fossify.commons.R.color.md_pink_500,
+	            org.fossify.commons.R.color.md_purple_500,
+	            org.fossify.commons.R.color.md_teal_500,
+	            org.fossify.commons.R.color.md_green_500,
+	            org.fossify.commons.R.color.md_indigo_500,
+	            org.fossify.commons.R.color.md_blue_500,
+	            org.fossify.commons.R.color.md_amber_500
+	        ).map { ResourcesCompat.getColor(resources, it, theme) }
+	        arrayOf(
+	            choosePhotoIcon,
+	            chooseVideoIcon,
+	            takePhotoIcon,
+	            recordVideoIcon,
+	            recordAudioIcon,
+	            pickFileIcon,
+	            pickContactIcon,
+	            scheduleMessageIcon,
+	            sendSatsIcon
+	        ).forEachIndexed { index, icon ->
+	            val iconColor = buttonColors[index]
+	            icon.background.applyColorFilter(iconColor)
+	            icon.applyColorFilter(iconColor.getContrastColor())
+	        }
 
         val textColor = getProperTextColor()
-        arrayOf(
-            choosePhotoText,
-            chooseVideoText,
-            takePhotoText,
-            recordVideoText,
-            recordAudioText,
-            pickFileText,
-            pickContactText,
-            scheduleMessageText
-        ).forEach { it.setTextColor(textColor) }
+	        arrayOf(
+	            choosePhotoText,
+	            chooseVideoText,
+	            takePhotoText,
+	            recordVideoText,
+	            recordAudioText,
+	            pickFileText,
+	            pickContactText,
+	            scheduleMessageText,
+	            sendSatsText
+	        ).forEach { it.setTextColor(textColor) }
 
         choosePhoto.setOnClickListener {
             launchGetContentIntent(arrayOf("image/*"), PICK_PHOTO_INTENT)
@@ -2792,14 +2807,28 @@ class ThreadActivity : SimpleActivity() {
         pickContact.setOnClickListener {
             launchPickContactIntent()
         }
-        scheduleMessage.setOnClickListener {
-            if (isScheduledMessage) {
-                launchScheduleSendDialog(scheduledDateTime)
-            } else {
-                launchScheduleSendDialog()
-            }
-        }
-    }
+	        scheduleMessage.setOnClickListener {
+	            if (isScheduledMessage) {
+	                launchScheduleSendDialog(scheduledDateTime)
+	            } else {
+	                launchScheduleSendDialog()
+	            }
+	        }
+
+	        sendSats.setOnClickListener {
+	            launchWalletSendToken()
+	        }
+	    }
+
+	    private fun launchWalletSendToken() {
+	        val secure = isMeshThread() ||
+	            (E2eManager.hasSharedSecret(this, threadId) && E2eManager.isThreadEncrypted(this, threadId))
+	        val intent = Intent().apply {
+	            setClassName(this@ThreadActivity, "org.fossify.phone.activities.WalletSendTokenActivity")
+	            putExtra(EXTRA_WALLET_SECURE_CHANNEL, secure)
+	        }
+	        launchActivityForResult(intent, WALLET_SEND_TOKEN_INTENT)
+	    }
 
     private fun showAttachmentPicker() {
         binding.messageHolder.attachmentPickerDivider.showWithAnimation()

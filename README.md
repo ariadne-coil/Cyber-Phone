@@ -62,6 +62,16 @@ Cyber Phone integrates the Reticulum Network Stack to enable off-grid communicat
 
 *   Optional AI spam classification that runs entirely on-device and is privacy friendly
 
+6. Sovereign Wallet
+
+*   Native in-app Bitcoin + Lightning wallet with federation-aware backend switching
+
+*   Fedimint support for e-cash style transfers across encrypted messaging and mesh channels
+
+*   Contact-integrated pay/request flows and wallet destination fields
+
+*   Encrypted wallet backups with passphrase protection and restore support
+
 ## Privacy & Network Behavior
 
 Cyber Phone does not ship analytics or Play Services. Network access is only used for user-enabled features:
@@ -106,6 +116,10 @@ The Code belongs to the Commons.
 - Yet Another Call Blocker (https://gitlab.com/xynngh/YetAnotherCallBlocker)
 - Reticulum Network Stack (https://github.com/markqvist/Reticulum)
 - LXMF (https://github.com/markqvist/LXMF)
+- Fedimint (https://github.com/fedimint/fedimint)
+- Fedimint Web SDK (https://www.npmjs.com/package/@fedimint/core-web)
+- Lightning Dev Kit / ldk-node-android (https://github.com/lightningdevkit/ldk-node)
 - libphonenumber (https://github.com/google/libphonenumber)
 - Hugging Face (https://huggingface.co)
 - Google AI Edge / MediaPipe models (https://ai.google.dev/edge)
+- OpenAI Codex (implementation assistance)

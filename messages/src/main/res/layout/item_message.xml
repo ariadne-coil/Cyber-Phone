@@ -66,6 +66,26 @@
             tools:drawableEndCompat="@drawable/scheduled_message_icon"
             tools:text="Message content" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/thread_message_pay"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/thread_message_body"
+            android:layout_toEndOf="@id/thread_message_sender_photo"
+            android:layout_marginTop="@dimen/tiny_margin"
+            android:insetLeft="0dp"
+            android:insetTop="0dp"
+            android:insetRight="0dp"
+            android:insetBottom="0dp"
+            android:minHeight="0dp"
+            android:paddingHorizontal="@dimen/normal_margin"
+            android:paddingVertical="@dimen/tiny_margin"
+            android:text="@string/wallet_pay"
+            android:textAllCaps="false"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
         <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/thread_message_reaction"
             android:layout_width="wrap_content"

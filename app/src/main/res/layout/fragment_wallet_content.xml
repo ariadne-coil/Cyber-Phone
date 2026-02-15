@@ -1,0 +1,574 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/wallet_swipe_refresh"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/wallet_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:overScrollMode="ifContentScrolls"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/wallet_root_holder"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="@dimen/activity_margin"
+                android:paddingTop="@dimen/normal_margin"
+                android:paddingEnd="@dimen/activity_margin"
+                android:paddingBottom="@dimen/activity_margin">
+
+                <com.google.android.material.progressindicator.LinearProgressIndicator
+                    android:id="@+id/wallet_progress"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:indeterminate="true"
+                    android:visibility="gone"
+                    app:hideAnimationBehavior="outward"
+                    app:showAnimationBehavior="inward"
+                    app:trackCornerRadius="@dimen/small_margin" />
+
+                <LinearLayout
+                    android:id="@+id/wallet_empty_holder"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/bigger_margin"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingStart="@dimen/normal_margin"
+                    android:paddingEnd="@dimen/normal_margin">
+
+                    <org.fossify.commons.views.MyTextView
+                        android:id="@+id/wallet_empty_title"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="@string/wallet_no_federation_selected"
+                        android:textSize="@dimen/bigger_text_size"
+                        android:textStyle="bold" />
+
+                    <org.fossify.commons.views.MyTextView
+                        android:id="@+id/wallet_empty_subtitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/normal_margin"
+                        android:gravity="center"
+                        android:textSize="@dimen/bigger_text_size"
+                        android:textStyle="bold" />
+
+                    <org.fossify.commons.views.MyTextView
+                        android:id="@+id/wallet_select_federation_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/bigger_margin"
+                        android:background="@drawable/ripple_all_corners"
+                        android:gravity="center"
+                        android:paddingStart="@dimen/activity_margin"
+                        android:paddingTop="@dimen/normal_margin"
+                        android:paddingEnd="@dimen/activity_margin"
+                        android:paddingBottom="@dimen/normal_margin"
+                        android:text="@string/wallet_select_federation"
+                        android:textSize="@dimen/bigger_text_size"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/wallet_dashboard_holder"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/wallet_federation_card"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/normal_margin"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="?attr/selectableItemBackground"
+                        app:cardCornerRadius="@dimen/bigger_margin"
+                        app:cardElevation="0dp">
+
+                        <LinearLayout
+                            android:id="@+id/wallet_hero_container"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:paddingStart="@dimen/activity_margin"
+                            android:paddingTop="@dimen/activity_margin"
+                            android:paddingEnd="@dimen/activity_margin"
+                            android:paddingBottom="@dimen/activity_margin">
+
+                            <RelativeLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content">
+
+                                <org.fossify.commons.views.MyTextView
+                                    android:id="@+id/wallet_federation_label"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_centerHorizontal="true"
+                                    android:text="@string/wallet_federation"
+                                    android:textSize="@dimen/normal_text_size"
+                                    android:textStyle="bold" />
+
+                                <org.fossify.commons.views.MyTextView
+                                    android:id="@+id/wallet_federation_value"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_below="@id/wallet_federation_label"
+                                    android:layout_marginTop="2dp"
+                                    android:gravity="center"
+                                    android:paddingEnd="36dp"
+                                    android:textSize="@dimen/bigger_text_size"
+                                    android:textStyle="bold" />
+
+                                <ImageView
+                                    android:id="@+id/wallet_federation_arrow"
+                                    android:layout_width="22dp"
+                                    android:layout_height="22dp"
+                                    android:layout_alignParentEnd="true"
+                                    android:layout_centerVertical="true"
+                                    android:contentDescription="@string/wallet_change_federation"
+                                    android:src="@drawable/ic_arrow_down_vector" />
+                            </RelativeLayout>
+
+                            <org.fossify.commons.views.MyTextView
+                                android:id="@+id/wallet_balance_title"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/normal_margin"
+                                android:gravity="center"
+                                android:text="@string/wallet_balance"
+                                android:textSize="@dimen/normal_text_size"
+                                android:textStyle="bold" />
+
+                            <org.fossify.commons.views.MyTextView
+                                android:id="@+id/wallet_balance_total"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:gravity="center"
+                                android:textSize="46sp"
+                                android:textStyle="bold" />
+
+                            <org.fossify.commons.views.MyTextView
+                                android:id="@+id/wallet_balance_fiat"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:gravity="center"
+                                android:textSize="@dimen/bigger_text_size"
+                                android:textStyle="bold"
+                                android:visibility="gone" />
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/normal_margin"
+                                android:orientation="horizontal">
+
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:gravity="center_horizontal"
+                                    android:orientation="vertical">
+
+                                    <org.fossify.commons.views.MyTextView
+                                        android:id="@+id/wallet_balance_onchain_label"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="@string/wallet_onchain"
+                                        android:textSize="@dimen/normal_text_size"
+                                        android:textStyle="bold" />
+
+                                    <org.fossify.commons.views.MyTextView
+                                        android:id="@+id/wallet_balance_onchain_value"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="2dp"
+                                        android:textSize="@dimen/bigger_text_size"
+                                        android:textStyle="bold" />
+                                </LinearLayout>
+
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:gravity="center_horizontal"
+                                    android:orientation="vertical">
+
+                                    <org.fossify.commons.views.MyTextView
+                                        android:id="@+id/wallet_balance_ln_label"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="@string/wallet_lightning"
+                                        android:textSize="@dimen/normal_text_size"
+                                        android:textStyle="bold" />
+
+                                    <org.fossify.commons.views.MyTextView
+                                        android:id="@+id/wallet_balance_ln_value"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="2dp"
+                                        android:textSize="@dimen/bigger_text_size"
+                                        android:textStyle="bold" />
+                                </LinearLayout>
+                            </LinearLayout>
+
+                            <org.fossify.commons.views.MyTextView
+                                android:id="@+id/wallet_exchange_rate"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/normal_margin"
+                                android:gravity="center"
+                                android:textSize="@dimen/normal_text_size"
+                                android:textStyle="bold" />
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/normal_margin"
+                                android:gravity="center"
+                                android:orientation="horizontal">
+
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:gravity="center_horizontal"
+                                    android:orientation="vertical">
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/wallet_send"
+                                        style="@style/Widget.MaterialComponents.Button"
+                                        android:layout_width="56dp"
+                                        android:layout_height="56dp"
+                                        android:insetTop="0dp"
+                                        android:insetBottom="0dp"
+                                        android:minWidth="0dp"
+                                        android:minHeight="0dp"
+                                        android:padding="0dp"
+                                        app:cornerRadius="28dp"
+                                        app:icon="@drawable/ic_call_made_vector"
+                                        app:iconGravity="textStart"
+                                        app:iconPadding="0dp" />
+
+                                    <org.fossify.commons.views.MyTextView
+                                        android:id="@+id/wallet_send_label"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="@dimen/small_margin"
+                                        android:text="@string/wallet_send"
+                                        android:textSize="@dimen/normal_text_size"
+                                        android:textStyle="bold" />
+                                </LinearLayout>
+
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:gravity="center_horizontal"
+                                    android:orientation="vertical">
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/wallet_receive"
+                                        style="@style/Widget.MaterialComponents.Button"
+                                        android:layout_width="56dp"
+                                        android:layout_height="56dp"
+                                        android:insetTop="0dp"
+                                        android:insetBottom="0dp"
+                                        android:minWidth="0dp"
+                                        android:minHeight="0dp"
+                                        android:padding="0dp"
+                                        app:cornerRadius="28dp"
+                                        app:icon="@drawable/ic_call_received_vector"
+                                        app:iconGravity="textStart"
+                                        app:iconPadding="0dp" />
+
+                                    <org.fossify.commons.views.MyTextView
+                                        android:id="@+id/wallet_receive_label"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="@dimen/small_margin"
+                                        android:text="@string/wallet_receive"
+                                        android:textSize="@dimen/normal_text_size"
+                                        android:textStyle="bold" />
+                                </LinearLayout>
+
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:gravity="center_horizontal"
+                                    android:orientation="vertical">
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/wallet_sync"
+                                        style="@style/Widget.MaterialComponents.Button"
+                                        android:layout_width="56dp"
+                                        android:layout_height="56dp"
+                                        android:insetTop="0dp"
+                                        android:insetBottom="0dp"
+                                        android:minWidth="0dp"
+                                        android:minHeight="0dp"
+                                        android:padding="0dp"
+                                        app:cornerRadius="28dp"
+                                        app:icon="@drawable/ic_call_swap_vector"
+                                        app:iconGravity="textStart"
+                                        app:iconPadding="0dp" />
+
+                                    <org.fossify.commons.views.MyTextView
+                                        android:id="@+id/wallet_sync_label"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="@dimen/small_margin"
+                                        android:text="@string/wallet_sync"
+                                        android:textSize="@dimen/normal_text_size"
+                                        android:textStyle="bold" />
+                                </LinearLayout>
+                            </LinearLayout>
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/wallet_my_addresses_card"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/normal_margin"
+                        app:cardCornerRadius="@dimen/normal_margin"
+                        app:cardElevation="0dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:paddingStart="@dimen/activity_margin"
+                            android:paddingTop="@dimen/activity_margin"
+                            android:paddingEnd="@dimen/activity_margin"
+                            android:paddingBottom="@dimen/activity_margin">
+
+                            <org.fossify.commons.views.MyTextView
+                                android:id="@+id/wallet_my_addresses_title"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:gravity="center"
+                                android:text="@string/wallet_my_addresses"
+                                android:textSize="@dimen/bigger_text_size"
+                                android:textStyle="bold" />
+
+                            <org.fossify.commons.views.MyTextView
+                                android:id="@+id/wallet_my_addresses_hint"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:gravity="center"
+                                android:text="@string/wallet_tap_to_copy"
+                                android:textSize="@dimen/normal_text_size"
+                                android:textStyle="bold" />
+
+                            <org.fossify.commons.views.MyTextView
+                                android:id="@+id/wallet_my_invoice_label"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/normal_margin"
+                                android:text="@string/wallet_my_lightning_invoice"
+                                android:textSize="@dimen/normal_text_size"
+                                android:textStyle="bold" />
+
+                            <org.fossify.commons.views.MyTextView
+                                android:id="@+id/wallet_my_invoice_value"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:background="@drawable/ripple_all_corners"
+                                android:padding="@dimen/normal_margin"
+                                android:text="@string/wallet_not_generated_yet"
+                                android:textSize="@dimen/bigger_text_size"
+                                android:textStyle="bold" />
+
+                            <org.fossify.commons.views.MyTextView
+                                android:id="@+id/wallet_my_address_label"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/normal_margin"
+                                android:text="@string/wallet_my_onchain_address"
+                                android:textSize="@dimen/normal_text_size"
+                                android:textStyle="bold" />
+
+                            <org.fossify.commons.views.MyTextView
+                                android:id="@+id/wallet_my_address_value"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:background="@drawable/ripple_all_corners"
+                                android:padding="@dimen/normal_margin"
+                                android:text="@string/wallet_not_generated_yet"
+                                android:textSize="@dimen/bigger_text_size"
+                                android:textStyle="bold" />
+
+                            <org.fossify.commons.views.MyTextView
+                                android:id="@+id/wallet_my_bip21_label"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/normal_margin"
+                                android:text="@string/wallet_my_unified_uri"
+                                android:textSize="@dimen/normal_text_size"
+                                android:textStyle="bold" />
+
+                            <org.fossify.commons.views.MyTextView
+                                android:id="@+id/wallet_my_bip21_value"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:background="@drawable/ripple_all_corners"
+                                android:padding="@dimen/normal_margin"
+                                android:text="@string/wallet_not_generated_yet"
+                                android:textSize="@dimen/bigger_text_size"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/wallet_payments_card"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/normal_margin"
+                        app:cardCornerRadius="@dimen/normal_margin"
+                        app:cardElevation="0dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:paddingStart="@dimen/activity_margin"
+                            android:paddingTop="@dimen/activity_margin"
+                            android:paddingEnd="@dimen/activity_margin"
+                            android:paddingBottom="@dimen/activity_margin">
+
+                            <org.fossify.commons.views.MyTextView
+                                android:id="@+id/wallet_payments_title"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:gravity="center"
+                                android:text="@string/wallet_recent_activity"
+                                android:textSize="@dimen/bigger_text_size"
+                                android:textStyle="bold" />
+
+                            <org.fossify.commons.views.MyRecyclerView
+                                android:id="@+id/wallet_payments_list"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/small_margin"
+                                android:nestedScrollingEnabled="false"
+                                android:scrollbars="none"
+                                app:layoutManager="org.fossify.commons.views.MyLinearLayoutManager" />
+
+                            <org.fossify.commons.views.MyTextView
+                                android:id="@+id/wallet_payments_placeholder"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/normal_margin"
+                                android:gravity="center"
+                                android:text="@string/no_items_found"
+                                android:textSize="@dimen/bigger_text_size"
+                                android:textStyle="bold"
+                                android:visibility="gone" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/wallet_backup_restore_card"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/normal_margin"
+                        app:cardCornerRadius="@dimen/normal_margin"
+                        app:cardElevation="0dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:paddingStart="@dimen/activity_margin"
+                            android:paddingTop="@dimen/activity_margin"
+                            android:paddingEnd="@dimen/activity_margin"
+                            android:paddingBottom="@dimen/activity_margin">
+
+                            <org.fossify.commons.views.MyTextView
+                                android:id="@+id/wallet_backup_restore_title"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:gravity="center"
+                                android:text="@string/wallet_backup_restore"
+                                android:textSize="@dimen/bigger_text_size"
+                                android:textStyle="bold" />
+
+                            <org.fossify.commons.views.MyTextView
+                                android:id="@+id/wallet_backup_restore_hint"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:gravity="center"
+                                android:text="@string/wallet_backup_restore_hint"
+                                android:textSize="@dimen/normal_text_size"
+                                android:textStyle="bold" />
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/normal_margin"
+                                android:orientation="horizontal">
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/wallet_backup"
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="@string/wallet_backup" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/wallet_restore"
+                                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="@dimen/medium_margin"
+                                    android:layout_weight="1"
+                                    android:text="@string/wallet_restore" />
+                            </LinearLayout>
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <org.fossify.commons.views.MyTextView
+                        android:id="@+id/wallet_status_subtitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/normal_margin"
+                        android:gravity="center"
+                        android:textSize="@dimen/normal_text_size"
+                        android:textStyle="bold" />
+
+                    <org.fossify.commons.views.MyTextView
+                        android:id="@+id/wallet_error"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/normal_margin"
+                        android:gravity="center"
+                        android:textSize="@dimen/bigger_text_size"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+</merge>

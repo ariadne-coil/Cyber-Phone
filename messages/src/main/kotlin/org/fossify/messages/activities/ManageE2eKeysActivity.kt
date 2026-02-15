@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.Manifest
+import android.net.Uri
 import android.os.Bundle
 import android.os.Build
 import android.provider.ContactsContract
@@ -29,10 +30,13 @@ import org.fossify.commons.helpers.NavigationIcon
 import org.fossify.commons.models.RadioItem
 import org.fossify.messages.R
 import org.fossify.messages.databinding.ActivityManageE2eKeysBinding
+import org.fossify.messages.helpers.CyberIdentityPayload
+import org.fossify.messages.helpers.CyberIdentityQr
 import org.fossify.messages.helpers.E2eManager
 import org.fossify.messages.helpers.JSON_MIME_TYPE
 import org.fossify.messages.helpers.MeshDiscoveryManager
 import org.fossify.messages.helpers.TXT_MIME_TYPE
+import org.fossify.messages.helpers.WalletContactHelper
 import org.fossify.mesh.MeshConfig
 import org.fossify.mesh.MeshIdentityStore
 import org.fossify.mesh.MeshManager
@@ -46,7 +50,7 @@ import org.fossify.mesh.wifiaware.MeshWifiAwareState
 
 class ManageE2eKeysActivity : SimpleActivity() {
     private val binding by viewBinding(ActivityManageE2eKeysBinding::inflate)
-    private var pendingMeshAddress: String? = null
+    private var pendingIdentity: CyberIdentityPayload? = null
 
     private val createDocument =
         registerForActivityResult(ActivityResultContracts.CreateDocument(TXT_MIME_TYPE)) { uri ->
@@ -134,13 +138,24 @@ class ManageE2eKeysActivity : SimpleActivity() {
     private val scanMeshQr =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
-            val meshAddress = result.data
-                ?.getStringExtra(MeshQrScanActivity.EXTRA_MESH_ADDRESS)
+            val raw = result.data
+                ?.getStringExtra(MeshQrScanActivity.EXTRA_QR_PAYLOAD)
                 ?.trim()
                 .orEmpty()
-            if (meshAddress.isBlank()) return@registerForActivityResult
-            pendingMeshAddress = meshAddress
-            showMeshSaveDialog()
+                .ifBlank {
+                    result.data
+                        ?.getStringExtra(MeshQrScanActivity.EXTRA_MESH_ADDRESS)
+                        ?.trim()
+                        .orEmpty()
+                }
+            if (raw.isBlank()) return@registerForActivityResult
+            val parsed = CyberIdentityQr.parse(raw)
+            if (parsed == null) {
+                toast(R.string.profile_mesh_invalid)
+                return@registerForActivityResult
+            }
+            pendingIdentity = parsed
+            showIdentitySaveDialog()
         }
 
     private val pickContact =
@@ -158,20 +173,20 @@ class ManageE2eKeysActivity : SimpleActivity() {
             } ?: return@registerForActivityResult
 
             val rawId = resolveRawContactId(contactId) ?: return@registerForActivityResult
-            val meshAddress = pendingMeshAddress ?: return@registerForActivityResult
+            val identity = pendingIdentity ?: return@registerForActivityResult
             if (!hasPermission(PERMISSION_WRITE_CONTACTS)) {
                 handlePermission(PERMISSION_WRITE_CONTACTS) { granted ->
                     if (granted) {
-                        MeshContactHelper.upsertMeshAddressForRawContact(this, rawId, meshAddress)
+                        saveIdentityToRawContact(rawId, identity)
                         toast(R.string.profile_mesh_saved)
-                        pendingMeshAddress = null
+                        pendingIdentity = null
                     }
                 }
                 return@registerForActivityResult
             }
-            MeshContactHelper.upsertMeshAddressForRawContact(this, rawId, meshAddress)
+            saveIdentityToRawContact(rawId, identity)
             toast(R.string.profile_mesh_saved)
-            pendingMeshAddress = null
+            pendingIdentity = null
         }
 
     private val createContact =
@@ -179,7 +194,7 @@ class ManageE2eKeysActivity : SimpleActivity() {
             if (result.resultCode == Activity.RESULT_OK) {
                 toast(R.string.profile_mesh_saved)
             }
-            pendingMeshAddress = null
+            pendingIdentity = null
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -539,13 +554,15 @@ class ManageE2eKeysActivity : SimpleActivity() {
     }
 
     private fun showQrCode() {
-        val address = MeshDiscoveryManager.getLocalMeshAddress(this) ?: return
-        // Use an SMS URI so any scanner opens the default SMS app (Cyber Phone).
-        val content = MeshDiscoveryManager.buildMeshAddressUri(this)
-            ?: MeshDiscoveryManager.buildMeshHttpUri(this)
-            ?: MeshDiscoveryManager.buildMeshSmsUri(this)
-            ?: MeshDiscoveryManager.buildMeshIntentUri(this)
-            ?: ("mesh:" + address)
+        val meshUri = MeshDiscoveryManager.getLocalMeshAddress(this) ?: return
+        val content = CyberIdentityQr.buildVCard(
+            displayName = getProfileDisplayName(),
+            phoneNumber = getProfilePhoneNumber(),
+            meshUri = meshUri,
+            e2ePublicKeyBase64 = E2eManager.getPublicKeyBase64(this),
+            walletOnchainAddress = getLocalWalletOnchainAddress(),
+            walletLightningInvoice = getLocalWalletLastInvoice(),
+        )
         val size = resources.getDimensionPixelSize(R.dimen.profile_qr_size)
         val bitmap = createQrBitmap(content, size) ?: return
         val pad = (16 * resources.displayMetrics.density).toInt()
@@ -584,33 +601,41 @@ class ManageE2eKeysActivity : SimpleActivity() {
         scanMeshQr.launch(Intent(this, MeshQrScanActivity::class.java))
     }
 
-    private fun showMeshSaveDialog() {
-        val meshAddress = pendingMeshAddress ?: return
+    private fun showIdentitySaveDialog() {
+        val identity = pendingIdentity ?: return
+        val message = buildString {
+            identity.meshAddress?.let { appendLine("Mesh: $it") }
+            identity.e2ePublicKeyBase64?.let { appendLine("E2E: ${it.take(16)}...") }
+            identity.walletOnchainAddress?.let { appendLine("BTC: $it") }
+            identity.walletLightningInvoice?.let { appendLine("LN: ${it.take(16)}...") }
+        }.trim().ifBlank { identity.raw }
         android.app.AlertDialog.Builder(this)
             .setTitle(R.string.profile_mesh_save_title)
-            .setMessage(meshAddress)
+            .setMessage(message)
             .setPositiveButton(R.string.profile_mesh_select_contact) { _, _ ->
-                requestContactForMeshAddress()
+                requestContactForIdentity()
             }
             .setNeutralButton(R.string.profile_mesh_add_contact) { _, _ ->
-                createNewContactWithMesh(meshAddress)
+                createNewContactWithIdentity(identity)
             }
             .setNegativeButton(android.R.string.cancel) { _, _ ->
-                pendingMeshAddress = null
+                pendingIdentity = null
             }
             .show()
     }
 
-    private fun createNewContactWithMesh(meshAddress: String) {
+    private fun createNewContactWithIdentity(identity: CyberIdentityPayload) {
         Intent().apply {
             action = Intent.ACTION_INSERT
             data = ContactsContract.Contacts.CONTENT_URI
-            MeshContactHelper.addMeshPhoneInsertExtras(this, meshAddress)
+            identity.meshAddress?.let { MeshContactHelper.addMeshPhoneInsertExtras(this, it) }
+            identity.e2ePublicKeyBase64?.let { E2eManager.addE2ePublicKeyInsertExtras(this, it) }
+            identity.walletOnchainAddress?.let { WalletContactHelper.addWalletInsertExtras(this, it) }
             createContact.launch(this)
         }
     }
 
-    private fun requestContactForMeshAddress() {
+    private fun requestContactForIdentity() {
         if (!hasPermission(PERMISSION_READ_CONTACTS)) {
             handlePermission(PERMISSION_READ_CONTACTS) { granted ->
                 if (granted) {
@@ -646,10 +671,58 @@ class ManageE2eKeysActivity : SimpleActivity() {
         val dataString = intent.dataString
         val payload = listOfNotNull(textExtra, dataString).firstOrNull().orEmpty()
         if (payload.isBlank()) return
-        val meshAddress = MeshDiscoveryManager.extractMeshAddress(payload)
-        if (meshAddress.isNullOrBlank()) return
-        pendingMeshAddress = meshAddress
-        showMeshSaveDialog()
+        val parsed = CyberIdentityQr.parse(payload) ?: return
+        pendingIdentity = parsed
+        showIdentitySaveDialog()
+    }
+
+    private fun saveIdentityToRawContact(rawId: Long, identity: CyberIdentityPayload) {
+        identity.meshAddress?.let { MeshContactHelper.upsertMeshAddressForRawContact(this, rawId, it) }
+        identity.e2ePublicKeyBase64?.let { E2eManager.storeContactPublicKeyForRawContact(this, rawId, it) }
+        buildWalletDestinationFromIdentity(identity)?.let { WalletContactHelper.upsertWalletDestination(this, rawId, it) }
+    }
+
+    private fun buildWalletDestinationFromIdentity(identity: CyberIdentityPayload): String? {
+        val btc = identity.walletOnchainAddress?.trim().orEmpty()
+        val ln = identity.walletLightningInvoice?.trim().orEmpty()
+
+        // Prefer a unified BIP21 URI if we have both. This keeps a single stable field in the
+        // contact while preserving both on-chain and Lightning options for the "Pay" action.
+        if (btc.isNotBlank()) {
+            return if (ln.isBlank()) {
+                btc
+            } else {
+                "bitcoin:$btc?lightning=${Uri.encode(ln)}"
+            }
+        }
+
+        // Fallback: Lightning-only (may be an invoice, which can expire).
+        return ln.takeIf { it.isNotBlank() }
+    }
+
+    private fun getLocalWalletOnchainAddress(): String? {
+        // Stored by the Wallet feature in the shared BaseConfig prefs ("Prefs").
+        val prefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+        val selectedId = prefs.getString("wallet_selected_federation_id", "")?.trim().orEmpty()
+        val scoped = if (selectedId.isNotBlank()) {
+            prefs.getString("wallet_last_onchain_address_$selectedId", "")?.trim().orEmpty()
+        } else {
+            ""
+        }
+        if (scoped.isNotBlank()) return scoped
+        return prefs.getString("wallet_last_onchain_address", "")?.trim()?.takeIf { it.isNotBlank() }
+    }
+
+    private fun getLocalWalletLastInvoice(): String? {
+        val prefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+        val selectedId = prefs.getString("wallet_selected_federation_id", "")?.trim().orEmpty()
+        val scoped = if (selectedId.isNotBlank()) {
+            prefs.getString("wallet_last_invoice_$selectedId", "")?.trim().orEmpty()
+        } else {
+            ""
+        }
+        if (scoped.isNotBlank()) return scoped
+        return prefs.getString("wallet_last_invoice", "")?.trim()?.takeIf { it.isNotBlank() }
     }
 
     private fun getProfileDisplayName(): String? {

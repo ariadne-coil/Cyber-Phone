@@ -8,7 +8,7 @@
     <androidx.constraintlayout.helper.widget.Flow
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:constraint_referenced_ids="choose_photo,choose_video,take_photo,record_video,record_audio,pick_file,pick_contact,schedule_message"
+        app:constraint_referenced_ids="choose_photo,choose_video,take_photo,record_video,record_audio,pick_file,pick_contact,schedule_message,send_sats"
         app:flow_verticalGap="@dimen/small_margin"
         app:flow_wrapMode="aligned"
         app:layout_constraintEnd_toEndOf="parent"
@@ -268,6 +268,38 @@
             android:layout_gravity="center"
             android:layout_marginTop="@dimen/medium_margin"
             android:text="@string/schedule_message"
+            android:textAlignment="center"
+            android:textColor="@color/default_text_color"
+            android:textSize="@dimen/normal_text_size" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/send_sats"
+        android:layout_width="@dimen/attachment_button_width"
+        android:layout_height="wrap_content"
+        android:background="?selectableItemBackgroundBorderless"
+        android:minHeight="@dimen/attachment_button_height"
+        android:orientation="vertical"
+        android:paddingHorizontal="@dimen/medium_margin"
+        android:paddingVertical="@dimen/medium_margin">
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/send_sats_icon"
+            android:layout_width="@dimen/medium_icon_size"
+            android:layout_height="@dimen/medium_icon_size"
+            android:layout_gravity="center"
+            android:background="@drawable/circle_background"
+            android:backgroundTint="@color/colorPrimary"
+            android:padding="@dimen/medium_margin"
+            android:src="@drawable/ic_coins_vector" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/send_sats_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="@dimen/medium_margin"
+            android:text="@string/wallet_send_sats"
             android:textAlignment="center"
             android:textColor="@color/default_text_color"
             android:textSize="@dimen/normal_text_size" />

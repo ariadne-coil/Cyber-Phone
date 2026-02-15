@@ -186,6 +186,8 @@ class RnsLink private constructor(
     private var requestTimeMs: Long = 0L
     private var rttSeconds: Double? = null
     private val pendingRequests = ConcurrentHashMap<String, RnsRequestReceipt>()
+    @Volatile
+    private var lastPendingTrimAtMs: Long = 0L
     private var remoteIdentity: RnsIdentity? = null
 
     fun buildLinkRequestPacket(): RnsPacket {
@@ -316,6 +318,7 @@ class RnsLink private constructor(
         sendResource: ((ByteArray, ByteArray, Boolean) -> Boolean)? = null
     ): RnsRequestReceipt? {
         if (!isActive()) return null
+        trimPendingRequests()
         val requestPayload = packRequest(path, data)
         val requestId = if (requestPayload.size <= mdu) {
             val raw = sendPacket(this, RnsPacket.DATA, RnsPacket.REQUEST, requestPayload) ?: run {
@@ -336,6 +339,7 @@ class RnsLink private constructor(
         }
         val receipt = RnsRequestReceipt(requestId, onResponse, onFailure)
         pendingRequests[RnsHex.encode(requestId)] = receipt
+        trimPendingRequests()
         return receipt
     }
 
@@ -423,6 +427,32 @@ class RnsLink private constructor(
             receipt.response = response
             receipt.onResponse?.invoke(receipt)
         } catch (_: Exception) {
+        }
+    }
+
+    private fun trimPendingRequests(now: Long = System.currentTimeMillis()) {
+        // Never allow unbounded growth if a peer disappears mid-request.
+        val limit = 256
+        val ttlMs = 5 * 60_000L
+        val overLimit = pendingRequests.size > limit
+        if (!overLimit && now - lastPendingTrimAtMs < 60_000L) return
+        lastPendingTrimAtMs = now
+
+        val minKeep = now - ttlMs
+        val iterator = pendingRequests.entries.iterator()
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            if (entry.value.createdAt < minKeep) {
+                iterator.remove()
+            }
+        }
+
+        if (pendingRequests.size > limit) {
+            val keyIterator = pendingRequests.keys.iterator()
+            while (pendingRequests.size > limit && keyIterator.hasNext()) {
+                keyIterator.next()
+                keyIterator.remove()
+            }
         }
     }
 

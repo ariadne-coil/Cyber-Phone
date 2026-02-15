@@ -45,5 +45,13 @@
             android:paddingBottom="@dimen/activity_margin"
             android:text="@string/messages_tab" />
 
+        <org.fossify.commons.views.MyAppCompatCheckbox
+            android:id="@+id/manage_visible_tabs_wallet"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="@dimen/activity_margin"
+            android:paddingBottom="@dimen/activity_margin"
+            android:text="@string/wallet_tab" />
+
     </LinearLayout>
 </ScrollView>

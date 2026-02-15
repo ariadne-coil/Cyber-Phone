@@ -48,6 +48,7 @@ import org.fossify.phone.dialogs.ManageVisibleTabsDialog
 import org.fossify.phone.extensions.canLaunchAccountsConfiguration
 import org.fossify.phone.extensions.config
 import org.fossify.phone.helpers.TAB_MESSAGES
+import org.fossify.phone.helpers.TAB_WALLET
 import org.fossify.phone.extensions.launchAccountsConfiguration
 import org.fossify.phone.helpers.RecentsHelper
 import org.fossify.phone.models.RecentCall
@@ -743,6 +744,7 @@ class SettingsActivity : SimpleActivity() {
                 RadioItem(TAB_FAVORITES, getString(R.string.favorites_tab)),
                 RadioItem(TAB_CALL_HISTORY, getString(R.string.call_history_tab)),
                 RadioItem(TAB_MESSAGES, getString(R.string.messages_tab)),
+                RadioItem(TAB_WALLET, getString(R.string.wallet_tab)),
                 RadioItem(TAB_LAST_USED, getString(R.string.last_used_tab))
             )
 
@@ -759,6 +761,7 @@ class SettingsActivity : SimpleActivity() {
             TAB_FAVORITES -> R.string.favorites_tab
             TAB_CALL_HISTORY -> R.string.call_history_tab
             TAB_MESSAGES -> R.string.messages_tab
+            TAB_WALLET -> R.string.wallet_tab
             else -> R.string.last_used_tab
         }
     )

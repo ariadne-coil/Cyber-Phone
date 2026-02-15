@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Cyber Phone Fedimint Engine</title>
+  </head>
+  <body>
+    <!--
+      Headless Fedimint SDK execution environment.
+      This page is loaded into an internal WebView and communicates with Android via a JS bridge.
+    -->
+    <script>
+      const bridge = globalThis.CyberPhoneFedimint;
+      let FedimintWallet = null;
+
+      function reportFatal(error) {
+        const msg = error && error.message ? error.message : String(error);
+        try {
+          if (bridge && typeof bridge.onError === "function") {
+            bridge.onError(msg);
+          }
+        } catch (_) {}
+      }
+
+      globalThis.addEventListener("error", (event) => {
+        reportFatal(event && (event.error || event.message || "Engine error"));
+      });
+
+      globalThis.addEventListener("unhandledrejection", (event) => {
+        reportFatal(event && event.reason ? event.reason : "Unhandled promise rejection");
+      });
+
+      let wallet = null;
+      let currentClientName = null;
+
+      function dynamicImport(path) {
+        try {
+          const importer = new Function("p", "return import(p)");
+          return importer(path);
+        } catch (e) {
+          return Promise.reject(e);
+        }
+      }
+
+      function requireBridge() {
+        if (!bridge || typeof bridge.onResponse !== "function") {
+          throw new Error("CyberPhoneFedimint bridge missing");
+        }
+      }
+
+      function ensureWallet() {
+        if (!FedimintWallet) {
+          throw new Error("Fedimint runtime not initialized");
+        }
+        if (!wallet) {
+          wallet = new FedimintWallet();
+          // Keep logs off by default; Android will surface errors via UI.
+          try {
+            wallet.setLogLevel("none");
+          } catch (_) {}
+        }
+        return wallet;
+      }
+
+      function getWalletClientBridge(w) {
+        // Prefer explicit/public bridges if provided by newer SDK wrappers.
+        if (w && w.client && typeof w.client.sendSingleMessage === "function") {
+          return w.client;
+        }
+        if (w && w._client && typeof w._client.sendSingleMessage === "function") {
+          return w._client;
+        }
+        return null;
+      }
+
+      async function getMnemonicFromRuntime(clientName) {
+        const w = ensureWallet();
+        if (typeof w.getMnemonic === "function") {
+          return await w.getMnemonic(clientName);
+        }
+        const bridgeClient = getWalletClientBridge(w);
+        if (!bridgeClient) {
+          throw new Error("Fedimint runtime missing mnemonic API bridge");
+        }
+        return await bridgeClient.sendSingleMessage("getMnemonic", {
+          clientName: clientName || undefined,
+        });
+      }
+
+      async function setMnemonicInRuntime(clientName, mnemonic) {
+        const w = ensureWallet();
+        if (typeof w.setMnemonic === "function") {
+          return await w.setMnemonic(clientName, mnemonic);
+        }
+        const bridgeClient = getWalletClientBridge(w);
+        if (!bridgeClient) {
+          throw new Error("Fedimint runtime missing mnemonic API bridge");
+        }
+        return await bridgeClient.sendSingleMessage("setMnemonic", {
+          clientName,
+          mnemonic,
+        });
+      }
+
+      async function hasUsableFederation(w) {
+        try {
+          const fid = await w.federation.getFederationId();
+          if (fid == null) return false;
+          if (typeof fid === "string") return fid.trim().length > 0;
+          // Some SDK versions may return structured values.
+          if (typeof fid === "object") {
+            const asString =
+              (fid.federation_id || fid.federationId || fid.id || "").toString();
+            return asString.trim().length > 0;
+          }
+          return false;
+        } catch (_) {
+          return false;
+        }
+      }
+
+      async function openOrJoin(clientName, inviteCode) {
+        const w = ensureWallet();
+        if (w.isOpen() && currentClientName === clientName) {
+          if (await hasUsableFederation(w)) {
+            return true;
+          }
+          // Open but unusable state; reset and rejoin below.
+          await w.cleanup();
+          wallet = null;
+          currentClientName = null;
+        }
+
+        // If a different client is open, reset the worker to avoid cross-client state bleed.
+        if (w.isOpen() && currentClientName && currentClientName !== clientName) {
+          await w.cleanup();
+          wallet = null;
+        }
+
+        const w2 = ensureWallet();
+        currentClientName = clientName;
+
+        let opened = false;
+        try {
+          opened = await w2.open(clientName);
+        } catch (_) {
+          opened = false;
+        }
+
+        if (opened && (await hasUsableFederation(w2))) {
+          return true;
+        }
+
+        // If open succeeded but the client has no usable federation, recreate and force join.
+        if (opened) {
+          await w2.cleanup();
+          wallet = null;
+          currentClientName = null;
+        }
+
+        if (!inviteCode || !inviteCode.trim()) {
+          throw new Error("Invite code required to join federation");
+        }
+
+        const w3 = ensureWallet();
+        currentClientName = clientName;
+        await w3.joinFederation(inviteCode.trim(), clientName);
+        if (!(await hasUsableFederation(w3))) {
+          throw new Error("Joined federation but wallet is not usable yet");
+        }
+        return true;
+      }
+
+      function parseIntegerLike(value) {
+        if (typeof value === "bigint") {
+          return value >= 0n ? value : null;
+        }
+
+        if (typeof value === "number" && Number.isFinite(value)) {
+          const n = BigInt(Math.trunc(value));
+          return n >= 0n ? n : null;
+        }
+
+        if (typeof value === "string") {
+          const m = value.trim().match(/-?\d+/);
+          if (!m) return null;
+          try {
+            const n = BigInt(m[0]);
+            return n >= 0n ? n : null;
+          } catch (_) {
+            return null;
+          }
+        }
+
+        return null;
+      }
+
+      function normalizeBalanceToMsats(value, hint = "") {
+        const lowerHint = String(hint || "").toLowerCase();
+        const hintIsMsat = lowerHint.includes("msat");
+        const hintIsSat = !hintIsMsat && lowerHint.includes("sat");
+
+        if (typeof value === "string") {
+          const parsed = parseIntegerLike(value);
+          if (parsed == null) return null;
+
+          const lowerValue = value.toLowerCase();
+          if (lowerValue.includes("msat")) return parsed;
+          if (!lowerValue.includes("msat") && lowerValue.includes("sat")) {
+            return parsed * 1000n;
+          }
+          if (hintIsSat) return parsed * 1000n;
+          return parsed;
+        }
+
+        const direct = parseIntegerLike(value);
+        if (direct != null) {
+          if (hintIsSat) return direct * 1000n;
+          return direct;
+        }
+
+        if (Array.isArray(value)) {
+          for (const item of value) {
+            const parsed = normalizeBalanceToMsats(item, hint);
+            if (parsed != null) return parsed;
+          }
+          return null;
+        }
+
+        if (value && typeof value === "object") {
+          const preferredKeys = [
+            "msats",
+            "amount_msats",
+            "balance_msats",
+            "total_msats",
+            "amountMsats",
+            "balanceMsats",
+            "totalMsats",
+            "sats",
+            "amount_sats",
+            "balance_sats",
+            "total_sats",
+            "amountSats",
+            "balanceSats",
+            "totalSats",
+            "amount",
+            "balance",
+            "total",
+            "value",
+          ];
+
+          for (const key of preferredKeys) {
+            if (Object.prototype.hasOwnProperty.call(value, key)) {
+              const parsed = normalizeBalanceToMsats(value[key], key);
+              if (parsed != null) return parsed;
+            }
+          }
+
+          for (const [key, nested] of Object.entries(value)) {
+            const parsed = normalizeBalanceToMsats(nested, key);
+            if (parsed != null) return parsed;
+          }
+        }
+
+        return null;
+      }
+
+      async function handle(req) {
+        const { id, method, params } = req;
+        requireBridge();
+
+        const ok = (result) =>
+          bridge.onResponse(id, JSON.stringify({ ok: true, result }));
+        const fail = (error) => {
+          const msg = error && error.message ? error.message : String(error);
+          bridge.onResponse(id, JSON.stringify({ ok: false, error: msg }));
+        };
+
+        try {
+          const p = params || {};
+
+          if (method === "openOrJoin") {
+            const res = await openOrJoin(p.clientName, p.inviteCode);
+            return ok(res);
+          }
+
+          if (method === "isOpen") {
+            const w = ensureWallet();
+            return ok({ open: !!w.isOpen(), clientName: currentClientName });
+          }
+
+          if (method === "getMnemonic") {
+            const clientName = String(p.clientName || currentClientName || "").trim();
+            const res = await getMnemonicFromRuntime(clientName);
+            return ok(res);
+          }
+
+          if (method === "setMnemonic") {
+            const clientName = String(p.clientName || currentClientName || "").trim();
+            const mnemonic = String(p.mnemonic || "").trim();
+            if (!clientName) throw new Error("Client name required for mnemonic restore");
+            if (!mnemonic) throw new Error("Mnemonic required");
+            const res = await setMnemonicInRuntime(clientName, mnemonic);
+            return ok(res);
+          }
+
+          const w = ensureWallet();
+          // Most methods require an open wallet; enforce that consistently.
+          if (!w.isOpen()) {
+            throw new Error("Wallet not open");
+          }
+
+          if (method === "getBalanceMsats") {
+            const bal = await w.balance.getBalance();
+            const normalized = normalizeBalanceToMsats(bal, "balance");
+            if (normalized == null) {
+              throw new Error("Unsupported getBalance response shape");
+            }
+            return ok({ msats: normalized.toString() });
+          }
+
+          if (method === "createInvoice") {
+            const amountMsats = Number(p.amountMsats || 0);
+            const memo = String(p.memo || "Cyber Phone");
+            const expiryTime = p.expiryTime == null ? null : Number(p.expiryTime);
+            const res = await w.lightning.createInvoice(amountMsats, memo, expiryTime, {});
+            return ok(res);
+          }
+
+          if (method === "payInvoice") {
+            const invoice = String(p.invoice || "").trim();
+            if (!invoice) throw new Error("Invoice required");
+            const res = await w.lightning.payInvoice(invoice, {});
+            return ok(res);
+          }
+
+          if (method === "spendNotes") {
+            const amountMsats = Number(p.amountMsats || 0);
+            const tryCancelAfterSecs = Number(p.tryCancelAfterSecs || 86400);
+            // NOTE: We intentionally do not include invite codes in notes by default.
+            const includeInvite = !!p.includeInvite;
+            const extraMeta = p.extraMeta || {};
+            const op = await w.mint.spendNotes(
+              amountMsats,
+              tryCancelAfterSecs,
+              includeInvite,
+              extraMeta
+            );
+
+            // The SDK returns an operation id. We then subscribe until we receive the out-of-band notes.
+            const opId =
+              typeof op === "string"
+                ? op
+                : (op && (op.operation_id || op.operationId || op.id)) || null;
+
+            // If the SDK ever returns notes directly, accept that too.
+            const direct =
+              op &&
+              (op.oob_notes ||
+                op.notes ||
+                op.oobNotes ||
+                op.oobNotesString ||
+                null);
+            if (direct && typeof direct === "string" && direct.trim()) {
+              return ok({ operation_id: opId, notes: direct.trim() });
+            }
+
+            if (!opId) {
+              // Unexpected shape; return whatever we got so Android can surface an error.
+              return ok(op);
+            }
+
+            const res = await new Promise((resolve, reject) => {
+              let done = false;
+              let unsub = null;
+              const timeout = setTimeout(() => {
+                if (done) return;
+                done = true;
+                try {
+                  if (typeof unsub === "function") unsub();
+                } catch (_) {}
+                reject(new Error("Timeout waiting for spend notes"));
+              }, 90_000);
+
+              const finishOk = (notes) => {
+                if (done) return;
+                done = true;
+                clearTimeout(timeout);
+                try {
+                  if (typeof unsub === "function") unsub();
+                } catch (_) {}
+                resolve({ operation_id: opId, notes });
+              };
+
+              const finishErr = (err) => {
+                if (done) return;
+                done = true;
+                clearTimeout(timeout);
+                try {
+                  if (typeof unsub === "function") unsub();
+                } catch (_) {}
+                reject(err);
+              };
+
+              const extractCandidate = (payload) => {
+                if (!payload) return null;
+                if (typeof payload === "string") return payload.trim() || null;
+                if (typeof payload !== "object") return null;
+
+                const keys = [
+                  "oob_notes",
+                  "notes",
+                  "oobNotes",
+                  "oobNotesString",
+                  "oob",
+                ];
+                for (const k of keys) {
+                  const v = payload[k];
+                  if (typeof v === "string" && v.trim()) return v.trim();
+                }
+                return null;
+              };
+
+              const maybeHandle = async (payload) => {
+                try {
+                  let obj = payload;
+                  if (typeof payload === "string") {
+                    const t = payload.trim();
+                    if (t.startsWith("{") || t.startsWith("[")) {
+                      try {
+                        obj = JSON.parse(t);
+                      } catch (_) {}
+                    }
+                  }
+
+                  const cand = extractCandidate(obj);
+                  if (!cand) return;
+
+                  // Validate candidate so we don't confuse operation ids with notes strings.
+                  try {
+                    await w.mint.validateNotes(cand);
+                  } catch (_) {
+                    return;
+                  }
+
+                  finishOk(cand);
+                } catch (e) {
+                  // Ignore parsing issues; keep waiting.
+                }
+              };
+
+              try {
+                unsub = w.mint.subscribeSpendNotes(
+                  opId,
+                  (data) => {
+                    // subscription callbacks are not awaited; run async work in the background.
+                    Promise.resolve().then(() => maybeHandle(data));
+                  },
+                  (err) => finishErr(new Error(err && err.message ? err.message : String(err)))
+                );
+              } catch (e) {
+                finishErr(e);
+              }
+            });
+
+            return ok(res);
+          }
+
+          if (method === "redeemEcash") {
+            const notes = String(p.notes || "").trim();
+            if (!notes) throw new Error("Notes required");
+            const res = await w.mint.redeemEcash(notes);
+            return ok(res);
+          }
+
+          if (method === "tryCancelSpendNotes") {
+            const operationId = String(p.operationId || p.operation_id || "").trim();
+            if (!operationId) throw new Error("Operation id required");
+            await w.mint.tryCancelSpendNotes(operationId);
+            return ok({ cancelled: true });
+          }
+
+          throw new Error("Unknown method: " + method);
+        } catch (e) {
+          return fail(e);
+        }
+      }
+
+      globalThis.__cyber_fedimint = {
+        request(json) {
+          const req = JSON.parse(json);
+          // Fire-and-forget; results are returned via the bridge.
+          handle(req);
+        },
+      };
+
+      async function bootstrap() {
+        const Default = await dynamicImport("./index.js");
+        FedimintWallet = Default && Default.FedimintWallet;
+        if (!FedimintWallet) {
+          throw new Error("FedimintWallet export missing");
+        }
+
+        if (bridge && typeof bridge.onReady === "function") {
+          bridge.onReady();
+        }
+      }
+
+      bootstrap().catch((e) => {
+        reportFatal(e);
+      });
+    </script>
+  </body>
+</html>

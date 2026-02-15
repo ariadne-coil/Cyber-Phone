@@ -156,7 +156,12 @@ class MeshAudioEngine(
             while (isRunning.get()) {
                 val frame = synchronized(incomingLock) { incomingFrames.removeFirstOrNull() }
                 if (frame == null) {
-                    Thread.sleep(5)
+                    try {
+                        Thread.sleep(5)
+                    } catch (_: InterruptedException) {
+                        // stop() interrupts the thread to speed up teardown. Exit cleanly.
+                        break
+                    }
                     continue
                 }
                 val decoded = dec.decode(frame, 0, frame.size, pcm, 0, frameSize, false)

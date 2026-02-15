@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/federation_item_holder"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/ripple_all_corners"
+    android:paddingStart="@dimen/activity_margin"
+    android:paddingTop="@dimen/normal_margin"
+    android:paddingEnd="@dimen/activity_margin"
+    android:paddingBottom="@dimen/normal_margin">
+
+    <org.fossify.commons.views.MyTextView
+        android:id="@+id/federation_item_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="@dimen/normal_text_size"
+        android:textStyle="bold" />
+
+    <org.fossify.commons.views.MyTextView
+        android:id="@+id/federation_item_meta"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/federation_item_name"
+        android:alpha="0.8"
+        android:paddingTop="2dp"
+        android:textSize="@dimen/smaller_text_size" />
+
+</RelativeLayout>
+

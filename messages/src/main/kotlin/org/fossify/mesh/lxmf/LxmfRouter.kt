@@ -44,6 +44,9 @@ object LxmfRouter {
     private const val PROPAGATION_OFFER_INTERVAL_MS = 60_000L
     private const val PROPAGATION_OFFER_JITTER_MS = 15_000L
     private const val PROPAGATION_OFFER_MAX_IDS = 512
+    private const val PROCESSED_TRANSIENT_TTL_MS = 6L * 60L * 60L * 1000L
+    private const val PROCESSED_TRANSIENT_LIMIT = 8192
+    private const val PROCESSED_TRANSIENT_TRIM_INTERVAL_MS = 60_000L
 
     private const val ERROR_NO_IDENTITY = 0xF0
     private const val ERROR_NO_ACCESS = 0xF1
@@ -83,6 +86,8 @@ object LxmfRouter {
     private val announceListener: (org.fossify.mesh.rns.RnsAnnounce, org.fossify.mesh.rns.RnsPacket) -> Unit = { announce, _ ->
         handleAnnounce(announce)
     }
+    @Volatile
+    private var lastProcessedTransientsTrimAt = 0L
 
     private data class PropagationPeer(
         val destinationHash: ByteArray,
@@ -500,8 +505,10 @@ object LxmfRouter {
 
     private fun handleValidatedPropagation(entry: LxmfStamper.StampedMessage) {
         val transientKey = RnsHex.encode(entry.transientId)
+        trimProcessedTransients()
         if (processedTransients.containsKey(transientKey)) return
         processedTransients[transientKey] = System.currentTimeMillis()
+        trimProcessedTransients()
 
         if (entry.lxmfData.size < DESTINATION_HASH_LEN) return
         val destinationHash = entry.lxmfData.copyOfRange(0, DESTINATION_HASH_LEN)
@@ -791,7 +798,11 @@ object LxmfRouter {
 
         if (!RnsNode.identifyLink(propagation, peer.destination, local)) {
             thread {
-                Thread.sleep(1500)
+                try {
+                    Thread.sleep(1500)
+                } catch (_: InterruptedException) {
+                    return@thread
+                }
                 offerToPeer(peer)
             }
             return
@@ -880,7 +891,11 @@ object LxmfRouter {
 
         if (!RnsNode.identifyLink(owner, peer.destination, identity)) {
             thread {
-                Thread.sleep(1500)
+                try {
+                    Thread.sleep(1500)
+                } catch (_: InterruptedException) {
+                    return@thread
+                }
                 requestMessagesFromPropagationNode(maxMessages)
             }
             return
@@ -899,7 +914,11 @@ object LxmfRouter {
 
         if (receipt == null) {
             thread {
-                Thread.sleep(1500)
+                try {
+                    Thread.sleep(1500)
+                } catch (_: InterruptedException) {
+                    return@thread
+                }
                 requestMessagesFromPropagationNode(maxMessages)
             }
         }
@@ -910,6 +929,7 @@ object LxmfRouter {
         maxMessages: Int,
         peer: PropagationPeer
     ) {
+        trimProcessedTransients()
         val response = receipt.response
         val errorCode = (response as? Number)?.toInt()
         if (errorCode == ERROR_NO_IDENTITY || errorCode == ERROR_NO_ACCESS) return
@@ -1014,6 +1034,32 @@ object LxmfRouter {
                 } catch (_: Exception) {
                     // keep for later
                 }
+            }
+        }
+    }
+
+    private fun trimProcessedTransients(now: Long = System.currentTimeMillis()) {
+        // Fast-path: don't do O(n) work on every packet/message, but never allow unbounded growth.
+        val overLimit = processedTransients.size > PROCESSED_TRANSIENT_LIMIT
+        if (!overLimit && now - lastProcessedTransientsTrimAt < PROCESSED_TRANSIENT_TRIM_INTERVAL_MS) return
+        lastProcessedTransientsTrimAt = now
+
+        // TTL-based trim first.
+        val minKeep = now - PROCESSED_TRANSIENT_TTL_MS
+        val iterator = processedTransients.entries.iterator()
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            if (entry.value < minKeep) {
+                iterator.remove()
+            }
+        }
+
+        // Hard bound: if we still have too many, evict arbitrary entries.
+        if (processedTransients.size > PROCESSED_TRANSIENT_LIMIT) {
+            val keyIterator = processedTransients.keys.iterator()
+            while (processedTransients.size > PROCESSED_TRANSIENT_LIMIT && keyIterator.hasNext()) {
+                keyIterator.next()
+                keyIterator.remove()
             }
         }
     }

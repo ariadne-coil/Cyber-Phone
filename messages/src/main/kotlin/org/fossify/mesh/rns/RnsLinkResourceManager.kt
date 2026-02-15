@@ -18,6 +18,18 @@ class RnsLinkResourceManager(
         private const val ADV_OVERHEAD = 134
         private const val REQUEST_WINDOW = 32
         private const val MAX_EFFICIENT_SIZE = (1024 * 1024) - 1
+        private const val STATE_TRIM_INTERVAL_MS = 30_000L
+        private const val OUTGOING_TTL_MS = 10 * 60_000L
+        private const val INCOMING_TTL_MS = 10 * 60_000L
+        private const val SEGMENT_QUEUE_TTL_MS = 10 * 60_000L
+        private const val SEGMENT_ASSEMBLY_TTL_MS = 10 * 60_000L
+
+        // Hard bounds: large/segmented resources can hold many MB in memory. Keep the node from OOMing
+        // if proofs never arrive or peers advertise lots of junk.
+        private const val OUTGOING_LIMIT = 32
+        private const val INCOMING_LIMIT = 32
+        private const val SEGMENT_QUEUE_LIMIT = 8
+        private const val INCOMING_SEGMENT_LIMIT = 8
 
         private fun hashmapMaxLen(link: RnsLink): Int {
             val max = floor((link.mdu - ADV_OVERHEAD).toDouble() / MAP_HASH_LEN.toDouble()).toInt()
@@ -31,6 +43,7 @@ class RnsLinkResourceManager(
     }
 
     private data class OutgoingResource(
+        val createdAt: Long = System.currentTimeMillis(),
         val link: RnsLink,
         val linkId: String,
         val hash: ByteArray,
@@ -53,6 +66,7 @@ class RnsLinkResourceManager(
     )
 
     private data class IncomingResource(
+        val createdAt: Long = System.currentTimeMillis(),
         val link: RnsLink,
         val hash: ByteArray,
         val randomHash: ByteArray,
@@ -82,6 +96,8 @@ class RnsLinkResourceManager(
     private val incoming = ConcurrentHashMap<String, IncomingResource>()
     private val segmentQueues = ConcurrentHashMap<String, SegmentQueue>()
     private val incomingSegments = ConcurrentHashMap<String, SegmentAssembly>()
+    @Volatile
+    private var lastTrimAt = 0L
 
     data class ResourceMeta(
         val requestId: ByteArray?,
@@ -98,6 +114,7 @@ class RnsLinkResourceManager(
         isRequest: Boolean = false,
         send: (Int, Int, ByteArray) -> Unit
     ): Boolean {
+        maybeTrim()
         if (resourceData.size > MAX_EFFICIENT_SIZE) {
             return advertiseSegmented(resourceData, link, requestId, isResponse, isRequest, send)
         }
@@ -113,12 +130,14 @@ class RnsLinkResourceManager(
             isResponse = isResponse
         ) ?: return false
         outgoing[RnsHex.encode(outgoingResource.hash)] = outgoingResource
+        maybeTrim()
         val advPayload = buildAdvertisementPayload(outgoingResource, link, segment = 0)
         send(RnsPacket.DATA, RnsPacket.RESOURCE_ADV, advPayload)
         return true
     }
 
     fun handleAdvertisement(payload: ByteArray, link: RnsLink, send: (Int, Int, ByteArray) -> Unit) {
+        maybeTrim()
         val adv = parseAdvertisement(payload) ?: return
         val key = RnsHex.encode(adv.hash)
         if (incoming.containsKey(key)) return
@@ -142,11 +161,13 @@ class RnsLinkResourceManager(
             hashmapMaxLen = hashmapMaxLen(link)
         )
         incoming[key] = incomingResource
+        maybeTrim()
         applyHashmapSegment(incomingResource, 0, adv.hashmapSegment)
         requestMissingParts(incomingResource, link, send)
     }
 
     fun handleRequest(payload: ByteArray, link: RnsLink, send: (Int, Int, ByteArray) -> Unit) {
+        maybeTrim()
         val request = parseRequest(payload) ?: return
         val key = RnsHex.encode(request.hash)
         val resource = outgoing[key] ?: return
@@ -171,6 +192,7 @@ class RnsLinkResourceManager(
     }
 
     fun handlePart(payload: ByteArray, link: RnsLink, send: (Int, Int, ByteArray) -> Unit) {
+        maybeTrim()
         val part = payload
         val hash = findIncomingByPart(part) ?: return
         val resource = incoming[hash] ?: return
@@ -186,6 +208,7 @@ class RnsLinkResourceManager(
             val assembled = assemble(resource, link) ?: return
             sendProof(resource.hash, assembled.proof, link, send)
             incoming.remove(hash)
+            maybeTrim()
             handleCompletedResource(resource, assembled.data, link)
             return
         }
@@ -193,6 +216,7 @@ class RnsLinkResourceManager(
     }
 
     fun handleHmu(payload: ByteArray, link: RnsLink, send: (Int, Int, ByteArray) -> Unit) {
+        maybeTrim()
         if (payload.size < HASH_LEN) return
         val hash = payload.copyOfRange(0, HASH_LEN)
         val key = RnsHex.encode(hash)
@@ -216,6 +240,7 @@ class RnsLinkResourceManager(
     }
 
     fun handleProof(payload: ByteArray, link: RnsLink, send: (Int, Int, ByteArray) -> Unit) {
+        maybeTrim()
         if (payload.size < HASH_LEN * 2) return
         val hash = payload.copyOfRange(0, HASH_LEN)
         val proof = payload.copyOfRange(HASH_LEN, HASH_LEN * 2)
@@ -223,6 +248,7 @@ class RnsLinkResourceManager(
         val resource = outgoing[key] ?: return
         if (proof.contentEquals(resource.expectedProof)) {
             outgoing.remove(key)
+            maybeTrim()
             if (resource.totalSegments > 1 && resource.segmentIndex < resource.totalSegments) {
                 val queue = segmentQueues[RnsHex.encode(resource.originalHash)] ?: return
                 if (queue.nextIndex <= queue.segments.size) {
@@ -239,6 +265,7 @@ class RnsLinkResourceManager(
                         isResponse = queue.isResponse
                     ) ?: return
                     outgoing[RnsHex.encode(next.hash)] = next
+                    maybeTrim()
                     val advPayload = buildAdvertisementPayload(next, resource.link, segment = 0)
                     queue.nextIndex += 1
                     send(RnsPacket.DATA, RnsPacket.RESOURCE_ADV, advPayload)
@@ -286,6 +313,7 @@ class RnsLinkResourceManager(
         val requestId: ByteArray?,
         val isRequest: Boolean,
         val isResponse: Boolean,
+        val createdAt: Long = System.currentTimeMillis(),
         var nextIndex: Int
     )
 
@@ -298,6 +326,75 @@ class RnsLinkResourceManager(
         val segments: Array<ByteArray?> = arrayOfNulls(totalSegments),
         var receivedCount: Int = 0
     )
+
+    private fun maybeTrim(now: Long = System.currentTimeMillis()) {
+        val overLimit = outgoing.size > OUTGOING_LIMIT ||
+            incoming.size > INCOMING_LIMIT ||
+            segmentQueues.size > SEGMENT_QUEUE_LIMIT ||
+            incomingSegments.size > INCOMING_SEGMENT_LIMIT
+        if (!overLimit && now - lastTrimAt < STATE_TRIM_INTERVAL_MS) return
+        lastTrimAt = now
+
+        // TTL-based eviction.
+        run {
+            val iterator = outgoing.entries.iterator()
+            while (iterator.hasNext()) {
+                val entry = iterator.next()
+                if (now - entry.value.createdAt > OUTGOING_TTL_MS) {
+                    iterator.remove()
+                }
+            }
+        }
+        run {
+            val iterator = incoming.entries.iterator()
+            while (iterator.hasNext()) {
+                val entry = iterator.next()
+                if (now - entry.value.createdAt > INCOMING_TTL_MS) {
+                    iterator.remove()
+                }
+            }
+        }
+        run {
+            val iterator = segmentQueues.entries.iterator()
+            while (iterator.hasNext()) {
+                val entry = iterator.next()
+                if (now - entry.value.createdAt > SEGMENT_QUEUE_TTL_MS) {
+                    iterator.remove()
+                }
+            }
+        }
+        run {
+            val iterator = incomingSegments.entries.iterator()
+            while (iterator.hasNext()) {
+                val entry = iterator.next()
+                if (now - entry.value.createdAt > SEGMENT_ASSEMBLY_TTL_MS) {
+                    iterator.remove()
+                }
+            }
+        }
+
+        // Hard bounds: drop oldest entries if still over limit.
+        if (outgoing.size > OUTGOING_LIMIT) {
+            outgoing.entries.sortedBy { it.value.createdAt }
+                .take(outgoing.size - OUTGOING_LIMIT)
+                .forEach { outgoing.remove(it.key) }
+        }
+        if (incoming.size > INCOMING_LIMIT) {
+            incoming.entries.sortedBy { it.value.createdAt }
+                .take(incoming.size - INCOMING_LIMIT)
+                .forEach { incoming.remove(it.key) }
+        }
+        if (segmentQueues.size > SEGMENT_QUEUE_LIMIT) {
+            segmentQueues.entries.sortedBy { it.value.createdAt }
+                .take(segmentQueues.size - SEGMENT_QUEUE_LIMIT)
+                .forEach { segmentQueues.remove(it.key) }
+        }
+        if (incomingSegments.size > INCOMING_SEGMENT_LIMIT) {
+            incomingSegments.entries.sortedBy { it.value.createdAt }
+                .take(incomingSegments.size - INCOMING_SEGMENT_LIMIT)
+                .forEach { incomingSegments.remove(it.key) }
+        }
+    }
 
     private fun addRandomPrefix(data: ByteArray): RandomizedData {
         val prefixRandom = ByteArray(RANDOM_HASH_SIZE).also { rng.nextBytes(it) }

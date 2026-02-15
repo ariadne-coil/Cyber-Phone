@@ -1,6 +1,8 @@
 package org.fossify.messages.helpers
 
 import android.content.Context
+import android.content.ContentValues
+import android.content.Intent
 import android.provider.ContactsContract
 import android.util.Base64
 import org.fossify.commons.extensions.hasPermission
@@ -279,6 +281,46 @@ object E2eManager {
         val storedCustom = upsertContactKeyCustomData(resolver, rawId, publicKey)
         val storedIm = upsertContactKeyImData(resolver, rawId, publicKey)
         return storedCustom || storedIm
+    }
+
+    fun storeContactPublicKeyForRawContact(
+        context: Context,
+        rawContactId: Long,
+        publicKey: String,
+    ): Boolean {
+        if (!context.hasPermission(PERMISSION_WRITE_CONTACTS)) {
+            return false
+        }
+        val resolver = context.contentResolver
+        val storedCustom = upsertContactKeyCustomData(resolver, rawContactId, publicKey)
+        val storedIm = upsertContactKeyImData(resolver, rawContactId, publicKey)
+        return storedCustom || storedIm
+    }
+
+    fun addE2ePublicKeyInsertExtras(intent: Intent, publicKey: String) {
+        val data = intent.getParcelableArrayListExtra<ContentValues>(ContactsContract.Intents.Insert.DATA)
+            ?: arrayListOf()
+
+        // Store both a custom MIME row (for reliability) and an IM row (for editability/visibility).
+        data.add(
+            ContentValues().apply {
+                put(ContactsContract.Data.MIMETYPE, CONTACT_KEY_MIME)
+                put(ContactsContract.Data.DATA1, publicKey.trim())
+            }
+        )
+        data.add(
+            ContentValues().apply {
+                put(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.Im.CONTENT_ITEM_TYPE)
+                put(ContactsContract.CommonDataKinds.Im.DATA, publicKey.trim())
+                put(ContactsContract.CommonDataKinds.Im.TYPE, ContactsContract.CommonDataKinds.Im.TYPE_CUSTOM)
+                put(ContactsContract.CommonDataKinds.Im.LABEL, CONTACT_KEY_LABEL)
+                put(ContactsContract.CommonDataKinds.Im.PROTOCOL, ContactsContract.CommonDataKinds.Im.PROTOCOL_CUSTOM)
+                // We use the label as protocol to keep matching logic consistent across editors.
+                put(ContactsContract.CommonDataKinds.Im.CUSTOM_PROTOCOL, CONTACT_KEY_LABEL)
+            }
+        )
+
+        intent.putParcelableArrayListExtra(ContactsContract.Intents.Insert.DATA, data)
     }
 
     fun removeContactPublicKey(

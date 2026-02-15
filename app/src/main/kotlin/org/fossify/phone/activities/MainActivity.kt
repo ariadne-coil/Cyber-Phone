@@ -47,6 +47,7 @@ import org.fossify.phone.fragments.RecentsFragment
 import org.fossify.phone.helpers.OPEN_DIAL_PAD_AT_LAUNCH
 import org.fossify.phone.helpers.RecentsHelper
 import org.fossify.phone.helpers.TAB_MESSAGES
+import org.fossify.phone.helpers.TAB_WALLET
 import org.fossify.phone.helpers.tabsList
 import org.fossify.phone.models.Events
 import org.fossify.mesh.MeshManager
@@ -182,6 +183,18 @@ class MainActivity : SimpleActivity() {
         super.onActivityResult(requestCode, resultCode, resultData)
         if (requestCode == MessagesFragment.REQUEST_CODE_SET_DEFAULT_SMS) {
             getMessagesFragment()?.handleActivityResult(requestCode, resultCode)
+            return
+        }
+        if (requestCode == org.fossify.phone.fragments.WalletFragment.REQUEST_CODE_PICK_WALLET_CONTACT) {
+            getWalletFragment()?.handleWalletContactPickerResult(resultCode, resultData)
+            return
+        }
+        if (requestCode == org.fossify.phone.fragments.WalletFragment.REQUEST_CODE_CREATE_WALLET_BACKUP) {
+            getWalletFragment()?.handleWalletBackupCreateResult(resultCode, resultData)
+            return
+        }
+        if (requestCode == org.fossify.phone.fragments.WalletFragment.REQUEST_CODE_OPEN_WALLET_BACKUP) {
+            getWalletFragment()?.handleWalletBackupRestoreResult(resultCode, resultData)
             return
         }
         // we don't really care about the result, the app can work without being the default Dialer too
@@ -417,14 +430,16 @@ class MainActivity : SimpleActivity() {
     private fun setupTabs() {
         binding.viewPager.adapter = null
         binding.mainTabsHolder.removeAllTabs()
-        tabsList.forEachIndexed { index, value ->
+        var visibleIndex = 0
+        tabsList.forEach { value ->
             if (config.showTabs and value != 0) {
                 binding.mainTabsHolder.newTab().setCustomView(R.layout.bottom_tablayout_item).apply {
-                    customView?.findViewById<ImageView>(R.id.tab_item_icon)?.setImageDrawable(getTabIcon(index))
-                    customView?.findViewById<TextView>(R.id.tab_item_label)?.text = getTabLabel(index)
+                    customView?.findViewById<ImageView>(R.id.tab_item_icon)?.setImageDrawable(getTabIcon(visibleIndex))
+                    customView?.findViewById<TextView>(R.id.tab_item_label)?.text = getTabLabel(visibleIndex)
                     AutofitHelper.create(customView?.findViewById(R.id.tab_item_label))
                     binding.mainTabsHolder.addTab(this)
                 }
+                visibleIndex++
             }
         }
 
@@ -479,6 +494,7 @@ class MainActivity : SimpleActivity() {
             TAB_FAVORITES -> R.string.favorites_tab
             TAB_CALL_HISTORY -> R.string.call_history_tab
             TAB_MESSAGES -> R.string.messages_tab
+            TAB_WALLET -> R.string.wallet_tab
             else -> R.string.contacts_tab
         }
         return resources.getString(stringId)
@@ -514,6 +530,7 @@ class MainActivity : SimpleActivity() {
         getFavoritesFragment()?.refreshItems()
         getRecentsFragment()?.refreshItems()
         getMessagesFragment()?.refreshItems()
+        getWalletFragment()?.refreshItems()
     }
 
     private fun getAllFragments(): ArrayList<MyViewPagerFragment<*>?> {
@@ -536,6 +553,10 @@ class MainActivity : SimpleActivity() {
             fragments.add(getMessagesFragment())
         }
 
+        if (showTabs and TAB_WALLET > 0) {
+            fragments.add(getWalletFragment())
+        }
+
         return fragments
     }
 
@@ -548,6 +569,8 @@ class MainActivity : SimpleActivity() {
     private fun getRecentsFragment(): RecentsFragment? = findViewById(R.id.recents_fragment)
 
     private fun getMessagesFragment(): MessagesFragment? = findViewById(R.id.messages_fragment)
+
+    private fun getWalletFragment(): org.fossify.phone.fragments.WalletFragment? = findViewById(R.id.wallet_fragment)
 
     private fun getVisibleTabs(): List<Int> = tabsList.filter { it and config.showTabs != 0 }
 
@@ -577,6 +600,7 @@ class MainActivity : SimpleActivity() {
             TAB_FAVORITES -> if (selected) R.drawable.ic_star_vector else R.drawable.ic_star_outline_vector
             TAB_CALL_HISTORY -> if (selected) R.drawable.ic_clock_filled_vector else R.drawable.ic_clock_vector
             TAB_MESSAGES -> R.drawable.ic_sms_vector
+            TAB_WALLET -> if (selected) R.drawable.ic_wallet_vector else R.drawable.ic_wallet_outline_vector
             else -> R.drawable.ic_person_vector
         }
     }

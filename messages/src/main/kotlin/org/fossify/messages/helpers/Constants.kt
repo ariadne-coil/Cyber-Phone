@@ -81,6 +81,11 @@ const val E2E_KEY_MESSAGE_PREFIX = "E2EKEY1:"
 const val E2E_ENCRYPTED_MESSAGE_PREFIX = "E2E1:"
 const val MESH_ADDRESS_MESSAGE_PREFIX = "MESHADDR1:"
 const val MESH_ADDRESS_REPLY_THREADS = "mesh_address_reply_threads"
+const val EXTRA_WALLET_DESTINATION = "org.fossify.phone.extra.WALLET_DESTINATION"
+// Optional hint for the wallet UI: whether the payment request arrived via an encrypted channel
+// (mesh or E2E). Used for applying high-value safety policy.
+const val EXTRA_WALLET_SECURE_CHANNEL = "org.fossify.phone.extra.WALLET_SECURE_CHANNEL"
+const val EXTRA_WALLET_TOKEN_TEXT = "org.fossify.phone.extra.WALLET_TOKEN_TEXT"
 
 private const val PATH = "org.fossify.org.fossify.messages.action."
 const val MARK_AS_READ = PATH + "mark_as_read"
@@ -131,6 +136,7 @@ const val CAPTURE_AUDIO_INTENT = 46
 const val PICK_DOCUMENT_INTENT = 47
 const val PICK_CONTACT_INTENT = 48
 const val PICK_SAVE_DIR_INTENT = 50
+const val WALLET_SEND_TOKEN_INTENT = 51
 
 const val BLOCKED_KEYWORDS_EXPORT_DELIMITER = ","
 const val BLOCKED_KEYWORDS_EXPORT_EXTENSION = ".txt"

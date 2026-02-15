@@ -55,76 +55,81 @@ object YacbSiaManager {
             if (initialized) {
                 return
             }
+            try {
+                val appContext = context.applicationContext
+                this.appContext = appContext
+                val storage = AndroidStorage(appContext)
+                val properties = AndroidProperties(appContext, SIA_PROPERTIES)
+                val settings = SettingsImpl(properties)
 
-            val appContext = context.applicationContext
-            this.appContext = appContext
-            val storage = AndroidStorage(appContext)
-            val properties = AndroidProperties(appContext, SIA_PROPERTIES)
-            val settings = SettingsImpl(properties)
+                val okHttpClientFactory = OkHttpClientFactory { OkHttpClient() }
 
-            val okHttpClientFactory = OkHttpClientFactory { OkHttpClient() }
+                communityDatabase = CommunityDatabase(
+                    storage,
+                    AbstractDatabase.Source.ANY,
+                    SIA_PATH_PREFIX,
+                    SIA_SECONDARY_PATH_PREFIX,
+                    settings
+                )
+                featuredDatabase = FeaturedDatabase(
+                    storage,
+                    AbstractDatabase.Source.ANY,
+                    SIA_PATH_PREFIX
+                )
+                siaMetadata = SiaMetadata(storage, SIA_PATH_PREFIX, communityDatabase::isUsingInternal)
 
-            communityDatabase = CommunityDatabase(
-                storage,
-                AbstractDatabase.Source.ANY,
-                SIA_PATH_PREFIX,
-                SIA_SECONDARY_PATH_PREFIX,
-                settings
-            )
-            featuredDatabase = FeaturedDatabase(
-                storage,
-                AbstractDatabase.Source.ANY,
-                SIA_PATH_PREFIX
-            )
-            siaMetadata = SiaMetadata(storage, SIA_PATH_PREFIX, communityDatabase::isUsingInternal)
+                val wsParameterProvider = object : WebService.DefaultWSParameterProvider() {
+                    private var appId: String? = null
+                    private var appIdTimestamp = 0L
 
-            val wsParameterProvider = object : WebService.DefaultWSParameterProvider() {
-                private var appId: String? = null
-                private var appIdTimestamp = 0L
+                    override fun getAppId(): String {
+                        val now = System.nanoTime()
+                        val cached = appId
+                        if (cached != null && now < appIdTimestamp + TimeUnit.MINUTES.toNanos(5)) {
+                            return cached
+                        }
 
-                override fun getAppId(): String {
-                    val now = System.nanoTime()
-                    val cached = appId
-                    if (cached != null && now < appIdTimestamp + TimeUnit.MINUTES.toNanos(5)) {
-                        return cached
+                        val newId = Utils.generateAppId()
+                        appId = newId
+                        appIdTimestamp = now
+                        return newId
                     }
 
-                    val newId = Utils.generateAppId()
-                    appId = newId
-                    appIdTimestamp = now
-                    return newId
+                    override fun getAppVersion(): Int {
+                        return siaMetadata.getSiaAppVersion()
+                    }
+
+                    override fun getOkHttpVersion(): String {
+                        return siaMetadata.getSiaOkHttpVersion()
+                    }
+
+                    override fun getDbVersion(): Int {
+                        return communityDatabase.getEffectiveDbVersion()
+                    }
+
+                    override fun getCountry(): SiaMetadata.Country {
+                        return siaMetadata.getCountry("")
+                    }
                 }
 
-                override fun getAppVersion(): Int {
-                    return siaMetadata.getSiaAppVersion()
-                }
+                val webService = WebService(wsParameterProvider, okHttpClientFactory)
+                this.webService = webService
+                dbManager = DbManager(
+                    storage,
+                    SIA_PATH_PREFIX,
+                    DbDownloader(okHttpClientFactory),
+                    DbUpdateRequester(webService),
+                    communityDatabase
+                )
 
-                override fun getOkHttpVersion(): String {
-                    return siaMetadata.getSiaOkHttpVersion()
-                }
-
-                override fun getDbVersion(): Int {
-                    return communityDatabase.getEffectiveDbVersion()
-                }
-
-                override fun getCountry(): SiaMetadata.Country {
-                    return siaMetadata.getCountry("")
-                }
+                initialized = true
+                ensureCommunityDbAsync(appContext)
+                updateAutoUpdate(appContext)
+            } catch (t: Throwable) {
+                initialized = false
+                webService = null
+                Log.e("YacbSiaManager", "Initialization failed, disabling YACB runtime", t)
             }
-
-            val webService = WebService(wsParameterProvider, okHttpClientFactory)
-            this.webService = webService
-            dbManager = DbManager(
-                storage,
-                SIA_PATH_PREFIX,
-                DbDownloader(okHttpClientFactory),
-                DbUpdateRequester(webService),
-                communityDatabase
-            )
-
-            initialized = true
-            ensureCommunityDbAsync(appContext)
-            updateAutoUpdate(appContext)
         }
     }
 
@@ -152,6 +157,10 @@ object YacbSiaManager {
     fun ensureCommunityDbAsync(context: Context, onFinished: ((Boolean) -> Unit)? = null) {
         if (!initialized) {
             init(context)
+        }
+        if (!initialized || !::communityDatabase.isInitialized || !::dbManager.isInitialized) {
+            onFinished?.invoke(false)
+            return
         }
         ensureBackgroundThread {
             val wasReady = isCommunityDbReady()
@@ -264,7 +273,7 @@ object YacbSiaManager {
             communityDatabase.reload()
             featuredDatabase.reload()
             siaMetadata.reload()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w("YacbSiaManager", "Secondary DB update failed", e)
         }
     }
@@ -284,7 +293,7 @@ object YacbSiaManager {
                     appContext.messagesConfig.yacbLastRefresh = System.currentTimeMillis()
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w("YacbSiaManager", "Main DB download failed", e)
         }
     }

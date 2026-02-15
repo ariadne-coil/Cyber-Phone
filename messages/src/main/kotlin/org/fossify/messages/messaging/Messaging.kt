@@ -13,6 +13,7 @@ import org.fossify.messages.extensions.config
 import org.fossify.messages.extensions.getThreadId
 import org.fossify.messages.extensions.messagingUtils
 import org.fossify.messages.extensions.shortcutHelper
+import org.fossify.messages.helpers.WalletTokenParser
 import org.fossify.messages.helpers.E2eManager
 import org.fossify.messages.messaging.SmsException.Companion.EMPTY_DESTINATION_ADDRESS
 import org.fossify.messages.messaging.SmsException.Companion.ERROR_PERSISTING_MESSAGE
@@ -48,6 +49,9 @@ fun Context.sendMessageCompat(
     messageId: Long? = null
 ) {
     val maxLinkSmsParts = 6
+    // Fedimint ecash tokens can be long and are frequently blocked/broken when converted to
+    // "text-only MMS". Prefer segmented SMS for a bounded size to keep delivery reliable.
+    val maxWalletTokenSmsParts = 12
     val cleanAddresses = addresses.filterNot { LxmfAddress.isMeshLike(it) }
     if (cleanAddresses.isEmpty()) {
         toast(id = R.string.mesh_disabled, length = LENGTH_LONG)
@@ -71,7 +75,14 @@ fun Context.sendMessageCompat(
         smsParts <= maxLinkSmsParts &&
         Patterns.WEB_URL.matcher(outgoingText).find()
 
-    val isMms = !forceSmsForLink && (
+    // If the thread is E2E-encrypted, outgoingText will not contain CPFM1 plaintext anymore.
+    // Detect tokens in the original text, but apply the size check on the actual outgoing payload.
+    val forceSmsForWalletToken = attachments.isEmpty() &&
+        cleanAddresses.size == 1 &&
+        smsParts <= maxWalletTokenSmsParts &&
+        WalletTokenParser.parseFedimintEcashToken(text) != null
+
+    val isMms = !forceSmsForLink && !forceSmsForWalletToken && (
         attachments.isNotEmpty() ||
             isLongMmsMessage(outgoingText, settings) ||
             cleanAddresses.size > 1 && settings.group

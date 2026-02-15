@@ -70,15 +70,21 @@ import org.fossify.messages.extensions.launchViewIntent
 import org.fossify.messages.extensions.startContactDetailsIntent
 import org.fossify.messages.extensions.subscriptionManagerCompat
 import org.fossify.messages.helpers.EXTRA_VCARD_URI
+import org.fossify.messages.helpers.EXTRA_WALLET_DESTINATION
+import org.fossify.messages.helpers.EXTRA_WALLET_SECURE_CHANNEL
+import org.fossify.messages.helpers.EXTRA_WALLET_TOKEN_TEXT
 import org.fossify.messages.helpers.THREAD_DATE_TIME
 import org.fossify.messages.helpers.THREAD_RECEIVED_MESSAGE
 import org.fossify.messages.helpers.THREAD_SENT_MESSAGE
 import org.fossify.messages.helpers.THREAD_SENT_MESSAGE_ERROR
 import org.fossify.messages.helpers.THREAD_SENT_MESSAGE_SENDING
 import org.fossify.messages.helpers.THREAD_SENT_MESSAGE_SENT
+import org.fossify.messages.helpers.E2eManager
 import org.fossify.messages.helpers.generateStableId
 import org.fossify.messages.helpers.setupDocumentPreview
 import org.fossify.messages.helpers.setupVCardPreview
+import org.fossify.messages.helpers.WalletTokenParser
+import org.fossify.mesh.lxmf.LxmfAddress
 import org.fossify.messages.models.Attachment
 import org.fossify.messages.models.Message
 import org.fossify.messages.models.ThreadItem
@@ -422,6 +428,46 @@ class ThreadAdapter(
             val reactionText = reactionsByMessageId[message.id].orEmpty()
             threadMessageReaction.text = reactionText
             threadMessageReaction.beVisibleIf(reactionText.isNotBlank())
+
+            // Wallet actions (Pay / Redeem): only show on received messages, so we don't clutter outgoing bubbles.
+            val walletAction = if (selectedKeys.isEmpty() && message.isReceivedMessage()) {
+                WalletTokenParser.findActionToken(message.body)
+            } else {
+                null
+            }
+            threadMessagePay.beVisibleIf(walletAction != null)
+            threadMessagePay.text = when (walletAction?.action) {
+                WalletTokenParser.WalletAction.REDEEM -> activity.getString(R.string.wallet_redeem)
+                WalletTokenParser.WalletAction.PAY -> activity.getString(R.string.wallet_pay)
+                null -> activity.getString(R.string.wallet_pay)
+            }
+            threadMessagePay.updateLayoutParams<RelativeLayout.LayoutParams> {
+                removeRule(RelativeLayout.BELOW)
+                addRule(RelativeLayout.BELOW, threadMessageReaction.id)
+                topMargin = resources.getDimensionPixelSize(R.dimen.tiny_margin)
+            }
+            threadMessagePay.setOnClickListener {
+                val secure = LxmfAddress.isMeshThreadId(message.threadId) ||
+                    (E2eManager.hasSharedSecret(activity, message.threadId) &&
+                        E2eManager.isThreadEncrypted(activity, message.threadId))
+                val act = walletAction ?: return@setOnClickListener
+                val intent = when (act.action) {
+                    WalletTokenParser.WalletAction.REDEEM -> Intent().apply {
+                        setClassName(activity, "org.fossify.phone.activities.WalletRedeemTokenActivity")
+                        putExtra(EXTRA_WALLET_TOKEN_TEXT, act.token)
+                    }
+                    WalletTokenParser.WalletAction.PAY -> Intent().apply {
+                        setClassName(activity, "org.fossify.phone.activities.WalletPayActivity")
+                        putExtra(EXTRA_WALLET_DESTINATION, act.token)
+                        putExtra(EXTRA_WALLET_SECURE_CHANNEL, secure)
+                    }
+                }
+                runCatching {
+                    activity.startActivity(intent)
+                }.onFailure { t ->
+                    activity.showErrorToast(t.message ?: t.toString())
+                }
+            }
         }
     }
 
@@ -550,7 +596,11 @@ class ThreadAdapter(
                     target: Target<Drawable>?,
                     isFirstResource: Boolean
                 ): Boolean {
-                    threadMessagePlayOutline.beGone()
+                    // Avoid mutating RecyclerView/Glide-bound UI directly inside Glide callbacks.
+                    // Glide forbids starting/clearing loads from these callbacks and may throw.
+                    imageView.attachmentImage.post {
+                        threadMessagePlayOutline.beGone()
+                    }
                     return false
                 }
 

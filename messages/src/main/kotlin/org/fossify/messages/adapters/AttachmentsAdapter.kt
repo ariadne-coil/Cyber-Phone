@@ -184,15 +184,23 @@ class AttachmentsAdapter(
             .apply(options)
             .listener(object : RequestListener<Drawable> {
                 override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>, isFirstResource: Boolean): Boolean {
-                    removeAttachment(attachment)
-                    activity.toast(org.fossify.commons.R.string.unknown_error_occurred)
+                    // Important: do not mutate adapter state inside Glide callbacks.
+                    // Glide explicitly forbids starting/clearing loads (and RecyclerView recycling can
+                    // clear loads) from RequestListener callbacks and will crash the app otherwise.
+                    binding.thumbnail.post {
+                        removeAttachment(attachment)
+                        activity.toast(org.fossify.commons.R.string.unknown_error_occurred)
+                    }
                     return false
                 }
 
                 override fun onResourceReady(dr: Drawable, a: Any, t: Target<Drawable>, d: DataSource, i: Boolean): Boolean {
-                    binding.thumbnail.beVisible()
-                    binding.playIcon.beVisibleIf(attachment.mimetype.isVideoMimeType())
-                    binding.compressionProgress.beGone()
+                    // Keep UI mutations off the immediate Glide callback stack.
+                    binding.thumbnail.post {
+                        binding.thumbnail.beVisible()
+                        binding.playIcon.beVisibleIf(attachment.mimetype.isVideoMimeType())
+                        binding.compressionProgress.beGone()
+                    }
                     return false
                 }
             })

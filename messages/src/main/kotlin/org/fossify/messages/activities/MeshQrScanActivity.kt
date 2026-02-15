@@ -17,6 +17,7 @@ import org.fossify.commons.extensions.viewBinding
 import org.fossify.commons.helpers.NavigationIcon
 import org.fossify.messages.R
 import org.fossify.messages.databinding.ActivityMeshQrScanBinding
+import org.fossify.messages.helpers.CyberIdentityQr
 import org.fossify.messages.helpers.MeshDiscoveryManager
 
 class MeshQrScanActivity : SimpleActivity() {
@@ -48,8 +49,9 @@ class MeshQrScanActivity : SimpleActivity() {
                 val raw = result?.text?.trim().orEmpty()
                 if (raw.isBlank()) return
 
-                val meshAddress = MeshDiscoveryManager.extractMeshAddress(raw)
-                if (meshAddress.isNullOrBlank()) {
+                val parsed = CyberIdentityQr.parse(raw)
+                val meshAddress = parsed?.meshAddress
+                if (parsed == null) {
                     // Keep scanning; avoid spamming toasts if we repeatedly scan a non-mesh QR.
                     val now = System.currentTimeMillis()
                     if (now - lastInvalidToastMs > 2_000L) {
@@ -60,7 +62,11 @@ class MeshQrScanActivity : SimpleActivity() {
                 }
 
                 handled = true
-                val data = Intent().putExtra(EXTRA_MESH_ADDRESS, meshAddress)
+                val data = Intent()
+                    .putExtra(EXTRA_QR_PAYLOAD, raw)
+                if (!meshAddress.isNullOrBlank()) {
+                    data.putExtra(EXTRA_MESH_ADDRESS, meshAddress)
+                }
                 setResult(Activity.RESULT_OK, data)
                 finish()
             }
@@ -87,6 +93,7 @@ class MeshQrScanActivity : SimpleActivity() {
     }
 
     companion object {
+        const val EXTRA_QR_PAYLOAD = "org.fossify.messages.extra.QR_PAYLOAD"
         const val EXTRA_MESH_ADDRESS = "org.fossify.messages.extra.MESH_ADDRESS"
     }
 }

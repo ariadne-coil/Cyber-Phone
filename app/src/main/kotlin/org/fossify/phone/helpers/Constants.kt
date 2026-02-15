@@ -22,11 +22,23 @@ const val ALWAYS_SHOW_FULLSCREEN = "always_show_fullscreen"
 const val BLOCK_NEGATIVE_RATINGS = "block_negative_ratings"
 const val SHOW_BLOCKED_CALL_NOTIFICATIONS = "show_blocked_call_notifications"
 const val SHOW_CALL_RATING_NOTIFICATIONS = "show_call_rating_notifications"
+const val WALLET_SELECTED_FEDERATION_ID = "wallet_selected_federation_id"
+const val WALLET_DIRECTORY_JSON = "wallet_directory_json"
+const val WALLET_DIRECTORY_LAST_SYNC_MS = "wallet_directory_last_sync_ms"
+const val WALLET_DIRECTORY_LAST_HASH = "wallet_directory_last_hash"
+const val WALLET_DIRECTORY_LAST_UPDATED_AT_MS = "wallet_directory_last_updated_at_ms"
+const val WALLET_BTC_USD_RATE = "wallet_btc_usd_rate"
+const val WALLET_BTC_USD_RATE_LAST_SYNC_MS = "wallet_btc_usd_rate_last_sync_ms"
+const val WALLET_LAST_INVOICE = "wallet_last_invoice"
+const val WALLET_LAST_INVOICE_CREATED_MS = "wallet_last_invoice_created_ms"
+const val WALLET_LAST_ONCHAIN_ADDRESS = "wallet_last_onchain_address"
+const val WALLET_LAST_ONCHAIN_ADDRESS_CREATED_MS = "wallet_last_onchain_address_created_ms"
 
 const val TAB_MESSAGES = 8
-const val ALL_TABS_MASK = TAB_CONTACTS or TAB_FAVORITES or TAB_CALL_HISTORY or TAB_MESSAGES
+const val TAB_WALLET = 16
+const val ALL_TABS_MASK = TAB_CONTACTS or TAB_FAVORITES or TAB_CALL_HISTORY or TAB_MESSAGES or TAB_WALLET
 
-val tabsList = arrayListOf(TAB_CONTACTS, TAB_FAVORITES, TAB_CALL_HISTORY, TAB_MESSAGES)
+val tabsList = arrayListOf(TAB_CONTACTS, TAB_FAVORITES, TAB_CALL_HISTORY, TAB_MESSAGES, TAB_WALLET)
 
 private const val PATH = "org.fossify.phone.action."
 const val ACCEPT_CALL = PATH + "ACCEPT_CALL"

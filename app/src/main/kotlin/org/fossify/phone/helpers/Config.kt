@@ -147,4 +147,134 @@ class Config(context: Context) : BaseConfig(context) {
     var showCallRatingNotifications: Boolean
         get() = prefs.getBoolean(SHOW_CALL_RATING_NOTIFICATIONS, false)
         set(value) = prefs.edit().putBoolean(SHOW_CALL_RATING_NOTIFICATIONS, value).apply()
+
+    var walletSelectedFederationId: String
+        get() = prefs.getString(WALLET_SELECTED_FEDERATION_ID, "") ?: ""
+        set(value) = prefs.edit().putString(WALLET_SELECTED_FEDERATION_ID, value).apply()
+
+    var walletDirectoryJson: String
+        get() = prefs.getString(WALLET_DIRECTORY_JSON, "") ?: ""
+        set(value) = prefs.edit().putString(WALLET_DIRECTORY_JSON, value).apply()
+
+    var walletDirectoryLastSyncMs: Long
+        get() = prefs.getLong(WALLET_DIRECTORY_LAST_SYNC_MS, 0L)
+        set(value) = prefs.edit().putLong(WALLET_DIRECTORY_LAST_SYNC_MS, value).apply()
+
+    var walletDirectoryLastHash: String
+        get() = prefs.getString(WALLET_DIRECTORY_LAST_HASH, "") ?: ""
+        set(value) = prefs.edit().putString(WALLET_DIRECTORY_LAST_HASH, value).apply()
+
+    var walletDirectoryLastUpdatedAtMs: Long
+        get() = prefs.getLong(WALLET_DIRECTORY_LAST_UPDATED_AT_MS, 0L)
+        set(value) = prefs.edit().putLong(WALLET_DIRECTORY_LAST_UPDATED_AT_MS, value).apply()
+
+    // Stored as raw IEEE 754 bits so we can keep it in SharedPreferences reliably.
+    var walletBtcUsdRate: Double
+        get() = java.lang.Double.longBitsToDouble(prefs.getLong(WALLET_BTC_USD_RATE, 0L))
+        set(value) = prefs.edit().putLong(WALLET_BTC_USD_RATE, java.lang.Double.doubleToLongBits(value)).apply()
+
+    var walletBtcUsdRateLastSyncMs: Long
+        get() = prefs.getLong(WALLET_BTC_USD_RATE_LAST_SYNC_MS, 0L)
+        set(value) = prefs.edit().putLong(WALLET_BTC_USD_RATE_LAST_SYNC_MS, value).apply()
+
+    var walletLastInvoice: String
+        get() = prefs.getString(WALLET_LAST_INVOICE, "") ?: ""
+        set(value) = prefs.edit().putString(WALLET_LAST_INVOICE, value).apply()
+
+    var walletLastInvoiceCreatedMs: Long
+        get() = prefs.getLong(WALLET_LAST_INVOICE_CREATED_MS, 0L)
+        set(value) = prefs.edit().putLong(WALLET_LAST_INVOICE_CREATED_MS, value).apply()
+
+    var walletLastOnchainAddress: String
+        get() = prefs.getString(WALLET_LAST_ONCHAIN_ADDRESS, "") ?: ""
+        set(value) = prefs.edit().putString(WALLET_LAST_ONCHAIN_ADDRESS, value).apply()
+
+    var walletLastOnchainAddressCreatedMs: Long
+        get() = prefs.getLong(WALLET_LAST_ONCHAIN_ADDRESS_CREATED_MS, 0L)
+        set(value) = prefs.edit().putLong(WALLET_LAST_ONCHAIN_ADDRESS_CREATED_MS, value).apply()
+
+    // Wallet receive cache should be federation-specific, otherwise switching between mainnet/testnet
+    // will show invalid addresses/invoices. Keep the legacy global keys for migration/backward compat.
+    private fun walletKey(prefix: String, federationId: String): String {
+        val id = federationId.trim().ifBlank { "default" }
+        return "${prefix}_$id"
+    }
+
+    fun getWalletLastInvoiceForFederation(federationId: String): String {
+        val key = walletKey(WALLET_LAST_INVOICE, federationId)
+        val scoped = prefs.getString(key, "")?.trim().orEmpty()
+        if (scoped.isNotBlank()) return scoped
+
+        // One-time migration for the currently selected federation only.
+        val legacy = walletLastInvoice.trim()
+        if (legacy.isNotBlank() && federationId == walletSelectedFederationId) {
+            setWalletLastInvoiceForFederation(federationId, legacy)
+            return legacy
+        }
+        return ""
+    }
+
+    fun setWalletLastInvoiceForFederation(federationId: String, invoice: String) {
+        val key = walletKey(WALLET_LAST_INVOICE, federationId)
+        prefs.edit().putString(key, invoice.trim()).apply()
+        // Keep legacy in sync for older code paths.
+        walletLastInvoice = invoice.trim()
+    }
+
+    fun getWalletLastInvoiceCreatedMsForFederation(federationId: String): Long {
+        val key = walletKey(WALLET_LAST_INVOICE_CREATED_MS, federationId)
+        val scoped = prefs.getLong(key, 0L)
+        if (scoped > 0L) return scoped
+
+        val legacy = walletLastInvoiceCreatedMs
+        if (legacy > 0L && federationId == walletSelectedFederationId) {
+            setWalletLastInvoiceCreatedMsForFederation(federationId, legacy)
+            return legacy
+        }
+        return 0L
+    }
+
+    fun setWalletLastInvoiceCreatedMsForFederation(federationId: String, createdMs: Long) {
+        val key = walletKey(WALLET_LAST_INVOICE_CREATED_MS, federationId)
+        prefs.edit().putLong(key, createdMs).apply()
+        walletLastInvoiceCreatedMs = createdMs
+    }
+
+    fun getWalletLastOnchainAddressForFederation(federationId: String): String {
+        val key = walletKey(WALLET_LAST_ONCHAIN_ADDRESS, federationId)
+        val scoped = prefs.getString(key, "")?.trim().orEmpty()
+        if (scoped.isNotBlank()) return scoped
+
+        val legacy = walletLastOnchainAddress.trim()
+        if (legacy.isNotBlank() && federationId == walletSelectedFederationId) {
+            setWalletLastOnchainAddressForFederation(federationId, legacy)
+            return legacy
+        }
+        return ""
+    }
+
+    fun setWalletLastOnchainAddressForFederation(federationId: String, address: String) {
+        val key = walletKey(WALLET_LAST_ONCHAIN_ADDRESS, federationId)
+        prefs.edit().putString(key, address.trim()).apply()
+        walletLastOnchainAddress = address.trim()
+    }
+
+    fun getWalletLastOnchainAddressCreatedMsForFederation(federationId: String): Long {
+        val key = walletKey(WALLET_LAST_ONCHAIN_ADDRESS_CREATED_MS, federationId)
+        val scoped = prefs.getLong(key, 0L)
+        if (scoped > 0L) return scoped
+
+        val legacy = walletLastOnchainAddressCreatedMs
+        if (legacy > 0L && federationId == walletSelectedFederationId) {
+            setWalletLastOnchainAddressCreatedMsForFederation(federationId, legacy)
+            return legacy
+        }
+        return 0L
+    }
+
+    fun setWalletLastOnchainAddressCreatedMsForFederation(federationId: String, createdMs: Long) {
+        val key = walletKey(WALLET_LAST_ONCHAIN_ADDRESS_CREATED_MS, federationId)
+        prefs.edit().putLong(key, createdMs).apply()
+        walletLastOnchainAddressCreatedMs = createdMs
+    }
 }

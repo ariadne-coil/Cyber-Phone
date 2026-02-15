@@ -208,6 +208,24 @@
         </activity>
 
         <activity
+            android:name=".activities.WalletPayActivity"
+            android:exported="false"
+            android:label="@string/wallet_send"
+            android:parentActivityName=".activities.MainActivity" />
+
+        <activity
+            android:name=".activities.WalletSendTokenActivity"
+            android:exported="false"
+            android:label="@string/wallet_send_token_title"
+            android:parentActivityName=".activities.MainActivity" />
+
+        <activity
+            android:name=".activities.WalletRedeemTokenActivity"
+            android:exported="false"
+            android:label="@string/wallet_redeem_token_title"
+            android:parentActivityName=".activities.MainActivity" />
+
+        <activity
             android:name="org.fossify.phone.activities.CallActivity"
             android:excludeFromRecents="true"
             android:exported="false"

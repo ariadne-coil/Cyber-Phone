@@ -147,7 +147,11 @@ object MeshCallRouter {
         val readyDeadline = start + timeoutMs.coerceAtMost(2_000L)
         while (SystemClock.elapsedRealtime() < readyDeadline) {
             if (RnsNode.isRunning() && callDestination != null && localIdentity != null) break
-            Thread.sleep(50)
+            try {
+                Thread.sleep(50)
+            } catch (_: InterruptedException) {
+                return ProbeResult(success = false)
+            }
         }
         if (!RnsNode.isRunning() || callDestination == null || localIdentity == null) {
             return ProbeResult(success = false)
@@ -159,7 +163,11 @@ object MeshCallRouter {
             while (SystemClock.elapsedRealtime() - start < timeoutMs) {
                 identity = RnsNode.recallIdentity(remoteDeliveryHash)
                 if (identity != null) break
-                Thread.sleep(200)
+                try {
+                    Thread.sleep(200)
+                } catch (_: InterruptedException) {
+                    return ProbeResult(success = false)
+                }
             }
         }
         if (identity == null) {
@@ -185,7 +193,11 @@ object MeshCallRouter {
                 onFailure = null
             )
             if (receipt == null) {
-                Thread.sleep(200)
+                try {
+                    Thread.sleep(200)
+                } catch (_: InterruptedException) {
+                    return ProbeResult(success = false)
+                }
             }
         }
 
@@ -203,7 +215,11 @@ object MeshCallRouter {
                     remoteDestination = remoteCallDestination
                 )
             }
-            Thread.sleep(100)
+            try {
+                Thread.sleep(100)
+            } catch (_: InterruptedException) {
+                return ProbeResult(success = false)
+            }
         }
         return ProbeResult(success = false)
     }
@@ -265,7 +281,11 @@ object MeshCallRouter {
         }
         thread(name = "mesh-call-end-retry", start = true) {
             repeat(2) {
-                Thread.sleep(200)
+                try {
+                    Thread.sleep(200)
+                } catch (_: InterruptedException) {
+                    return@thread
+                }
                 try {
                     sendControlPayload(session, payload)
                     RnsNode.send(RnsPacket(destination = session.remoteDestination, data = payload))

@@ -17,6 +17,7 @@ class RnsIdentity private constructor(
         const val KEY_SIZE = 64
         private const val KEY_HALF = 32
         private const val DERIVED_KEY_LENGTH = 64
+        private const val KNOWN_RATCHETS_LIMIT = 4096
         private val knownRatchets = ConcurrentHashMap<String, ByteArray>()
 
         fun generate(): RnsIdentity {
@@ -54,6 +55,19 @@ class RnsIdentity private constructor(
         fun rememberRatchet(destinationHash: ByteArray, ratchetPublic: ByteArray) {
             if (ratchetPublic.isEmpty()) return
             knownRatchets[RnsHex.encode(destinationHash)] = ratchetPublic
+            // This is a best-effort cache. Bound memory so a long-running node cannot OOM on
+            // hostile networks with many peers.
+            if (knownRatchets.size > KNOWN_RATCHETS_LIMIT) {
+                // ConcurrentHashMap has no ordering; evict arbitrary entries.
+                val iterator = knownRatchets.keys.iterator()
+                var removed = 0
+                val target = KNOWN_RATCHETS_LIMIT / 2
+                while (iterator.hasNext() && removed < target) {
+                    iterator.next()
+                    iterator.remove()
+                    removed++
+                }
+            }
         }
 
         fun getRatchetForDestination(destinationHash: ByteArray): ByteArray? {

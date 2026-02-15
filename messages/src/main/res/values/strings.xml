@@ -183,11 +183,11 @@
     <string name="profile_scan_qr">Scan QR code</string>
     <string name="profile_rotate_mesh">Cycle mesh address</string>
     <string name="profile_mesh_rotated">Mesh address updated.</string>
-    <string name="profile_mesh_saved">Mesh address saved to contact.</string>
-    <string name="profile_mesh_invalid">Invalid mesh address.</string>
-    <string name="profile_mesh_scan_prompt">Scan a mesh address QR code</string>
+    <string name="profile_mesh_saved">Saved to contact.</string>
+    <string name="profile_mesh_invalid">Invalid QR code.</string>
+    <string name="profile_mesh_scan_prompt">Scan a Cyber Phone QR code</string>
     <string name="profile_mesh_scan_denied">Camera permission is required to scan QR codes.</string>
-    <string name="profile_mesh_save_title">Save mesh address</string>
+    <string name="profile_mesh_save_title">Save scanned identity</string>
     <string name="profile_mesh_select_contact">Select a contact</string>
     <string name="profile_mesh_add_contact">Add a new contact</string>
     <string name="messages_category_main">Main</string>
@@ -231,6 +231,9 @@
     <string name="attachment_sized_exceeds_max_limit">Attachment size exceeds max MMS limit</string>
     <string name="sim_card_not_available">SIM card not available</string>
     <string name="couldnt_download_mms">Couldn\'t download MMS</string>
+    <string name="wallet_pay">Pay</string>
+    <string name="wallet_redeem">Redeem</string>
+    <string name="wallet_send_sats">Send sats</string>
     <!-- FAQ -->
     <string name="faq_1_title">Why does the app require access to the internet?</string>
     <string name="faq_1_text">Sadly it is needed for sending MMS attachments. Not being able to send MMS would be a really huge disadvantage compared to other apps, so we decided to go this way.

@@ -30,6 +30,16 @@ object RnsNode {
     private const val PATH_REQUEST_TAG_LIMIT = 32_000
     private const val PATH_REQUEST_APP = "rnstransport"
 
+    // Hard bounds/TTLs to prevent unbounded growth in hostile or lossy networks.
+    // These values are intentionally conservative: they keep enough state for routing to work,
+    // while ensuring a long-running node cannot OOM due to caches never being trimmed.
+    private const val KNOWN_DESTINATION_TTL_MS = 24L * 60L * 60L * 1000L
+    private const val KNOWN_DESTINATION_LIMIT = 4096
+    private const val PATH_TABLE_TTL_MS = 60L * 60L * 1000L
+    private const val PATH_TABLE_LIMIT = 4096
+    private const val RECEIPT_TTL_MS = 60L * 60L * 1000L
+    private const val RECEIPT_LIMIT = 4096
+
     private val interfaces = mutableListOf<RnsInterface>()
     private val running = AtomicBooleanState()
     private val pathTable = ConcurrentHashMap<String, PathEntry>()
@@ -681,6 +691,7 @@ object RnsNode {
         destinationHash: ByteArray,
         onDelivered: (() -> Unit)? = null
     ) {
+        trimReceipts(System.currentTimeMillis())
         val raw = packet.pack()
         val hashable = RnsPacket.getHashablePart(raw)
         val fullHash = RnsHash.sha256(hashable)
@@ -893,6 +904,8 @@ object RnsNode {
         if (routingEnabled) {
             forwardAnnounce(raw, packet, iface)
         }
+
+        trimRoutingCaches(now)
     }
 
     private fun handleProof(packet: RnsPacket) {
@@ -917,6 +930,69 @@ object RnsNode {
         if (!verified) return
         receipts.remove(receiptKey)
         receipt.onDelivered?.invoke()
+        trimReceipts(System.currentTimeMillis())
+    }
+
+    private fun trimRoutingCaches(now: Long) {
+        trimKnownDestinations(now)
+        trimPathTable(now)
+        trimReceipts(now)
+    }
+
+    private fun trimKnownDestinations(now: Long) {
+        if (knownDestinations.isEmpty()) return
+
+        val cutoff = now - KNOWN_DESTINATION_TTL_MS
+        for ((key, value) in knownDestinations) {
+            if (value.lastSeen < cutoff) {
+                knownDestinations.remove(key)
+                // Drop any routing path associated with this destination as well.
+                pathTable.remove(key)
+            }
+        }
+
+        // Hard cap: remove arbitrary entries until below the limit (no sorting to avoid allocations).
+        if (knownDestinations.size <= KNOWN_DESTINATION_LIMIT) return
+        val it = knownDestinations.keys.iterator()
+        while (knownDestinations.size > KNOWN_DESTINATION_LIMIT && it.hasNext()) {
+            val k = it.next()
+            knownDestinations.remove(k)
+            pathTable.remove(k)
+        }
+    }
+
+    private fun trimPathTable(now: Long) {
+        if (pathTable.isEmpty()) return
+
+        val cutoff = now - PATH_TABLE_TTL_MS
+        for ((key, value) in pathTable) {
+            if (value.lastSeen < cutoff) {
+                pathTable.remove(key)
+            }
+        }
+
+        if (pathTable.size <= PATH_TABLE_LIMIT) return
+        val it = pathTable.keys.iterator()
+        while (pathTable.size > PATH_TABLE_LIMIT && it.hasNext()) {
+            pathTable.remove(it.next())
+        }
+    }
+
+    private fun trimReceipts(now: Long) {
+        if (receipts.isEmpty()) return
+
+        val cutoff = now - RECEIPT_TTL_MS
+        for ((key, receipt) in receipts) {
+            if (receipt.createdAt < cutoff) {
+                receipts.remove(key)
+            }
+        }
+
+        if (receipts.size <= RECEIPT_LIMIT) return
+        val it = receipts.keys.iterator()
+        while (receipts.size > RECEIPT_LIMIT && it.hasNext()) {
+            receipts.remove(it.next())
+        }
     }
 
     private fun maybeSendProof(packet: RnsPacket, local: LocalDestination) {
