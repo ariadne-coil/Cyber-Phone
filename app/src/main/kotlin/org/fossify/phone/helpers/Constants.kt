@@ -33,6 +33,14 @@ const val WALLET_LAST_INVOICE = "wallet_last_invoice"
 const val WALLET_LAST_INVOICE_CREATED_MS = "wallet_last_invoice_created_ms"
 const val WALLET_LAST_ONCHAIN_ADDRESS = "wallet_last_onchain_address"
 const val WALLET_LAST_ONCHAIN_ADDRESS_CREATED_MS = "wallet_last_onchain_address_created_ms"
+const val WALLET_LIQUIDITY_PROVIDER_MODE = "wallet_liquidity_provider_mode"
+const val WALLET_LIQUIDITY_PROVIDER_ID = "wallet_liquidity_provider_id"
+const val WALLET_LIQUIDITY_PROVIDER_STATS_JSON = "wallet_liquidity_provider_stats_json"
+const val WALLET_LIQUIDITY_CUSTOM_NAME = "wallet_liquidity_custom_name"
+const val WALLET_LIQUIDITY_CUSTOM_NETWORK = "wallet_liquidity_custom_network"
+const val WALLET_LIQUIDITY_CUSTOM_NODE_ID = "wallet_liquidity_custom_node_id"
+const val WALLET_LIQUIDITY_CUSTOM_ADDRESS = "wallet_liquidity_custom_address"
+const val WALLET_LIQUIDITY_CUSTOM_TOKEN = "wallet_liquidity_custom_token"
 
 const val TAB_MESSAGES = 8
 const val TAB_WALLET = 16

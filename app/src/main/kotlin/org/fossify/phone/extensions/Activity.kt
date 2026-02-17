@@ -194,8 +194,6 @@ fun Activity.startContactDetailsIntent(contact: Contact) {
                     Intent(Intent.ACTION_EDIT).apply {
                         data = publicUri
                         putExtra("finishActivityOnSaveCompleted", true)
-                        MeshContactHelper.addMeshPhoneInsertExtras(this)
-                        WalletContactHelper.addWalletInsertExtras(this)
                         launchActivityIntent(this)
                     }
                 }

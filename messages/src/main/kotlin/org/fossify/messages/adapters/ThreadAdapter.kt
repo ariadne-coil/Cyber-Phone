@@ -30,6 +30,7 @@ import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.Target
 import org.fossify.commons.adapters.MyRecyclerViewListAdapter
 import org.fossify.commons.dialogs.ConfirmationDialog
+import org.fossify.commons.extensions.adjustAlpha
 import org.fossify.commons.extensions.applyColorFilter
 import org.fossify.commons.extensions.beGone
 import org.fossify.commons.extensions.beVisible
@@ -41,6 +42,7 @@ import org.fossify.commons.extensions.getProperPrimaryColor
 import org.fossify.commons.extensions.getTextSize
 import org.fossify.commons.extensions.shareTextIntent
 import org.fossify.commons.extensions.showErrorToast
+import org.fossify.commons.extensions.toast
 import org.fossify.commons.extensions.usableScreenSize
 import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.commons.helpers.ensureBackgroundThread
@@ -70,7 +72,12 @@ import org.fossify.messages.extensions.launchViewIntent
 import org.fossify.messages.extensions.startContactDetailsIntent
 import org.fossify.messages.extensions.subscriptionManagerCompat
 import org.fossify.messages.helpers.EXTRA_VCARD_URI
+import org.fossify.messages.helpers.EXTRA_WALLET_AUTO_PAY
 import org.fossify.messages.helpers.EXTRA_WALLET_DESTINATION
+import org.fossify.messages.helpers.EXTRA_WALLET_FEDERATION_ID_HINT
+import org.fossify.messages.helpers.EXTRA_WALLET_REQUEST_AMOUNT_SATS
+import org.fossify.messages.helpers.EXTRA_WALLET_REQUEST_ID
+import org.fossify.messages.helpers.EXTRA_WALLET_REQUEST_THREAD_ID
 import org.fossify.messages.helpers.EXTRA_WALLET_SECURE_CHANNEL
 import org.fossify.messages.helpers.EXTRA_WALLET_TOKEN_TEXT
 import org.fossify.messages.helpers.THREAD_DATE_TIME
@@ -79,7 +86,10 @@ import org.fossify.messages.helpers.THREAD_SENT_MESSAGE
 import org.fossify.messages.helpers.THREAD_SENT_MESSAGE_ERROR
 import org.fossify.messages.helpers.THREAD_SENT_MESSAGE_SENDING
 import org.fossify.messages.helpers.THREAD_SENT_MESSAGE_SENT
+import org.fossify.messages.helpers.WALLET_REQUEST_ACTION_APPROVE
+import org.fossify.messages.helpers.WALLET_REQUEST_ACTION_DENY
 import org.fossify.messages.helpers.E2eManager
+import org.fossify.messages.helpers.WalletPaymentRequestStateManager
 import org.fossify.messages.helpers.generateStableId
 import org.fossify.messages.helpers.setupDocumentPreview
 import org.fossify.messages.helpers.setupVCardPreview
@@ -92,6 +102,9 @@ import org.fossify.messages.models.ThreadItem.ThreadDateTime
 import org.fossify.messages.models.ThreadItem.ThreadError
 import org.fossify.messages.models.ThreadItem.ThreadSending
 import org.fossify.messages.models.ThreadItem.ThreadSent
+import java.text.DateFormat
+import java.text.NumberFormat
+import java.util.Date
 
 class ThreadAdapter(
     activity: SimpleActivity,
@@ -102,6 +115,7 @@ class ThreadAdapter(
 ) : MyRecyclerViewListAdapter<ThreadItem>(activity, recyclerView, ThreadItemDiffCallback(), itemClick) {
     private var fontSize = activity.getTextSize()
     private var reactionsByMessageId: Map<Long, String> = emptyMap()
+    private val revealedWalletMessages = HashSet<Long>()
 
     @SuppressLint("MissingPermission")
     private val hasMultipleSIMCards = (activity.subscriptionManagerCompat().activeSubscriptionInfoList?.size ?: 0) > 1
@@ -368,11 +382,7 @@ class ThreadAdapter(
     private fun setupView(holder: ViewHolder, view: View, message: Message) {
         ItemMessageBinding.bind(view).apply {
             threadMessageHolder.isSelected = selectedKeys.contains(message.getSelectionKey())
-            threadMessageBody.apply {
-                text = message.body
-                setTextSize(TypedValue.COMPLEX_UNIT_PX, fontSize)
-                beVisibleIf(message.body.isNotEmpty())
-            }
+            threadMessageBody.setTextSize(TypedValue.COMPLEX_UNIT_PX, fontSize)
 
             threadMessageWrapper.setOnLongClickListener {
                 (activity as? ThreadActivity)?.dismissReactionPicker()
@@ -413,7 +423,24 @@ class ThreadAdapter(
                 threadMessagePlayOutline.beGone()
             }
 
-            val reactionAnchor = if (message.body.isNotEmpty()) {
+            val payRequest = WalletTokenParser.parseFedimintPaymentRequest(message.body)
+            val payResponse = WalletTokenParser.parseFedimintPaymentInvoiceResponse(message.body)
+            val payDenied = WalletTokenParser.parseFedimintPaymentDeniedResponse(message.body)
+            val ecashToken = WalletTokenParser.parseFedimintEcashToken(message.body)
+            val walletAction = WalletTokenParser.findActionToken(message.body)
+            val isWalletMessage = payRequest != null || payResponse != null || payDenied != null || ecashToken != null || walletAction != null
+
+            if (isWalletMessage && selectedKeys.isEmpty() && message.isReceivedMessage()) {
+                maybeAutoHandleWalletProtocolMessage(message)
+            }
+
+            val showRawWalletText = isWalletMessage && revealedWalletMessages.contains(message.id)
+            threadMessageBody.apply {
+                text = message.body
+                beVisibleIf(message.body.isNotEmpty() && (!isWalletMessage || showRawWalletText))
+            }
+
+            val reactionAnchor = if (threadMessageBody.visibility == View.VISIBLE) {
                 threadMessageBody.id
             } else {
                 threadMessageAttachmentsHolder.id
@@ -429,46 +456,261 @@ class ThreadAdapter(
             threadMessageReaction.text = reactionText
             threadMessageReaction.beVisibleIf(reactionText.isNotBlank())
 
-            // Wallet actions (Pay / Redeem): only show on received messages, so we don't clutter outgoing bubbles.
-            val walletAction = if (selectedKeys.isEmpty() && message.isReceivedMessage()) {
-                WalletTokenParser.findActionToken(message.body)
+            threadMessageRequestCard.beVisibleIf(isWalletMessage)
+            threadMessageWalletActions.beVisibleIf(isWalletMessage)
+
+            if (isWalletMessage) {
+                val primary = activity.getProperPrimaryColor()
+                val contrast = primary.getContrastColor()
+                threadMessageRequestCard.setCardBackgroundColor(primary.adjustAlpha(0.08f))
+                threadMessageRequestCard.strokeColor = primary.adjustAlpha(0.25f)
+                threadMessageRequestCard.strokeWidth = 1
+                threadMessageRequestAmount.setTextColor(textColor)
+                threadMessageRequestFederation.setTextColor(textColor.adjustAlpha(0.88f))
+                threadMessageRequestId.setTextColor(textColor.adjustAlpha(0.72f))
+
+                var titleText = ""
+                var detailsText = ""
+                var trailingText = ""
+
+                when {
+                    payRequest != null -> {
+                        val sats = NumberFormat.getIntegerInstance().format(payRequest.amountSats)
+                        titleText = if (message.isReceivedMessage()) {
+                            activity.getString(R.string.wallet_card_request_title)
+                        } else {
+                            activity.getString(R.string.wallet_card_request_sent)
+                        }
+                        detailsText = activity.getString(R.string.wallet_request_amount, sats)
+                        trailingText = activity.getString(R.string.wallet_request_federation, payRequest.federationId)
+                    }
+
+                    payResponse != null -> {
+                        val sats = NumberFormat.getIntegerInstance().format(payResponse.amountSats)
+                        titleText = activity.getString(R.string.wallet_card_request_approved, sats)
+                        detailsText = activity.getString(R.string.wallet_request_federation, payResponse.federationId)
+                        trailingText = activity.getString(R.string.wallet_request_id, payResponse.requestId)
+                    }
+
+                    payDenied != null -> {
+                        titleText = activity.getString(R.string.wallet_card_request_denied)
+                        detailsText = activity.getString(R.string.wallet_request_federation, payDenied.federationId)
+                        trailingText = activity.getString(R.string.wallet_request_id, payDenied.requestId)
+                    }
+
+                    ecashToken != null -> {
+                        val sats = NumberFormat.getIntegerInstance().format(ecashToken.amountSats)
+                        titleText = activity.getString(R.string.wallet_card_token_received, sats)
+                        detailsText = activity.getString(R.string.wallet_request_federation, ecashToken.federationId)
+                        val expText = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+                            .format(Date(ecashToken.expiresAtEpochSec * 1000L))
+                        trailingText = activity.getString(R.string.wallet_card_token_expires, expText)
+                    }
+
+                    walletAction?.action == WalletTokenParser.WalletAction.PAY -> {
+                        val token = walletAction.token.trim()
+                        titleText = when {
+                            token.startsWith("ln", ignoreCase = true) -> activity.getString(R.string.wallet_card_lightning_invoice)
+                            token.startsWith("bc1", ignoreCase = true) ||
+                                token.startsWith("tb1", ignoreCase = true) ||
+                                token.startsWith("bcrt1", ignoreCase = true) -> activity.getString(R.string.wallet_card_onchain_address)
+                            else -> activity.getString(R.string.wallet_card_payment_payload)
+                        }
+                        detailsText = walletAction.federationIdHint
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { activity.getString(R.string.wallet_request_federation, it) }
+                            .orEmpty()
+                        trailingText = activity.getString(R.string.wallet_card_destination, compactWalletValue(token))
+                    }
+
+                    else -> {
+                        titleText = activity.getString(R.string.wallet_card_payment_payload)
+                    }
+                }
+
+                threadMessageRequestAmount.text = titleText
+                threadMessageRequestFederation.text = detailsText
+                threadMessageRequestFederation.beVisibleIf(detailsText.isNotBlank())
+                threadMessageRequestId.text = trailingText
+                threadMessageRequestId.beVisibleIf(trailingText.isNotBlank())
+
+                val requestForActions = payRequest?.takeIf {
+                    message.isReceivedMessage() && selectedKeys.isEmpty()
+                }
+                threadMessageRequestActionsRow.beVisibleIf(requestForActions != null)
+                if (requestForActions != null) {
+                    val req = requestForActions
+                    threadMessageRequestApprove.backgroundTintList = android.content.res.ColorStateList.valueOf(primary)
+                    threadMessageRequestApprove.setTextColor(contrast)
+                    threadMessageRequestApprove.rippleColor = android.content.res.ColorStateList.valueOf(contrast.adjustAlpha(0.2f))
+                    threadMessageRequestDeny.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.TRANSPARENT)
+                    threadMessageRequestDeny.strokeColor = android.content.res.ColorStateList.valueOf(primary.adjustAlpha(0.55f))
+                    threadMessageRequestDeny.setTextColor(primary)
+                    threadMessageRequestDeny.rippleColor = android.content.res.ColorStateList.valueOf(primary.adjustAlpha(0.2f))
+
+                    threadMessageRequestApprove.setOnClickListener {
+                        (activity as? ThreadActivity)?.launchWalletRespondToPaymentRequest(req.raw, WALLET_REQUEST_ACTION_APPROVE)
+                    }
+                    threadMessageRequestDeny.setOnClickListener {
+                        (activity as? ThreadActivity)?.launchWalletRespondToPaymentRequest(req.raw, WALLET_REQUEST_ACTION_DENY)
+                    }
+                } else {
+                    threadMessageRequestApprove.setOnClickListener(null)
+                    threadMessageRequestDeny.setOnClickListener(null)
+                }
+
+                val actionForButton = walletAction?.takeIf {
+                    message.isReceivedMessage() && selectedKeys.isEmpty() && payRequest == null
+                }
+                threadMessagePay.beVisibleIf(actionForButton != null)
+                if (actionForButton != null) {
+                    threadMessagePay.text = when (actionForButton.action) {
+                        WalletTokenParser.WalletAction.REDEEM -> activity.getString(R.string.wallet_redeem)
+                        WalletTokenParser.WalletAction.PAY -> activity.getString(R.string.wallet_pay)
+                        WalletTokenParser.WalletAction.PAY_REQUEST -> activity.getString(R.string.wallet_review_request)
+                    }
+                    threadMessagePay.backgroundTintList = android.content.res.ColorStateList.valueOf(primary)
+                    threadMessagePay.setTextColor(contrast)
+                    threadMessagePay.rippleColor = android.content.res.ColorStateList.valueOf(contrast.adjustAlpha(0.2f))
+                    threadMessagePay.setOnClickListener {
+                        val secure = LxmfAddress.isMeshThreadId(message.threadId) ||
+                            (E2eManager.hasSharedSecret(activity, message.threadId) &&
+                                E2eManager.isThreadEncrypted(activity, message.threadId))
+                        val act = actionForButton
+                        val intent = when (act.action) {
+                            WalletTokenParser.WalletAction.REDEEM -> Intent().apply {
+                                setClassName(activity, "org.fossify.phone.activities.WalletRedeemTokenActivity")
+                                putExtra(EXTRA_WALLET_TOKEN_TEXT, act.token)
+                            }
+
+                            WalletTokenParser.WalletAction.PAY_REQUEST -> {
+                                (activity as? ThreadActivity)?.launchWalletRespondToPaymentRequest(act.token)
+                                null
+                            }
+
+                            WalletTokenParser.WalletAction.PAY -> Intent().apply {
+                                setClassName(activity, "org.fossify.phone.activities.WalletPayActivity")
+                                putExtra(EXTRA_WALLET_DESTINATION, act.token)
+                                putExtra(EXTRA_WALLET_FEDERATION_ID_HINT, act.federationIdHint)
+                                putExtra(EXTRA_WALLET_SECURE_CHANNEL, secure)
+                                act.requestId?.takeIf { it.isNotBlank() }?.let {
+                                    putExtra(EXTRA_WALLET_REQUEST_ID, it)
+                                    putExtra(EXTRA_WALLET_REQUEST_THREAD_ID, message.threadId)
+                                }
+                                act.amountSats?.takeIf { it > 0L }?.let {
+                                    putExtra(EXTRA_WALLET_REQUEST_AMOUNT_SATS, it)
+                                }
+                            }
+                        }
+                        if (intent != null) {
+                            runCatching {
+                                activity.startActivity(intent)
+                            }.onFailure { t ->
+                                activity.showErrorToast(t.message ?: t.toString())
+                            }
+                        }
+                    }
+                } else {
+                    threadMessagePay.setOnClickListener(null)
+                }
+
+                threadMessageWalletToggle.beVisible()
+                threadMessageWalletToggle.text = activity.getString(
+                    if (showRawWalletText) R.string.wallet_hide_full_message else R.string.wallet_show_full_message
+                )
+                threadMessageWalletToggle.strokeColor = android.content.res.ColorStateList.valueOf(primary.adjustAlpha(0.55f))
+                threadMessageWalletToggle.setTextColor(primary)
+                threadMessageWalletToggle.rippleColor = android.content.res.ColorStateList.valueOf(primary.adjustAlpha(0.2f))
+                threadMessageWalletToggle.setOnClickListener {
+                    if (revealedWalletMessages.contains(message.id)) {
+                        revealedWalletMessages.remove(message.id)
+                    } else {
+                        revealedWalletMessages.add(message.id)
+                    }
+                    val bindingPos = holder.bindingAdapterPosition
+                    if (bindingPos >= 0) {
+                        notifyItemChanged(bindingPos)
+                    } else {
+                        notifyDataSetChanged()
+                    }
+                }
+                threadMessageWalletActions.updateLayoutParams<RelativeLayout.LayoutParams> {
+                    removeRule(RelativeLayout.BELOW)
+                    addRule(RelativeLayout.BELOW, threadMessageRequestCard.id)
+                    topMargin = resources.getDimensionPixelSize(R.dimen.tiny_margin)
+                }
             } else {
-                null
-            }
-            threadMessagePay.beVisibleIf(walletAction != null)
-            threadMessagePay.text = when (walletAction?.action) {
-                WalletTokenParser.WalletAction.REDEEM -> activity.getString(R.string.wallet_redeem)
-                WalletTokenParser.WalletAction.PAY -> activity.getString(R.string.wallet_pay)
-                null -> activity.getString(R.string.wallet_pay)
-            }
-            threadMessagePay.updateLayoutParams<RelativeLayout.LayoutParams> {
-                removeRule(RelativeLayout.BELOW)
-                addRule(RelativeLayout.BELOW, threadMessageReaction.id)
-                topMargin = resources.getDimensionPixelSize(R.dimen.tiny_margin)
-            }
-            threadMessagePay.setOnClickListener {
-                val secure = LxmfAddress.isMeshThreadId(message.threadId) ||
-                    (E2eManager.hasSharedSecret(activity, message.threadId) &&
-                        E2eManager.isThreadEncrypted(activity, message.threadId))
-                val act = walletAction ?: return@setOnClickListener
-                val intent = when (act.action) {
-                    WalletTokenParser.WalletAction.REDEEM -> Intent().apply {
-                        setClassName(activity, "org.fossify.phone.activities.WalletRedeemTokenActivity")
-                        putExtra(EXTRA_WALLET_TOKEN_TEXT, act.token)
-                    }
-                    WalletTokenParser.WalletAction.PAY -> Intent().apply {
-                        setClassName(activity, "org.fossify.phone.activities.WalletPayActivity")
-                        putExtra(EXTRA_WALLET_DESTINATION, act.token)
-                        putExtra(EXTRA_WALLET_SECURE_CHANNEL, secure)
-                    }
-                }
-                runCatching {
-                    activity.startActivity(intent)
-                }.onFailure { t ->
-                    activity.showErrorToast(t.message ?: t.toString())
-                }
+                threadMessageRequestApprove.setOnClickListener(null)
+                threadMessageRequestDeny.setOnClickListener(null)
+                threadMessagePay.setOnClickListener(null)
+                threadMessageWalletToggle.setOnClickListener(null)
             }
         }
+    }
+
+    private fun maybeAutoHandleWalletProtocolMessage(message: Message) {
+        val denied = WalletTokenParser.parseFedimintPaymentDeniedResponse(message.body)
+        if (denied != null) {
+            if (WalletPaymentRequestStateManager.hasHandledResponseMessage(activity, message.id)) {
+                return
+            }
+            WalletPaymentRequestStateManager.markResponseMessageHandled(activity, message.id)
+            val pending = WalletPaymentRequestStateManager.getPendingRequest(activity, denied.requestId)
+            if (pending != null && pending.threadId == message.threadId) {
+                WalletPaymentRequestStateManager.markRequestDenied(activity, denied.requestId)
+                activity.toast(R.string.wallet_payment_request_denied)
+            }
+            return
+        }
+
+        val response = WalletTokenParser.parseFedimintPaymentInvoiceResponse(message.body) ?: return
+        if (WalletPaymentRequestStateManager.hasHandledResponseMessage(activity, message.id)) {
+            return
+        }
+
+        val validation = WalletPaymentRequestStateManager.validateAndReserveInvoiceResponse(
+            context = activity,
+            requestId = response.requestId,
+            threadId = message.threadId,
+            federationId = response.federationId,
+            amountSats = response.amountSats,
+            invoice = response.invoice,
+        )
+        WalletPaymentRequestStateManager.markResponseMessageHandled(activity, message.id)
+        if (!validation.isValid) {
+            // Avoid noisy toasts for old/history messages that do not belong to active pending requests.
+            if (!validation.error.isNullOrBlank() &&
+                !validation.error.contains("unknown or expired", ignoreCase = true)
+            ) {
+                activity.toast(validation.error)
+            }
+            return
+        }
+
+        val secure = LxmfAddress.isMeshThreadId(message.threadId) ||
+            (E2eManager.hasSharedSecret(activity, message.threadId) &&
+                E2eManager.isThreadEncrypted(activity, message.threadId))
+        val intent = Intent().apply {
+            setClassName(activity, "org.fossify.phone.activities.WalletPayActivity")
+            putExtra(EXTRA_WALLET_DESTINATION, response.invoice)
+            putExtra(EXTRA_WALLET_FEDERATION_ID_HINT, response.federationId)
+            putExtra(EXTRA_WALLET_SECURE_CHANNEL, secure)
+            putExtra(EXTRA_WALLET_AUTO_PAY, true)
+            putExtra(EXTRA_WALLET_REQUEST_ID, response.requestId)
+            putExtra(EXTRA_WALLET_REQUEST_AMOUNT_SATS, response.amountSats)
+            putExtra(EXTRA_WALLET_REQUEST_THREAD_ID, message.threadId)
+        }
+        runCatching {
+            activity.startActivity(intent)
+        }.onFailure { t ->
+            activity.showErrorToast(t.message ?: t.toString())
+        }
+    }
+
+    private fun compactWalletValue(value: String, prefix: Int = 16, suffix: Int = 10): String {
+        val clean = value.trim()
+        if (clean.length <= prefix + suffix + 3) return clean
+        return "${clean.take(prefix)}...${clean.takeLast(suffix)}"
     }
 
     private fun setupReceivedMessageView(messageBinding: ItemMessageBinding, message: Message) {

@@ -20,6 +20,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import org.fossify.messages.R
 import org.fossify.mesh.MeshConfig
 import org.fossify.mesh.call.MeshCallRouter
@@ -155,9 +156,26 @@ class MeshService : Service() {
     }
 
     private fun updateNotification() {
+        if (!shouldPostServiceNotificationUpdates()) {
+            return
+        }
         val notification = buildNotification()
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun shouldPostServiceNotificationUpdates(): Boolean {
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+            return false
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = manager.getNotificationChannel(CHANNEL_ID)
+            if (channel != null && channel.importance == NotificationManager.IMPORTANCE_NONE) {
+                return false
+            }
+        }
+        return true
     }
 
     private fun buildStatusText(): String {

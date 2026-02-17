@@ -27,6 +27,7 @@ import org.fossify.mesh.MeshContactHelper
 import org.fossify.messages.activities.ConversationDetailsActivity
 import org.fossify.messages.helpers.MeshDiscoveryManager
 import org.fossify.messages.helpers.THREAD_ID
+import org.fossify.messages.helpers.WalletContactHelper
 import org.fossify.mesh.lxmf.LxmfAddress
 import java.io.File
 import java.util.Locale
@@ -195,7 +196,6 @@ fun Activity.startContactDetailsIntent(contact: SimpleContact) {
                     Intent(Intent.ACTION_EDIT).apply {
                         data = publicUri
                         putExtra("finishActivityOnSaveCompleted", true)
-                        MeshContactHelper.addMeshPhoneInsertExtras(this)
                         launchActivityIntent(this)
                     }
                 }
@@ -203,6 +203,7 @@ fun Activity.startContactDetailsIntent(contact: SimpleContact) {
                     handlePermission(PERMISSION_WRITE_CONTACTS) { granted ->
                         if (granted) {
                             MeshContactHelper.ensureMeshPhoneRowForRawContact(this, contact.rawId.toLong())
+                            WalletContactHelper.dedupeWalletDestinationRowsForRawContact(this, contact.rawId.toLong())
                         }
                         launchEditor()
                     }

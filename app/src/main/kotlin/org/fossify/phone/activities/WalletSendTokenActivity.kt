@@ -1,13 +1,20 @@
 package org.fossify.phone.activities
 
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.os.Bundle
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import androidx.core.view.isVisible
+import com.google.android.material.textfield.TextInputLayout
+import org.fossify.commons.extensions.adjustAlpha
 import org.fossify.commons.extensions.getAlertDialogBuilder
+import org.fossify.commons.extensions.getContrastColor
+import org.fossify.commons.extensions.getProperBackgroundColor
+import org.fossify.commons.extensions.getProperPrimaryColor
+import org.fossify.commons.extensions.getProperTextColor
 import org.fossify.commons.extensions.toast
 import org.fossify.commons.extensions.viewBinding
 import org.fossify.commons.helpers.ensureBackgroundThread
@@ -45,6 +52,7 @@ class WalletSendTokenActivity : SimpleActivity() {
         secureChannel = intent?.getBooleanExtra(EXTRA_WALLET_SECURE_CHANNEL, false) == true
 
         setupToolbar()
+        applyThemeColors()
         binding.walletSendTokenToolbar.setNavigationOnClickListener { finish() }
 
         binding.walletSendTokenFederationCard.setOnClickListener { showSelectFederationDialog() }
@@ -59,7 +67,7 @@ class WalletSendTokenActivity : SimpleActivity() {
         ensureBackgroundThread {
             // Only show Fedimint-backed entries for OOB ecash tokens.
             allFederations = FederationDirectoryManager.getFederations(this)
-                .filter { it.kind.trim().equals("fedimint", ignoreCase = true) }
+                .filter { FederationDirectoryManager.isFedimintFederation(it) }
             runOnUiThread {
                 ensureFedimintSelection()
                 renderFederationLine()
@@ -71,6 +79,66 @@ class WalletSendTokenActivity : SimpleActivity() {
     private fun setupToolbar() {
         binding.walletSendTokenToolbar.setTitle(R.string.wallet_send_token_title)
         binding.walletSendTokenToolbar.setNavigationIcon(org.fossify.commons.R.drawable.ic_arrow_left_vector)
+    }
+
+    private fun applyThemeColors() {
+        val textColor = getProperTextColor()
+        val secondary = textColor.adjustAlpha(0.72f)
+        val primaryColor = getProperPrimaryColor()
+        val onPrimary = primaryColor.getContrastColor()
+
+        binding.root.setBackgroundColor(getProperBackgroundColor())
+        binding.walletSendTokenToolbar.setBackgroundColor(primaryColor)
+        binding.walletSendTokenToolbar.setTitleTextColor(onPrimary)
+        binding.walletSendTokenToolbar.navigationIcon?.mutate()?.setTint(onPrimary)
+
+        val cardColor = textColor.adjustAlpha(0.06f)
+        val cardStroke = textColor.adjustAlpha(0.14f)
+        binding.walletSendTokenFederationCard.setCardBackgroundColor(cardColor)
+        binding.walletSendTokenFederationCard.strokeColor = cardStroke
+        binding.walletSendTokenFederationCard.strokeWidth = 1
+
+        binding.walletSendTokenFederationLabel.setTextColor(secondary)
+        binding.walletSendTokenFederationValue.setTextColor(textColor)
+        binding.walletSendTokenRate.setTextColor(secondary)
+        binding.walletSendTokenChannelHint.setTextColor(secondary)
+
+        tintInputLayout(binding.walletSendTokenAmountLayout, textColor, primaryColor)
+        binding.walletSendTokenAmount.setTextColor(textColor)
+        binding.walletSendTokenAmount.setHintTextColor(secondary)
+
+        binding.walletSendTokenButton.backgroundTintList = ColorStateList.valueOf(primaryColor)
+        binding.walletSendTokenButton.setTextColor(onPrimary)
+        binding.walletSendTokenButton.rippleColor = ColorStateList.valueOf(onPrimary.adjustAlpha(0.2f))
+
+        binding.walletSendTokenProgress.setIndicatorColor(primaryColor)
+        binding.walletSendTokenError.setTextColor(getColor(org.fossify.commons.R.color.md_red_400))
+    }
+
+    private fun tintInputLayout(layout: TextInputLayout, textColor: Int, primaryColor: Int) {
+        val strokeDefault = textColor.adjustAlpha(0.28f)
+        layout.setBoxStrokeColorStateList(
+            ColorStateList(
+                arrayOf(
+                    intArrayOf(android.R.attr.state_focused),
+                    intArrayOf()
+                ),
+                intArrayOf(
+                    primaryColor,
+                    strokeDefault
+                )
+            )
+        )
+        layout.defaultHintTextColor = ColorStateList(
+            arrayOf(
+                intArrayOf(android.R.attr.state_focused),
+                intArrayOf()
+            ),
+            intArrayOf(
+                primaryColor,
+                textColor.adjustAlpha(0.62f)
+            )
+        )
     }
 
     private fun ensureFedimintSelection() {

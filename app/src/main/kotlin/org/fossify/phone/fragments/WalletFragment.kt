@@ -12,6 +12,7 @@ import android.util.AttributeSet
 import android.util.Log
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
 import org.fossify.commons.extensions.adjustAlpha
@@ -35,14 +36,29 @@ import org.fossify.phone.wallet.ExchangeRateManager
 import org.fossify.phone.wallet.FederationDirectoryManager
 import org.fossify.phone.wallet.FederationEntry
 import org.fossify.phone.wallet.FedimintWalletManager
+import org.fossify.phone.wallet.LiquidityProviderEntry
 import org.fossify.phone.wallet.LdkWalletManager
 import org.fossify.phone.wallet.WalletBackupCrypto
 import org.fossify.phone.wallet.WalletContactHelper
+import org.fossify.phone.wallet.WalletFederationTopupManager
 import org.fossify.phone.wallet.WalletPaymentsAdapter
 import org.fossify.phone.wallet.WalletPolicy
 import org.fossify.phone.wallet.WalletStoragePaths
+import org.fossify.phone.wallet.WalletUiDialogs
 import org.fossify.messages.activities.NewConversationActivity
+import org.fossify.messages.activities.ThreadActivity
+import org.fossify.messages.extensions.conversationsDB
+import org.fossify.messages.helpers.THREAD_ID
+import org.fossify.messages.helpers.THREAD_NUMBER
+import org.fossify.messages.helpers.THREAD_AUTO_SEND
+import org.fossify.messages.helpers.THREAD_TEXT
+import org.fossify.messages.helpers.THREAD_TITLE
+import org.fossify.messages.helpers.WalletPaymentRequestStateManager
+import org.fossify.messages.helpers.WalletTokenParser
+import org.fossify.messages.models.Conversation
+import org.fossify.mesh.lxmf.LxmfAddress
 import org.lightningdevkit.ldknode.Bolt11Invoice
+import org.lightningdevkit.ldknode.PaymentStatus
 import java.text.DateFormat
 import java.text.NumberFormat
 import java.util.Date
@@ -94,7 +110,15 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
     private val maxBackupPayloadBytes = 16L * 1024L * 1024L
 
     private fun isFedimint(selected: FederationEntry?): Boolean {
-        return selected?.kind?.trim()?.equals("fedimint", ignoreCase = true) == true
+        return FederationDirectoryManager.isFedimintFederation(selected)
+    }
+
+    private fun isBitcoinMainnet(selected: FederationEntry?): Boolean {
+        if (selected == null || isFedimint(selected)) return false
+        return when (selected.network?.trim()?.lowercase(Locale.ROOT).orEmpty()) {
+            "bitcoin", "mainnet", "btc", "" -> true
+            else -> false
+        }
     }
 
     override fun onFinishInflate() {
@@ -217,6 +241,15 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
         binding.walletSync.setOnClickListener {
             refreshAll(force = true)
         }
+        binding.walletExchange.setOnClickListener {
+            showExchangeDialog()
+        }
+        binding.walletMint.setOnClickListener {
+            showMintDialog()
+        }
+        binding.walletWithdraw.setOnClickListener {
+            showWithdrawDialog()
+        }
         binding.walletBackup.setOnClickListener {
             launchWalletBackupCreate()
         }
@@ -282,16 +315,27 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
         binding.walletSendLabel.setTextColor(heroSecondary)
         binding.walletReceiveLabel.setTextColor(heroSecondary)
         binding.walletSyncLabel.setTextColor(heroSecondary)
+        binding.walletMintLabel.setTextColor(heroSecondary)
+        binding.walletWithdrawLabel.setTextColor(heroSecondary)
 
         binding.walletSend.backgroundTintList = ColorStateList.valueOf(actionButtonTint)
         binding.walletReceive.backgroundTintList = ColorStateList.valueOf(actionButtonTint)
         binding.walletSync.backgroundTintList = ColorStateList.valueOf(actionButtonTint)
+        binding.walletExchange.backgroundTintList = ColorStateList.valueOf(actionButtonTint)
+        binding.walletMint.backgroundTintList = ColorStateList.valueOf(actionButtonTint)
+        binding.walletWithdraw.backgroundTintList = ColorStateList.valueOf(actionButtonTint)
         binding.walletSend.iconTint = ColorStateList.valueOf(heroText)
         binding.walletReceive.iconTint = ColorStateList.valueOf(heroText)
         binding.walletSync.iconTint = ColorStateList.valueOf(heroText)
+        binding.walletExchange.iconTint = ColorStateList.valueOf(heroText)
+        binding.walletMint.iconTint = ColorStateList.valueOf(heroText)
+        binding.walletWithdraw.iconTint = ColorStateList.valueOf(heroText)
         binding.walletSend.rippleColor = ColorStateList.valueOf(heroText.adjustAlpha(0.28f))
         binding.walletReceive.rippleColor = ColorStateList.valueOf(heroText.adjustAlpha(0.28f))
         binding.walletSync.rippleColor = ColorStateList.valueOf(heroText.adjustAlpha(0.28f))
+        binding.walletExchange.rippleColor = ColorStateList.valueOf(heroText.adjustAlpha(0.28f))
+        binding.walletMint.rippleColor = ColorStateList.valueOf(heroText.adjustAlpha(0.28f))
+        binding.walletWithdraw.rippleColor = ColorStateList.valueOf(heroText.adjustAlpha(0.28f))
 
         binding.walletMyAddressesTitle.setTextColor(textColor)
         binding.walletMyAddressesHint.setTextColor(cardTextSecondary)
@@ -371,6 +415,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
             var balances: org.lightningdevkit.ldknode.BalanceDetails? = null
             var payments: List<org.lightningdevkit.ldknode.PaymentDetails> = emptyList()
             var fmBalanceSats: Long? = null
+            var ldkStartedForSelection: Boolean = false
             var rate: Double? = null
             var fatalError: Throwable? = null
             var requestFedimintStartFor: FederationEntry? = null
@@ -400,44 +445,60 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                 // Ensure the wallet backend is running for the selected federation.
                 if (selected != null) {
                     if (isFm) {
-                        val selectedFedId = selected!!.id
+                        val selectedFed = selected
+                        val selectedFedId = selectedFed.id
                         val runningFedId = FedimintWalletManager.getRunningFederationId()
-                        val isRunningForSelection = runningFedId == selectedFedId &&
-                            FedimintWalletManager.verifyRunningFederationBlocking(context, selected!!)
-                        if (isRunningForSelection) {
-                            fmBalanceSats = FedimintWalletManager.getBalanceSatsBlocking(context, selected!!)
-                        } else if (!FedimintWalletManager.isBusy()) {
-                            // Start asynchronously to keep refresh bounded and avoid UI timeouts.
-                            // Throttle retries on repeated failures to prevent startup loops.
-                            val nowMs = System.currentTimeMillis()
-                            val retryCooldownMs = 30_000L
-                            val inFlight = fedimintStartInFlightForId == selectedFedId
-                            val cooldownActive = lastFedimintStartAttemptId == selectedFedId &&
-                                (nowMs - lastFedimintStartAttemptMs) < retryCooldownMs
-                            if (!inFlight && !cooldownActive) {
-                                requestFedimintStartFor = selected
-                                fedimintStartInFlightForId = selectedFedId
-                                lastFedimintStartAttemptId = selectedFedId
-                                lastFedimintStartAttemptMs = nowMs
+                        val busy = FedimintWalletManager.isBusy()
+
+                        // If we already have the selected federation active, try balance directly first.
+                        // The strict open-check can transiently fail during startup handoff.
+                        if (!busy && runningFedId == selectedFedId) {
+                            fmBalanceSats = FedimintWalletManager.getBalanceSatsBlocking(context, selectedFed)
+                        }
+
+                        // Fallback: verify/open state and schedule a (re)start if needed.
+                        if (fmBalanceSats == null && !FedimintWalletManager.isBusy()) {
+                            val isRunningForSelection = runningFedId == selectedFedId &&
+                                FedimintWalletManager.verifyRunningFederationBlocking(context, selectedFed)
+                            if (isRunningForSelection) {
+                                fmBalanceSats = FedimintWalletManager.getBalanceSatsBlocking(context, selectedFed)
+                            } else {
+                                // Start asynchronously to keep refresh bounded and avoid UI timeouts.
+                                // Throttle retries on repeated failures to prevent startup loops.
+                                val nowMs = System.currentTimeMillis()
+                                val retryCooldownMs = 30_000L
+                                val inFlight = fedimintStartInFlightForId == selectedFedId
+                                val bypassCooldown = runningFedId == selectedFedId
+                                val cooldownActive = !bypassCooldown &&
+                                    lastFedimintStartAttemptId == selectedFedId &&
+                                    (nowMs - lastFedimintStartAttemptMs) < retryCooldownMs
+                                if (!inFlight && !cooldownActive) {
+                                    requestFedimintStartFor = selectedFed
+                                    fedimintStartInFlightForId = selectedFedId
+                                    lastFedimintStartAttemptId = selectedFedId
+                                    lastFedimintStartAttemptMs = nowMs
+                                }
                             }
                         }
                     } else {
                         // Leaving Fedimint selection; allow immediate future attempts when user switches back.
                         fedimintStartInFlightForId = null
-                        val started = LdkWalletManager.ensureStartedBlocking(context, selected!!)
-                        if (started && force) {
-                            // Keep the UI responsive on federation switches.
-                            LdkWalletManager.syncWallets()
+                        val started = LdkWalletManager.ensureStartedBlocking(context, selected)
+                        ldkStartedForSelection = started
+                        if (started) {
+                            // Run a blocking sync in the refresh worker so feerate failover/recovery
+                            // can complete before we render balances.
+                            LdkWalletManager.syncWalletsBlocking()
                         }
                         if (started) {
                             // Generate default receive data once the wallet is enabled (selection made),
                             // so the user has addresses ready without manual setup.
-                            ensureDefaultReceiveDataBlocking(selected!!)
+                            ensureDefaultReceiveDataBlocking(selected)
                         }
                     }
                 }
 
-                if (!isFm) {
+                if (!isFm && selected != null && ldkStartedForSelection) {
                     balances = LdkWalletManager.listBalances()
                     payments = LdkWalletManager.listPayments(limit = 20)
                 }
@@ -705,6 +766,13 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
         binding.walletMyAddressValue.beVisibleIf(!isFm)
         binding.walletMyBip21Label.beVisibleIf(!isFm)
         binding.walletMyBip21Value.beVisibleIf(!isFm)
+
+        val showExchange = selected != null && isBitcoinMainnet(selected)
+        val showFedimintActions = selected != null && isFm
+        binding.walletExchangeHolder.beVisibleIf(showExchange)
+        binding.walletFedimintActionsRow.beVisibleIf(showFedimintActions)
+        binding.walletMintHolder.beVisibleIf(showFedimintActions)
+        binding.walletWithdrawHolder.beVisibleIf(showFedimintActions)
     }
 
     private fun renderMyAddresses() {
@@ -831,7 +899,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
         }
 
         val names = items.map { entry ->
-            val backend = if (entry.kind.trim().equals("fedimint", ignoreCase = true)) {
+            val backend = if (FederationDirectoryManager.isFedimintFederation(entry)) {
                 "Fedimint"
             } else {
                 "Bitcoin"
@@ -867,15 +935,22 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
             showSelectFederationDialog()
             return
         }
+        val selectedIsFedimint = isFedimint(selected)
 
         val vb = DialogWalletSendBinding.inflate(host.layoutInflater)
         vb.walletSendDestination.setText("")
         vb.walletSendAmount.setText("")
         activeSendDestination = vb.walletSendDestination
-
-        // Contact picker shortcut.
-        vb.walletSendDestinationHolder.setEndIconOnClickListener {
-            launchWalletContactPicker()
+        if (selectedIsFedimint) {
+            vb.walletSendDestinationHolder.beGone()
+            vb.walletSendHintText.text = host.getString(R.string.wallet_send_request_pick_thread)
+            activeSendDestination = null
+        } else {
+            // Contact picker shortcut.
+            vb.walletSendDestinationHolder.setEndIconOnClickListener {
+                launchWalletContactPicker()
+            }
+            vb.walletSendHintText.text = host.getString(R.string.wallet_send_hint)
         }
 
         host.getAlertDialogBuilder()
@@ -887,9 +962,26 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                         activeSendDestination = null
                     }
                     alertDialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                        val destination = vb.walletSendDestination.text?.toString()?.trim().orEmpty()
                         val amountSats = vb.walletSendAmount.text?.toString()?.trim()?.toLongOrNull()
+                        val txLimitText = NumberFormat.getIntegerInstance(Locale.getDefault())
+                            .format(WalletPolicy.MAX_SINGLE_TX_SATS)
 
+                        if (selectedIsFedimint) {
+                            if (amountSats == null || amountSats <= 0L) {
+                                host.toast(R.string.wallet_send_request_amount_required)
+                                return@setOnClickListener
+                            }
+                            if (!WalletPolicy.isAmountWithinSingleTxLimit(amountSats)) {
+                                host.toast(host.getString(R.string.wallet_amount_over_limit, txLimitText))
+                                return@setOnClickListener
+                            }
+
+                            alertDialog.dismiss()
+                            startFedimintPaymentRequestFlow(selected, amountSats)
+                            return@setOnClickListener
+                        }
+
+                        val destination = vb.walletSendDestination.text?.toString()?.trim().orEmpty()
                         if (destination.isBlank()) {
                             host.toast(R.string.wallet_send_destination_required)
                             return@setOnClickListener
@@ -900,6 +992,925 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                     }
                 }
             }
+    }
+
+    private fun startFedimintPaymentRequestFlow(
+        federation: FederationEntry,
+        amountSats: Long,
+    ) {
+        val host = activity ?: return
+        val requestId = WalletTokenParser.newFedimintPaymentRequestId()
+        val requestMessage = WalletTokenParser.buildFedimintPaymentRequestMessage(
+            requestId = requestId,
+            federationId = federation.id,
+            amountSats = amountSats,
+            federationName = federation.name,
+        )
+        if (requestMessage.isBlank()) {
+            host.toast(org.fossify.commons.R.string.unknown_error_occurred)
+            return
+        }
+
+        showExistingThreadPicker(requestMessage) { conversation ->
+            WalletPaymentRequestStateManager.registerOutgoingRequest(
+                context = context,
+                requestId = requestId,
+                threadId = conversation.threadId,
+                federationId = federation.id,
+                amountSats = amountSats,
+            )
+            host.toast(R.string.wallet_send_request_created)
+        }
+    }
+
+    private fun showExchangeDialog() {
+        val host = activity ?: return
+        val selected = FederationDirectoryManager.getSelectedFederation(context)
+        if (!isBitcoinMainnet(selected)) {
+            host.toast(R.string.wallet_select_federation)
+            return
+        }
+
+        val items = arrayOf(
+            host.getString(R.string.wallet_exchange_onchain_to_lightning),
+            host.getString(R.string.wallet_exchange_lightning_to_onchain),
+        )
+        host.getAlertDialogBuilder()
+            .setTitle(R.string.wallet_exchange_title)
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> promptAmountDialog(
+                        titleRes = R.string.wallet_exchange_onchain_to_lightning,
+                        hintRes = R.string.wallet_exchange_amount_hint,
+                    ) { amountSats ->
+                        exchangeOnchainToLightning(amountSats)
+                    }
+
+                    1 -> promptAmountDialog(
+                        titleRes = R.string.wallet_exchange_lightning_to_onchain,
+                        hintRes = R.string.wallet_exchange_amount_hint,
+                    ) { amountSats ->
+                        exchangeLightningToOnchain(amountSats)
+                    }
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showMintDialog() {
+        val host = activity ?: return
+        val selected = FederationDirectoryManager.getSelectedFederation(context)
+        if (!isFedimint(selected)) {
+            host.toast(R.string.wallet_select_federation)
+            return
+        }
+
+        promptAmountDialog(
+            titleRes = R.string.wallet_mint_title,
+            hintRes = R.string.wallet_mint_amount_hint,
+        ) { amountSats ->
+            mintToSelectedFederation(amountSats)
+        }
+    }
+
+    private fun showWithdrawDialog() {
+        val host = activity ?: return
+        val selected = FederationDirectoryManager.getSelectedFederation(context)
+        if (!isFedimint(selected)) {
+            host.toast(R.string.wallet_select_federation)
+            return
+        }
+
+        promptAmountDialog(
+            titleRes = R.string.wallet_withdraw_title,
+            hintRes = R.string.wallet_withdraw_amount_hint,
+        ) { amountSats ->
+            withdrawFromSelectedFederation(amountSats)
+        }
+    }
+
+    private fun promptAmountDialog(
+        titleRes: Int,
+        hintRes: Int,
+        onAmount: (Long) -> Unit,
+    ) {
+        val host = activity ?: return
+        val density = host.resources.displayMetrics.density
+        val spacing = (16f * density).toInt()
+
+        val container = LinearLayout(host).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(spacing, spacing / 2, spacing, 0)
+        }
+        val amountView = EditText(host).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            hint = host.getString(hintRes)
+        }
+        container.addView(
+            amountView,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        host.getAlertDialogBuilder()
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.ok, null)
+            .apply {
+                host.setupDialogStuff(container, this, titleRes) { alertDialog ->
+                    alertDialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val amountSats = amountView.text?.toString()?.trim()?.toLongOrNull() ?: 0L
+                        val txLimitText = NumberFormat.getIntegerInstance(Locale.getDefault())
+                            .format(WalletPolicy.MAX_SINGLE_TX_SATS)
+                        if (amountSats <= 0L) {
+                            host.toast(R.string.wallet_exchange_amount_required)
+                            return@setOnClickListener
+                        }
+                        if (!WalletPolicy.isAmountWithinSingleTxLimit(amountSats)) {
+                            host.toast(host.getString(R.string.wallet_amount_over_limit, txLimitText))
+                            return@setOnClickListener
+                        }
+                        alertDialog.dismiss()
+                        onAmount(amountSats)
+                    }
+                }
+            }
+    }
+
+    private fun exchangeOnchainToLightning(amountSats: Long) {
+        val host = activity ?: return
+        val selected = FederationDirectoryManager.getSelectedFederation(context)
+        if (!isBitcoinMainnet(selected) || selected == null) {
+            host.toast(R.string.wallet_select_federation)
+            return
+        }
+
+        binding.walletProgress.beVisible()
+        ensureBackgroundThread {
+            try {
+                val started = LdkWalletManager.ensureStartedBlocking(context, selected)
+                var errorMessage: String? = null
+
+                if (started) {
+                    val estimatedFunding = LdkWalletManager.estimateLiquidityBootstrapFundingSats(amountSats)
+                    host.runOnUiThread {
+                        binding.walletProgress.beGone()
+                        showAdvancedConvertWarningDialog(
+                            selected = selected,
+                            amountSats = amountSats,
+                            estimatedFundingSats = estimatedFunding,
+                        )
+                    }
+                    return@ensureBackgroundThread
+                } else {
+                    errorMessage = LdkWalletManager.getLastErrorMessage()
+                }
+
+                val finalError = errorMessage.orEmpty().ifBlank {
+                    LdkWalletManager.getLastErrorMessage()
+                        ?: host.getString(R.string.wallet_unknown_error)
+                }
+
+                host.runOnUiThread {
+                    binding.walletProgress.beGone()
+                    when {
+                        else -> host.toast(host.getString(R.string.wallet_exchange_failed, finalError))
+                    }
+                }
+            } catch (t: Throwable) {
+                val message = t.message?.trim().orEmpty().ifBlank {
+                    host.getString(R.string.wallet_unknown_error)
+                }
+                host.runOnUiThread {
+                    binding.walletProgress.beGone()
+                    host.toast(host.getString(R.string.wallet_exchange_failed, message))
+                }
+            }
+        }
+    }
+
+    private fun showAdvancedConvertWarningDialog(
+        selected: FederationEntry,
+        amountSats: Long,
+        estimatedFundingSats: Long,
+    ) {
+        val host = activity ?: return
+        host.getAlertDialogBuilder()
+            .setTitle(R.string.wallet_exchange_advanced_title)
+            .setMessage(
+                host.getString(
+                    R.string.wallet_exchange_bootstrap_warning,
+                    formatSats(amountSats.toULong()),
+                    formatSats(estimatedFundingSats.toULong())
+                )
+            )
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.wallet_exchange_advanced_button) { _, _ ->
+                showAdvancedConvertConfirmationDialog(
+                    selected = selected,
+                    amountSats = amountSats,
+                    estimatedFundingSats = estimatedFundingSats,
+                )
+            }
+            .show()
+    }
+
+    private fun showAdvancedConvertConfirmationDialog(
+        selected: FederationEntry,
+        amountSats: Long,
+        estimatedFundingSats: Long,
+    ) {
+        val host = activity ?: return
+        val density = host.resources.displayMetrics.density
+        val spacing = (16f * density).toInt()
+
+        val container = LinearLayout(host).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(spacing, spacing / 2, spacing, 0)
+        }
+        val messageView = TextView(host).apply {
+            text = host.getString(
+                R.string.wallet_exchange_advanced_confirm_message,
+                formatSats(amountSats.toULong()),
+                formatSats(estimatedFundingSats.toULong())
+            )
+        }
+        val confirmInput = EditText(host).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+            hint = host.getString(R.string.wallet_exchange_advanced_confirm_hint)
+            setSingleLine()
+        }
+        container.addView(
+            messageView,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+        container.addView(
+            confirmInput,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = spacing / 2
+            }
+        )
+
+        host.getAlertDialogBuilder()
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.wallet_exchange_advanced_execute, null)
+            .apply {
+                host.setupDialogStuff(container, this, R.string.wallet_exchange_advanced_confirm_title) { alertDialog ->
+                    alertDialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val typed = confirmInput.text?.toString()?.trim().orEmpty()
+                        if (typed.uppercase(Locale.ROOT) != "CONFIRM") {
+                            host.toast(R.string.wallet_exchange_advanced_confirm_required)
+                            return@setOnClickListener
+                        }
+                        alertDialog.dismiss()
+                        runAdvancedConvertOnchainToLightning(selected, amountSats)
+                    }
+                }
+            }
+    }
+
+    private fun runAdvancedConvertOnchainToLightning(
+        selected: FederationEntry,
+        amountSats: Long,
+    ) {
+        val host = activity ?: return
+        binding.walletProgress.beVisible()
+        ensureBackgroundThread {
+            try {
+                val started = LdkWalletManager.ensureStartedBlocking(context, selected)
+                var success = false
+                var pendingMessage: String? = null
+                var errorMessage: String? = null
+
+                if (started) {
+                    val direct = LdkWalletManager.bootstrapOutboundLiquidityBlocking(
+                        context = context,
+                        requiredSats = amountSats,
+                    )
+                    when {
+                        direct.success -> success = true
+                        direct.pending -> {
+                            pendingMessage = direct.errorMessage
+                                ?: host.getString(R.string.wallet_exchange_advanced_pending)
+                        }
+
+                        else -> {
+                            val fallback = LdkWalletManager.bootstrapOutboundLiquidityViaGatewayHintsBlocking(
+                                context = context,
+                                gatewayNodeIds = emptyList(),
+                                requiredSats = amountSats,
+                                network = selected.network,
+                            )
+                            when {
+                                fallback.success -> success = true
+                                fallback.pending -> {
+                                    pendingMessage = fallback.errorMessage
+                                        ?: host.getString(R.string.wallet_exchange_advanced_pending)
+                                }
+
+                                else -> {
+                                    errorMessage = fallback.errorMessage ?: direct.errorMessage
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    errorMessage = LdkWalletManager.getLastErrorMessage()
+                }
+
+                val finalError = errorMessage.orEmpty().ifBlank {
+                    LdkWalletManager.getLastErrorMessage()
+                        ?: host.getString(R.string.wallet_unknown_error)
+                }
+
+                host.runOnUiThread {
+                    binding.walletProgress.beGone()
+                    when {
+                        success -> {
+                            host.toast(R.string.wallet_exchange_submitted)
+                            refreshAll(force = false)
+                        }
+                        !pendingMessage.isNullOrBlank() -> host.toast(pendingMessage)
+                        else -> host.toast(host.getString(R.string.wallet_exchange_failed, finalError))
+                    }
+                }
+            } catch (t: Throwable) {
+                val message = t.message?.trim().orEmpty().ifBlank {
+                    host.getString(R.string.wallet_unknown_error)
+                }
+                host.runOnUiThread {
+                    binding.walletProgress.beGone()
+                    host.toast(host.getString(R.string.wallet_exchange_failed, message))
+                }
+            }
+        }
+    }
+
+    private fun exchangeLightningToOnchain(amountSats: Long) {
+        val host = activity ?: return
+        val selected = FederationDirectoryManager.getSelectedFederation(context)
+        if (!isBitcoinMainnet(selected) || selected == null) {
+            host.toast(R.string.wallet_select_federation)
+            return
+        }
+
+        binding.walletProgress.beVisible()
+        ensureBackgroundThread {
+            try {
+                val started = LdkWalletManager.ensureStartedBlocking(context, selected)
+                var errorMessage: String? = null
+
+                if (started) {
+                    val plan = LdkWalletManager.estimateLightningToOnchainChannelCloseSats(amountSats)
+                    if (plan == null) {
+                        errorMessage = LdkWalletManager.getLastErrorMessage()
+                    } else {
+                        host.runOnUiThread {
+                            binding.walletProgress.beGone()
+                            showAdvancedReverseConvertWarningDialog(
+                                selected = selected,
+                                amountSats = amountSats,
+                                plan = plan,
+                            )
+                        }
+                        return@ensureBackgroundThread
+                    }
+                } else {
+                    errorMessage = LdkWalletManager.getLastErrorMessage()
+                }
+
+                val finalError = errorMessage.orEmpty().ifBlank {
+                    LdkWalletManager.getLastErrorMessage()
+                        ?: host.getString(R.string.wallet_unknown_error)
+                }
+
+                host.runOnUiThread {
+                    binding.walletProgress.beGone()
+                    when {
+                        else -> host.toast(host.getString(R.string.wallet_exchange_failed, finalError))
+                    }
+                }
+            } catch (t: Throwable) {
+                val message = t.message?.trim().orEmpty().ifBlank {
+                    host.getString(R.string.wallet_unknown_error)
+                }
+                host.runOnUiThread {
+                    binding.walletProgress.beGone()
+                    host.toast(host.getString(R.string.wallet_exchange_failed, message))
+                }
+            }
+        }
+    }
+
+    private fun showAdvancedReverseConvertWarningDialog(
+        selected: FederationEntry,
+        amountSats: Long,
+        plan: LdkWalletManager.LightningToOnchainPlan,
+    ) {
+        val host = activity ?: return
+        host.getAlertDialogBuilder()
+            .setTitle(R.string.wallet_exchange_advanced_title)
+            .setMessage(
+                host.getString(
+                    R.string.wallet_exchange_reverse_warning,
+                    formatSats(amountSats.toULong()),
+                    plan.channelsToClose,
+                    formatSats(plan.estimatedReleaseSats.toULong()),
+                )
+            )
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.wallet_exchange_advanced_button) { _, _ ->
+                showAdvancedReverseConvertConfirmationDialog(
+                    selected = selected,
+                    amountSats = amountSats,
+                    plan = plan,
+                )
+            }
+            .show()
+    }
+
+    private fun showAdvancedReverseConvertConfirmationDialog(
+        selected: FederationEntry,
+        amountSats: Long,
+        plan: LdkWalletManager.LightningToOnchainPlan,
+    ) {
+        val host = activity ?: return
+        val density = host.resources.displayMetrics.density
+        val spacing = (16f * density).toInt()
+
+        val container = LinearLayout(host).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(spacing, spacing / 2, spacing, 0)
+        }
+        val messageView = TextView(host).apply {
+            text = host.getString(
+                R.string.wallet_exchange_reverse_confirm_message,
+                formatSats(amountSats.toULong()),
+                plan.channelsToClose,
+                formatSats(plan.estimatedReleaseSats.toULong()),
+            )
+        }
+        val confirmInput = EditText(host).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+            hint = host.getString(R.string.wallet_exchange_advanced_confirm_hint)
+            setSingleLine()
+        }
+        container.addView(
+            messageView,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+        container.addView(
+            confirmInput,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = spacing / 2
+            }
+        )
+
+        host.getAlertDialogBuilder()
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.wallet_exchange_advanced_execute, null)
+            .apply {
+                host.setupDialogStuff(container, this, R.string.wallet_exchange_advanced_confirm_title) { alertDialog ->
+                    alertDialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val typed = confirmInput.text?.toString()?.trim().orEmpty()
+                        if (typed.uppercase(Locale.ROOT) != "CONFIRM") {
+                            host.toast(R.string.wallet_exchange_advanced_confirm_required)
+                            return@setOnClickListener
+                        }
+                        alertDialog.dismiss()
+                        runAdvancedConvertLightningToOnchain(selected, amountSats)
+                    }
+                }
+            }
+    }
+
+    private fun runAdvancedConvertLightningToOnchain(
+        selected: FederationEntry,
+        amountSats: Long,
+    ) {
+        val host = activity ?: return
+        binding.walletProgress.beVisible()
+        ensureBackgroundThread {
+            try {
+                val started = LdkWalletManager.ensureStartedBlocking(context, selected)
+                var success = false
+                var pendingMessage: String? = null
+                var errorMessage: String? = null
+
+                if (started) {
+                    val result = LdkWalletManager.convertLightningToOnchainByClosingChannelsBlocking(amountSats)
+                    when {
+                        result.success -> success = true
+
+                        result.pending -> {
+                            pendingMessage = result.errorMessage
+                                ?: host.getString(R.string.wallet_exchange_reverse_pending)
+                        }
+
+                        else -> {
+                            errorMessage = result.errorMessage
+                        }
+                    }
+                } else {
+                    errorMessage = LdkWalletManager.getLastErrorMessage()
+                }
+
+                val finalError = errorMessage.orEmpty().ifBlank {
+                    LdkWalletManager.getLastErrorMessage()
+                        ?: host.getString(R.string.wallet_unknown_error)
+                }
+
+                host.runOnUiThread {
+                    binding.walletProgress.beGone()
+                    when {
+                        success -> {
+                            host.toast(R.string.wallet_exchange_submitted)
+                            refreshAll(force = false)
+                        }
+                        !pendingMessage.isNullOrBlank() -> {
+                            host.toast(pendingMessage)
+                            refreshAll(force = false)
+                        }
+                        else -> host.toast(host.getString(R.string.wallet_exchange_failed, finalError))
+                    }
+                }
+            } catch (t: Throwable) {
+                val message = t.message?.trim().orEmpty().ifBlank {
+                    host.getString(R.string.wallet_unknown_error)
+                }
+                host.runOnUiThread {
+                    binding.walletProgress.beGone()
+                    host.toast(host.getString(R.string.wallet_exchange_failed, message))
+                }
+            }
+        }
+    }
+
+    private fun mintToSelectedFederation(amountSats: Long) {
+        val host = activity ?: return
+        val selected = FederationDirectoryManager.getSelectedFederation(context)
+        if (!isFedimint(selected) || selected == null) {
+            host.toast(R.string.wallet_select_federation)
+            return
+        }
+
+        binding.walletProgress.beVisible()
+        ensureBackgroundThread {
+            try {
+                val mintInvoice = FedimintWalletManager.createBolt11InvoiceBlocking(
+                    context = context,
+                    federation = selected,
+                    amountSats = amountSats,
+                    memo = "Federation mint",
+                    expirySeconds = 15 * 60,
+                )
+                if (mintInvoice.isNullOrBlank()) {
+                    val err = FedimintWalletManager.getLastErrorMessage().orEmpty().ifBlank {
+                        host.getString(R.string.wallet_unknown_error)
+                    }
+                    host.runOnUiThread {
+                        binding.walletProgress.beGone()
+                        host.toast(host.getString(R.string.wallet_mint_failed, err))
+                    }
+                    return@ensureBackgroundThread
+                }
+
+                val quote = WalletFederationTopupManager.buildTopupQuote(
+                    context = context,
+                    targetFederation = selected,
+                    invoice = mintInvoice,
+                    currentFederationBalanceSats = 0L,
+                    assumeZeroOnUnknownBalance = true,
+                )
+                if (quote == null) {
+                    host.runOnUiThread {
+                        binding.walletProgress.beGone()
+                        host.toast(host.getString(R.string.wallet_mint_failed, host.getString(R.string.wallet_federation_topup_unavailable)))
+                    }
+                    return@ensureBackgroundThread
+                }
+
+                val topup = WalletFederationTopupManager.topupFromMainnetBlocking(context, quote)
+                val err = topup.errorMessage
+                    ?: FedimintWalletManager.getLastErrorMessage()
+                    ?: host.getString(R.string.wallet_unknown_error)
+
+                host.runOnUiThread {
+                    binding.walletProgress.beGone()
+                    if (topup.success) {
+                        host.toast(R.string.wallet_mint_success)
+                        refreshAll(force = false)
+                    } else {
+                        host.toast(host.getString(R.string.wallet_mint_failed, err))
+                    }
+                }
+            } catch (t: Throwable) {
+                val message = LdkWalletManager.summarizeThrowableForUi(t)
+                    ?: FedimintWalletManager.getLastErrorMessage()
+                    ?: LdkWalletManager.normalizeExternalErrorMessage(t.message)
+                    ?: host.getString(R.string.wallet_unknown_error)
+                host.runOnUiThread {
+                    binding.walletProgress.beGone()
+                    host.toast(host.getString(R.string.wallet_mint_failed, message))
+                }
+            }
+        }
+    }
+
+    private fun withdrawFromSelectedFederation(amountSats: Long) {
+        val host = activity ?: return
+        val selected = FederationDirectoryManager.getSelectedFederation(context)
+        if (!isFedimint(selected) || selected == null) {
+            host.toast(R.string.wallet_select_federation)
+            return
+        }
+
+        fun resolveWithdrawError(defaultMessage: String, vararg candidates: String?): String {
+            return candidates.asSequence()
+                .mapNotNull { it?.trim() }
+                .firstOrNull { it.isNotBlank() }
+                ?: defaultMessage
+        }
+
+        val source = WalletFederationTopupManager.findMainnetSourceFederation(
+            context = context,
+            targetFederationId = selected.id,
+            targetNetwork = selected.network,
+        )
+        if (source == null) {
+            host.toast(R.string.wallet_withdraw_source_unavailable)
+            return
+        }
+
+        binding.walletProgress.beVisible()
+        ensureBackgroundThread {
+            try {
+                val sourceStarted = LdkWalletManager.ensureStartedBlocking(context, source)
+                if (!sourceStarted) {
+                    val err = resolveWithdrawError(
+                        defaultMessage = host.getString(R.string.wallet_withdraw_source_start_failed),
+                        LdkWalletManager.getLastErrorMessage(),
+                        FedimintWalletManager.getLastErrorMessage(),
+                    )
+                    host.runOnUiThread {
+                        binding.walletProgress.beGone()
+                        host.toast(host.getString(R.string.wallet_withdraw_failed, err))
+                    }
+                    return@ensureBackgroundThread
+                }
+
+                var inboundLiquidity = LdkWalletManager.getUsableInboundLiquiditySats() ?: 0L
+                val activeLiquidityProviderId = LdkWalletManager.getActiveLiquidityProviderId().orEmpty()
+                val autoResolvedProvider = FederationDirectoryManager.resolveLiquidityProvider(context, source)
+                val liveFedimintGatewayNodeIds = FedimintWalletManager.discoverLightningGatewayNodeIdsBlocking(
+                    context = context,
+                    federation = selected,
+                )
+                val combinedGatewayNodeIds = (selected.vettedGateways + liveFedimintGatewayNodeIds)
+                    .asSequence()
+                    .map { it.trim() }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                    .toList()
+                val autoGatewayCandidates = LdkWalletManager.discoverLspsCandidatesFromGatewayHints(
+                    network = source.network,
+                    gatewayNodeIds = combinedGatewayNodeIds,
+                    maxCandidates = 6,
+                )
+                val autoDirectoryProviders = FederationDirectoryManager
+                    .getLiquidityProviders(context, source.network)
+                    .asSequence()
+                    .filter { it.id.trim().isNotBlank() }
+                    .filter { it.nodeId.trim().isNotBlank() && it.address.trim().isNotBlank() }
+                    .take(6)
+                    .toList()
+                val hasAnyLiquidityPath = inboundLiquidity >= amountSats ||
+                    activeLiquidityProviderId.isNotBlank() ||
+                    autoResolvedProvider != null ||
+                    autoGatewayCandidates.isNotEmpty() ||
+                    autoDirectoryProviders.isNotEmpty()
+                if (!hasAnyLiquidityPath) {
+                    host.runOnUiThread {
+                        binding.walletProgress.beGone()
+                        host.toast(
+                            host.getString(
+                                R.string.wallet_withdraw_incoming_liquidity_missing,
+                                formatSats(amountSats.toULong()),
+                                formatSats(inboundLiquidity.toULong()),
+                            )
+                        )
+                    }
+                    return@ensureBackgroundThread
+                }
+
+                var receiveInvoice = LdkWalletManager.createBolt11Invoice(
+                    amountSats = amountSats,
+                    memo = "Federation withdraw",
+                    expirySeconds = 5 * 60,
+                    preferJitChannel = true,
+                )
+                if (receiveInvoice.isNullOrBlank()) {
+                    val firstError = LdkWalletManager.getLastErrorMessage().orEmpty()
+                    val shouldRetryAfterRestart = autoResolvedProvider != null &&
+                        isLikelyLiquiditySetupError(firstError)
+
+                    if (shouldRetryAfterRestart) {
+                        // Rebuild the node so a newly resolved provider gets applied deterministically.
+                        LdkWalletManager.stop()
+                        val restarted = LdkWalletManager.ensureStartedBlocking(context, source)
+                        if (restarted) {
+                            inboundLiquidity = LdkWalletManager.getUsableInboundLiquiditySats() ?: inboundLiquidity
+                            receiveInvoice = LdkWalletManager.createBolt11Invoice(
+                                amountSats = amountSats,
+                                memo = "Federation withdraw",
+                                expirySeconds = 5 * 60,
+                                preferJitChannel = true,
+                            )
+                        }
+                    }
+
+                    // If inbound is already available but JIT path keeps failing, fallback to standard receive.
+                    if (receiveInvoice.isNullOrBlank() && inboundLiquidity >= amountSats) {
+                        receiveInvoice = LdkWalletManager.createBolt11Invoice(
+                            amountSats = amountSats,
+                            memo = "Federation withdraw",
+                            expirySeconds = 5 * 60,
+                            preferJitChannel = false,
+                        )
+                    }
+
+                    if (receiveInvoice.isNullOrBlank()) {
+                        val feeError = LdkWalletManager.getLastErrorMessage().orEmpty()
+                        if (isLikelyFeerateError(feeError)) {
+                            // Feerate estimation can be transient. Retry JIT a few times after sync.
+                            repeat(2) {
+                                LdkWalletManager.syncWalletsBlocking()
+                                receiveInvoice = LdkWalletManager.createBolt11Invoice(
+                                    amountSats = amountSats,
+                                    memo = "Federation withdraw",
+                                    expirySeconds = 5 * 60,
+                                    preferJitChannel = true,
+                                )
+                                if (!receiveInvoice.isNullOrBlank()) {
+                                    return@repeat
+                                }
+                                try {
+                                    Thread.sleep(750L)
+                                } catch (_: InterruptedException) {
+                                    Thread.currentThread().interrupt()
+                                    return@repeat
+                                }
+                            }
+
+                            // Degraded mode: if feerates still fail for JIT, attempt a standard invoice
+                            // so withdraw can continue when inbound liquidity is already available.
+                            if (receiveInvoice.isNullOrBlank()) {
+                                receiveInvoice = LdkWalletManager.createBolt11Invoice(
+                                    amountSats = amountSats,
+                                    memo = "Federation withdraw",
+                                    expirySeconds = 5 * 60,
+                                    preferJitChannel = false,
+                                )
+                            }
+                        }
+                    }
+
+                    if (receiveInvoice.isNullOrBlank() && autoGatewayCandidates.isNotEmpty()) {
+                        receiveInvoice = tryAutoLiquidityProviderFromGateways(
+                            sourceFederation = source,
+                            targetFederation = selected,
+                            amountSats = amountSats,
+                            candidates = autoGatewayCandidates,
+                        )
+                    }
+
+                    if (receiveInvoice.isNullOrBlank() && autoDirectoryProviders.isNotEmpty()) {
+                        receiveInvoice = tryAutoLiquidityProviderFromDirectory(
+                            sourceFederation = source,
+                            amountSats = amountSats,
+                            providers = autoDirectoryProviders,
+                        )
+                    }
+                }
+                if (receiveInvoice.isNullOrBlank()) {
+                    val err = resolveWithdrawError(
+                        defaultMessage = host.getString(R.string.wallet_withdraw_invoice_create_failed),
+                        LdkWalletManager.getLastErrorMessage(),
+                        FedimintWalletManager.getLastErrorMessage(),
+                    )
+                    host.runOnUiThread {
+                        binding.walletProgress.beGone()
+                        host.toast(host.getString(R.string.wallet_withdraw_failed, err))
+                    }
+                    return@ensureBackgroundThread
+                }
+
+                val payAccepted = FedimintWalletManager.payBolt11InvoiceBlocking(
+                    context = context,
+                    federation = selected,
+                    invoice = receiveInvoice,
+                )
+                var withdrawSucceeded = false
+                var withdrawPending = false
+                var err = FedimintWalletManager.getLastErrorMessage()
+
+                if (payAccepted) {
+                    when (
+                        LdkWalletManager.awaitIncomingLightningInvoiceStatusBlocking(
+                            invoiceStr = receiveInvoice,
+                            timeoutMs = 180_000L,
+                            failOnTimeout = false,
+                        )
+                    ) {
+                        PaymentStatus.SUCCEEDED -> {
+                            withdrawSucceeded = true
+                            err = null
+                        }
+
+                        PaymentStatus.PENDING -> {
+                            withdrawPending = true
+                            err = LdkWalletManager.getLastErrorMessage()
+                                ?: FedimintWalletManager.getLastErrorMessage()
+                        }
+
+                        PaymentStatus.FAILED,
+                        null,
+                        -> {
+                            val statusError = LdkWalletManager.getLastErrorMessage()
+                                ?: FedimintWalletManager.getLastErrorMessage()
+                            if (isLikelyFeerateError(statusError)) {
+                                withdrawPending = true
+                                err = statusError
+                            } else {
+                                err = statusError
+                            }
+                        }
+                    }
+                } else {
+                    err = resolveWithdrawError(
+                        defaultMessage = host.getString(R.string.wallet_withdraw_payment_rejected),
+                        err,
+                        FedimintWalletManager.getLastErrorMessage(),
+                        LdkWalletManager.getLastErrorMessage(),
+                    )
+                }
+
+                if (!withdrawSucceeded && !withdrawPending) {
+                    err = resolveWithdrawError(
+                        defaultMessage = host.getString(R.string.wallet_withdraw_settlement_failed),
+                        err,
+                        LdkWalletManager.getLastErrorMessage(),
+                        FedimintWalletManager.getLastErrorMessage(),
+                    )
+                }
+
+                val finalError = resolveWithdrawError(
+                    defaultMessage = host.getString(R.string.wallet_withdraw_settlement_failed),
+                    err,
+                    LdkWalletManager.getLastErrorMessage(),
+                    FedimintWalletManager.getLastErrorMessage(),
+                )
+
+                host.runOnUiThread {
+                    binding.walletProgress.beGone()
+                    if (withdrawSucceeded) {
+                        host.toast(R.string.wallet_withdraw_success)
+                        refreshAll(force = false)
+                    } else if (withdrawPending) {
+                        host.toast(R.string.wallet_withdraw_pending)
+                        refreshAll(force = false)
+                    } else {
+                        host.toast(host.getString(R.string.wallet_withdraw_failed, finalError))
+                    }
+                }
+            } catch (t: Throwable) {
+                val message = resolveWithdrawError(
+                    defaultMessage = host.getString(R.string.wallet_withdraw_settlement_failed),
+                    LdkWalletManager.summarizeThrowableForUi(t),
+                    LdkWalletManager.getLastErrorMessage(),
+                    FedimintWalletManager.getLastErrorMessage(),
+                    LdkWalletManager.normalizeExternalErrorMessage(t.message),
+                )
+                host.runOnUiThread {
+                    binding.walletProgress.beGone()
+                    host.toast(host.getString(R.string.wallet_withdraw_failed, message))
+                }
+            }
+        }
     }
 
     private fun launchWalletContactPicker() {
@@ -970,21 +1981,38 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
     private fun showSetWalletAddressDialog(rawId: Long) {
         val host = activity ?: return
         val vb = DialogContactWalletAddressBinding.inflate(host.layoutInflater)
-        vb.contactWalletAddress.setText("")
+        val existing = WalletContactHelper.getWalletDestinations(host, rawId, 0)
+        vb.contactWalletAddress.setText(existing.onchain.orEmpty())
+        vb.contactWalletLightning.setText(existing.lightning.orEmpty())
 
         host.getAlertDialogBuilder()
+            .setNeutralButton(R.string.clear) { _, _ ->
+                WalletContactHelper.deleteWalletDestination(host, rawId)
+                activeSendDestination?.setText("")
+                host.toast(R.string.done)
+            }
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.ok, null)
             .apply {
                 host.setupDialogStuff(vb.root, this, R.string.contact_wallet_address) { alertDialog ->
                     alertDialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                        val value = vb.contactWalletAddress.text?.toString()?.trim().orEmpty()
-                        if (value.isBlank()) {
-                            host.toast(R.string.wallet_send_destination_required)
+                        val onchain = vb.contactWalletAddress.text?.toString()?.trim().orEmpty()
+                        val lightning = vb.contactWalletLightning.text?.toString()?.trim().orEmpty()
+                        if (onchain.isBlank() && lightning.isBlank()) {
+                            host.toast(R.string.contact_wallet_destination_required)
                             return@setOnClickListener
                         }
-                        WalletContactHelper.upsertWalletDestination(host, rawId, value)
-                        activeSendDestination?.setText(value)
+                        if (onchain.isBlank()) {
+                            WalletContactHelper.deleteWalletOnchainDestination(host, rawId)
+                        } else {
+                            WalletContactHelper.upsertWalletOnchainDestination(host, rawId, onchain)
+                        }
+                        if (lightning.isBlank()) {
+                            WalletContactHelper.deleteWalletLightningDestination(host, rawId)
+                        } else {
+                            WalletContactHelper.upsertWalletLightningDestination(host, rawId, lightning)
+                        }
+                        activeSendDestination?.setText(if (lightning.isNotBlank()) lightning else onchain)
                         host.toast(R.string.done)
                         alertDialog.dismiss()
                     }
@@ -995,78 +2023,265 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
     private fun sendPayment(destination: String, amountSats: Long?) {
         val host = activity ?: return
         val selected = FederationDirectoryManager.getSelectedFederation(context) ?: return
-        val isFm = isFedimint(selected)
+        val normalizedDestination = normalizePayDestination(destination)
+        if (normalizedDestination.isBlank()) {
+            host.toast(R.string.wallet_send_destination_required)
+            return
+        }
+
+        var effectiveFederation = selected
+        var isFm = isFedimint(effectiveFederation)
+        val isBolt11Destination = LdkWalletManager.isBolt11Invoice(normalizedDestination)
+        val fixedDestinationInvoiceSats = if (isBolt11Destination) parseFixedInvoiceSats(normalizedDestination) else null
+        if (isFm && (!isBolt11Destination || fixedDestinationInvoiceSats == null)) {
+            WalletFederationTopupManager.findMainnetSourceFederation(
+                context = context,
+                targetFederationId = selected.id,
+                targetNetwork = selected.network,
+            )?.let { mainnetSource ->
+                effectiveFederation = mainnetSource
+                isFm = false
+            }
+        }
+        val tryFedimintFallback = FederationDirectoryManager.shouldTryFedimintFallback(effectiveFederation)
 
         binding.walletProgress.beVisible()
 
         ensureBackgroundThread {
-            val started = if (isFm) {
-                FedimintWalletManager.ensureStartedBlocking(context, selected)
-            } else {
-                LdkWalletManager.ensureStartedBlocking(context, selected)
-            }
-            var successMessage: String? = null
-            var userErrorMessage: String? = null
-
-            val txLimitText = NumberFormat.getIntegerInstance(Locale.getDefault())
-                .format(WalletPolicy.MAX_SINGLE_TX_SATS)
-
-            if (started) {
-                val isBolt11 = LdkWalletManager.isBolt11Invoice(destination)
-                val fixedInvoiceSats = if (isBolt11) parseFixedInvoiceSats(destination) else null
-                if (fixedInvoiceSats != null && !WalletPolicy.isAmountWithinSingleTxLimit(fixedInvoiceSats)) {
-                    userErrorMessage = host.getString(R.string.wallet_amount_over_limit, txLimitText)
-                } else if (amountSats != null && !WalletPolicy.isAmountWithinSingleTxLimit(amountSats)) {
-                    userErrorMessage = host.getString(R.string.wallet_amount_over_limit, txLimitText)
+            try {
+                val started = if (isFm) {
+                    FedimintWalletManager.ensureStartedBlocking(context, effectiveFederation)
+                } else {
+                    LdkWalletManager.ensureStartedBlocking(context, effectiveFederation)
                 }
+                var successMessage: String? = null
+                var pendingMessage: String? = null
+                var userErrorMessage: String? = null
+                var usedFedimintBackend = isFm
 
-                if (userErrorMessage == null) {
-                    if (!isBolt11) {
-                        // Fedimint currently supports Lightning (BOLT11) only via the embedded SDK.
-                        if (isFm) {
-                            userErrorMessage = host.getString(R.string.wallet_fedimint_invoice_only)
-                        } else {
-                            if (amountSats == null || amountSats <= 0L) {
-                                userErrorMessage = host.getString(R.string.wallet_send_amount_required)
-                            } else {
-                                val txId = LdkWalletManager.sendOnchain(destination, amountSats)
-                                if (txId != null) {
-                                    successMessage = host.getString(R.string.wallet_send_submitted)
+                val txLimitText = NumberFormat.getIntegerInstance(Locale.getDefault())
+                    .format(WalletPolicy.MAX_SINGLE_TX_SATS)
+
+                if (started) {
+                    val isBolt11 = LdkWalletManager.isBolt11Invoice(normalizedDestination)
+                    val fixedInvoiceSats = if (isBolt11) parseFixedInvoiceSats(normalizedDestination) else null
+                    if (fixedInvoiceSats != null && !WalletPolicy.isAmountWithinSingleTxLimit(fixedInvoiceSats)) {
+                        userErrorMessage = host.getString(R.string.wallet_amount_over_limit, txLimitText)
+                    } else if (amountSats != null && !WalletPolicy.isAmountWithinSingleTxLimit(amountSats)) {
+                        userErrorMessage = host.getString(R.string.wallet_amount_over_limit, txLimitText)
+                    }
+
+                    if (userErrorMessage == null) {
+                        if (isFm && isBolt11) {
+                            // Proactive top-up only when we can confidently read federation balance.
+                            val proactiveTopupQuote = WalletFederationTopupManager.buildTopupQuote(
+                                context = context,
+                                targetFederation = effectiveFederation,
+                                invoice = normalizedDestination,
+                                assumeZeroOnUnknownBalance = false,
+                            )
+                            if (proactiveTopupQuote != null) {
+                                host.runOnUiThread {
+                                    binding.walletProgress.beGone()
+                                    showMintTopupDialogForWallet(
+                                        quote = proactiveTopupQuote,
+                                        destination = normalizedDestination,
+                                    )
                                 }
+                                return@ensureBackgroundThread
                             }
                         }
-                    } else {
-                        if (isFm) {
-                            val fixed = parseFixedInvoiceSats(destination)
-                            if (fixed == null) {
-                                userErrorMessage = host.getString(R.string.wallet_fedimint_variable_invoice_unsupported)
+
+                        if (!isBolt11) {
+                            // Fedimint currently supports Lightning (BOLT11) only via the embedded SDK.
+                            if (isFm) {
+                                userErrorMessage = host.getString(R.string.wallet_fedimint_invoice_only)
                             } else {
-                                val ok = FedimintWalletManager.payBolt11InvoiceBlocking(context, selected, destination)
-                                if (ok) successMessage = host.getString(R.string.wallet_send_submitted)
+                                if (amountSats == null || amountSats <= 0L) {
+                                    userErrorMessage = host.getString(R.string.wallet_send_amount_required)
+                                } else {
+                                    val txId = LdkWalletManager.sendOnchain(normalizedDestination, amountSats)
+                                    if (txId != null) {
+                                        successMessage = host.getString(R.string.wallet_send_submitted)
+                                    }
+                                }
                             }
                         } else {
-                            val id = LdkWalletManager.payBolt11Invoice(destination, amountSats)
-                            if (id != null) {
-                                successMessage = host.getString(R.string.wallet_send_submitted)
+                            if (isFm) {
+                                val fixed = parseFixedInvoiceSats(normalizedDestination)
+                                if (fixed == null) {
+                                    userErrorMessage = host.getString(R.string.wallet_fedimint_variable_invoice_requires_mainnet)
+                                } else {
+                                    val ok = FedimintWalletManager.payBolt11InvoiceBlocking(context, effectiveFederation, normalizedDestination)
+                                    if (ok) successMessage = host.getString(R.string.wallet_send_submitted)
+                                }
+                            } else {
+                                val id = LdkWalletManager.payBolt11Invoice(normalizedDestination, amountSats)
+                                var allowFedimintFallback = true
+                                if (id != null) {
+                                    when (LdkWalletManager.awaitOutgoingLightningPaymentStatusBlocking(id)) {
+                                        PaymentStatus.SUCCEEDED -> {
+                                            successMessage = host.getString(R.string.wallet_send_success)
+                                            allowFedimintFallback = false
+                                        }
+
+                                        PaymentStatus.PENDING -> {
+                                            pendingMessage = host.getString(R.string.wallet_send_pending)
+                                            allowFedimintFallback = false
+                                        }
+
+                                        PaymentStatus.FAILED,
+                                        null,
+                                        -> {
+                                            // Keep allowFedimintFallback = true.
+                                        }
+                                    }
+                                }
+
+                                if (allowFedimintFallback && tryFedimintFallback) {
+                                    usedFedimintBackend = true
+                                    val fmStarted = FedimintWalletManager.ensureStartedBlocking(context, effectiveFederation)
+                                    val fmOk = fmStarted && FedimintWalletManager.payBolt11InvoiceBlocking(
+                                        context = context,
+                                        federation = effectiveFederation,
+                                        invoice = normalizedDestination,
+                                    )
+                                    if (fmOk) {
+                                        successMessage = host.getString(R.string.wallet_send_submitted)
+                                    }
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            val backendError = if (isFm) FedimintWalletManager.getLastErrorMessage() else LdkWalletManager.getLastErrorMessage()
-            val error = backendError.orEmpty().ifBlank {
-                host.getString(R.string.wallet_unknown_error)
-            }
-
-            host.runOnUiThread {
-                binding.walletProgress.beGone()
-                if (successMessage != null) {
-                    host.toast(successMessage!!)
-                    refreshAll(force = false)
-                } else if (userErrorMessage != null) {
-                    host.toast(userErrorMessage!!)
+                val backendError = if (usedFedimintBackend) {
+                    FedimintWalletManager.getLastErrorMessage()
                 } else {
+                    LdkWalletManager.getLastErrorMessage()
+                }
+                val error = backendError.orEmpty().ifBlank {
+                    host.getString(R.string.wallet_unknown_error)
+                }
+                val insufficientBalance = (
+                    usedFedimintBackend &&
+                    successMessage == null &&
+                    pendingMessage == null &&
+                    userErrorMessage == null &&
+                    WalletFederationTopupManager.isLikelyInsufficientBalance(error)
+                    )
+                val topupQuote = if (insufficientBalance) {
+                    WalletFederationTopupManager.buildTopupQuote(
+                        context = context,
+                        targetFederation = effectiveFederation,
+                        invoice = normalizedDestination,
+                    )
+                } else {
+                    null
+                }
+                val finalError = if (insufficientBalance && topupQuote == null) {
+                    host.getString(R.string.wallet_federation_topup_unavailable)
+                } else {
+                    error
+                }
+
+                host.runOnUiThread {
+                    binding.walletProgress.beGone()
+                    if (successMessage != null) {
+                        host.toast(successMessage!!)
+                        refreshAll(force = false)
+                    } else if (pendingMessage != null) {
+                        host.toast(pendingMessage!!)
+                        refreshAll(force = false)
+                    } else if (topupQuote != null) {
+                        showMintTopupDialogForWallet(
+                            quote = topupQuote,
+                            destination = destination,
+                        )
+                    } else if (userErrorMessage != null) {
+                        host.toast(userErrorMessage!!)
+                    } else {
+                        host.toast(host.getString(R.string.wallet_send_failed, finalError))
+                    }
+                }
+            } catch (t: Throwable) {
+                val error = t.message?.trim().orEmpty().ifBlank { host.getString(R.string.wallet_unknown_error) }
+                host.runOnUiThread {
+                    binding.walletProgress.beGone()
+                    host.toast(host.getString(R.string.wallet_send_failed, error))
+                }
+            }
+        }
+    }
+
+    private fun showMintTopupDialogForWallet(
+        quote: WalletFederationTopupManager.TopupQuote,
+        destination: String,
+    ) {
+        val host = activity ?: return
+        WalletUiDialogs.showTopupConfirmDialog(
+            activity = host,
+            quote = quote,
+            onConfirm = {
+                performTopupAndRetryWalletPayment(
+                    quote = quote,
+                    destination = destination,
+                )
+            },
+        )
+    }
+
+    private fun performTopupAndRetryWalletPayment(
+        quote: WalletFederationTopupManager.TopupQuote,
+        destination: String,
+    ) {
+        val host = activity ?: return
+        binding.walletProgress.beVisible()
+
+        ensureBackgroundThread {
+            try {
+                val topup = WalletFederationTopupManager.topupFromMainnetBlocking(context, quote)
+                val paidAfterTopup = if (topup.success) {
+                    FedimintWalletManager.payBolt11InvoiceBlocking(
+                        context = context,
+                        federation = quote.targetFederation,
+                        invoice = destination,
+                    )
+                } else {
+                    false
+                }
+                val paidByDirectRetry = if (!topup.success) {
+                    // If top-up fails due source-side constraints, retry direct federation payment once.
+                    FedimintWalletManager.payBolt11InvoiceBlocking(
+                        context = context,
+                        federation = quote.targetFederation,
+                        invoice = destination,
+                    )
+                } else {
+                    false
+                }
+                val paid = paidAfterTopup || paidByDirectRetry
+
+                val error = when {
+                    paid -> null
+                    topup.pending -> topup.errorMessage
+                    !topup.success -> topup.errorMessage ?: FedimintWalletManager.getLastErrorMessage()
+                    else -> FedimintWalletManager.getLastErrorMessage()
+                }.orEmpty().ifBlank { host.getString(R.string.wallet_unknown_error) }
+
+                host.runOnUiThread {
+                    binding.walletProgress.beGone()
+                    if (paid) {
+                        host.toast(R.string.wallet_send_submitted)
+                        refreshAll(force = false)
+                    } else {
+                        host.toast(host.getString(R.string.wallet_send_failed, error))
+                    }
+                }
+            } catch (t: Throwable) {
+                val error = t.message?.trim().orEmpty().ifBlank { host.getString(R.string.wallet_unknown_error) }
+                host.runOnUiThread {
+                    binding.walletProgress.beGone()
                     host.toast(host.getString(R.string.wallet_send_failed, error))
                 }
             }
@@ -1619,21 +2834,18 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                                     context.config.setWalletLastInvoiceForFederation(selected.id, invoice)
                                     context.config.setWalletLastInvoiceCreatedMsForFederation(selected.id, System.currentTimeMillis())
                                     renderMyAddresses()
+                                    val invoiceMessage = WalletTokenParser.buildLightningInvoiceMessage(
+                                        invoice = invoice,
+                                        federationId = selected.id,
+                                        federationName = selected.name,
+                                    ).ifBlank { invoice }
 
-                                    host.getAlertDialogBuilder()
-                                        .setTitle(R.string.wallet_invoice)
-                                        .setMessage(invoice)
-                                        .setPositiveButton(R.string.copy) { _, _ ->
-                                            host.copyToClipboard(invoice)
-                                            host.toast(org.fossify.commons.R.string.value_copied_to_clipboard)
-                                        }
-                                        .setNeutralButton(R.string.wallet_send_in_messages) { _, _ ->
-                                            sendTextInMessages(invoice)
-                                        }
-                                        .setNegativeButton(R.string.share) { _, _ ->
-                                            host.shareTextIntent(invoice)
-                                        }
-                                        .show()
+                                    WalletUiDialogs.showInvoicePreviewDialog(
+                                        activity = host,
+                                        federation = selected,
+                                        invoiceMessage = invoiceMessage,
+                                        onSendInMessages = { payload -> sendTextInMessages(payload) }
+                                    )
                                 } else {
                                     host.toast(host.getString(R.string.wallet_invoice_failed, error))
                                 }
@@ -1722,10 +2934,106 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
 
     private fun sendTextInMessages(text: String) {
         val host = activity ?: return
+        val payload = buildWalletMessageForSend(text)
+        if (payload.isBlank()) {
+            host.toast(R.string.wallet_send_destination_required)
+            return
+        }
+
+        val items = arrayOf(
+            host.getString(R.string.wallet_send_existing_thread),
+            host.getString(R.string.wallet_send_new_message),
+        )
+        host.getAlertDialogBuilder()
+            .setTitle(R.string.wallet_send_in_messages)
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> showExistingThreadPicker(payload)
+                    1 -> openNewConversationWithPrefill(payload)
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun buildWalletMessageForSend(text: String): String {
+        val trimmed = text.trim()
+        if (trimmed.isBlank()) return ""
+        val selected = FederationDirectoryManager.getSelectedFederation(context)
+        if (selected != null && LdkWalletManager.isBolt11Invoice(trimmed)) {
+            return WalletTokenParser.buildLightningInvoiceMessage(
+                invoice = trimmed,
+                federationId = selected.id,
+                federationName = selected.name,
+            ).ifBlank { trimmed }
+        }
+        return trimmed
+    }
+
+    private fun openNewConversationWithPrefill(text: String) {
+        val host = activity ?: return
         Intent(host, NewConversationActivity::class.java).apply {
             action = Intent.ACTION_SEND
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, text)
+            host.startActivity(this)
+        }
+    }
+
+    private fun showExistingThreadPicker(
+        prefillText: String,
+        onConversationSelected: ((Conversation) -> Unit)? = null,
+    ) {
+        val host = activity ?: return
+        binding.walletProgress.beVisible()
+        ensureBackgroundThread {
+            val conversations = runCatching {
+                context.conversationsDB.getNonArchived()
+            }.getOrDefault(emptyList())
+                .filterNot { it.isScheduled }
+                .sortedByDescending { it.date }
+
+            host.runOnUiThread {
+                binding.walletProgress.beGone()
+                if (conversations.isEmpty()) {
+                    host.toast(org.fossify.messages.R.string.no_conversations_found)
+                    return@runOnUiThread
+                }
+
+                val labels = conversations.map { conversation ->
+                    val title = conversation.title.trim().ifBlank { conversation.phoneNumber.trim() }
+                        .ifBlank { conversation.threadId.toString() }
+                    if (LxmfAddress.isMeshThreadId(conversation.threadId) ||
+                        LxmfAddress.isMeshLike(conversation.phoneNumber)
+                    ) {
+                        host.getString(R.string.wallet_thread_mesh_label, title)
+                    } else {
+                        title
+                    }
+                }.toTypedArray()
+
+                host.getAlertDialogBuilder()
+                    .setTitle(R.string.wallet_send_existing_thread)
+                    .setItems(labels) { _, which ->
+                        conversations.getOrNull(which)?.let { conversation ->
+                            onConversationSelected?.invoke(conversation)
+                            openExistingThreadWithPrefill(conversation, prefillText)
+                        }
+                    }
+                    .setNegativeButton(R.string.cancel, null)
+                    .show()
+            }
+        }
+    }
+
+    private fun openExistingThreadWithPrefill(conversation: Conversation, prefillText: String) {
+        val host = activity ?: return
+        Intent(host, ThreadActivity::class.java).apply {
+            putExtra(THREAD_ID, conversation.threadId)
+            putExtra(THREAD_TITLE, conversation.title)
+            putExtra(THREAD_NUMBER, conversation.phoneNumber)
+            putExtra(THREAD_TEXT, prefillText)
+            putExtra(THREAD_AUTO_SEND, true)
             host.startActivity(this)
         }
     }
@@ -1745,6 +3053,183 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
         val msat = runCatching { invoice.amountMilliSatoshis() }.getOrNull() ?: return null
         val sats = runCatching { (msat / 1000UL).toLong() }.getOrNull() ?: return null
         return sats.takeIf { it > 0L }
+    }
+
+    private fun isLikelyLiquiditySetupError(raw: String?): Boolean {
+        val text = raw?.trim().orEmpty().lowercase(Locale.ROOT)
+        if (text.isBlank()) return false
+        return text.contains("instant payments setup is missing") ||
+            (text.contains("liquidity source") && text.contains("missing")) ||
+            (text.contains("liquidity source") && text.contains("unavailable")) ||
+            text.contains("incoming lightning liquidity is too low")
+    }
+
+    private fun isLikelyFeerateError(raw: String?): Boolean {
+        val text = raw?.trim().orEmpty().lowercase(Locale.ROOT)
+        if (text.isBlank()) return false
+        return text.contains("feerate") ||
+            text.contains("fee rate") ||
+            text.contains("fee rates") ||
+            (text.contains("fee") && text.contains("estimate")) ||
+            ((text.contains("fee") || text.contains("fees")) && (text.contains("rate") || text.contains("rates"))) ||
+            (text.contains("fee") && text.contains("invalid"))
+    }
+
+    private data class LiquidityPrefsSnapshot(
+        val mode: String,
+        val providerId: String,
+        val customName: String,
+        val customNetwork: String,
+        val customNodeId: String,
+        val customAddress: String,
+        val customToken: String,
+    )
+
+    private fun snapshotLiquidityPrefs(): LiquidityPrefsSnapshot {
+        val cfg = context.config
+        return LiquidityPrefsSnapshot(
+            mode = cfg.walletLiquidityProviderMode,
+            providerId = cfg.walletLiquidityProviderId,
+            customName = cfg.walletLiquidityCustomName,
+            customNetwork = cfg.walletLiquidityCustomNetwork,
+            customNodeId = cfg.walletLiquidityCustomNodeId,
+            customAddress = cfg.walletLiquidityCustomAddress,
+            customToken = cfg.walletLiquidityCustomToken,
+        )
+    }
+
+    private fun restoreLiquidityPrefs(snapshot: LiquidityPrefsSnapshot) {
+        val cfg = context.config
+        cfg.walletLiquidityProviderMode = snapshot.mode
+        cfg.walletLiquidityProviderId = snapshot.providerId
+        cfg.walletLiquidityCustomName = snapshot.customName
+        cfg.walletLiquidityCustomNetwork = snapshot.customNetwork
+        cfg.walletLiquidityCustomNodeId = snapshot.customNodeId
+        cfg.walletLiquidityCustomAddress = snapshot.customAddress
+        cfg.walletLiquidityCustomToken = snapshot.customToken
+    }
+
+    private fun applyCustomLiquidityProvider(
+        name: String,
+        network: String,
+        nodeId: String,
+        address: String,
+        token: String = "",
+    ) {
+        val cfg = context.config
+        cfg.walletLiquidityCustomName = name
+        cfg.walletLiquidityCustomNetwork = network
+        cfg.walletLiquidityCustomNodeId = nodeId
+        cfg.walletLiquidityCustomAddress = address
+        cfg.walletLiquidityCustomToken = token
+        cfg.walletLiquidityProviderMode = "manual"
+        cfg.walletLiquidityProviderId = "custom-provider"
+    }
+
+    private fun applyManualDirectoryLiquidityProvider(providerId: String) {
+        val cfg = context.config
+        cfg.walletLiquidityProviderMode = "manual"
+        cfg.walletLiquidityProviderId = providerId
+    }
+
+    private fun tryAutoLiquidityProviderFromGateways(
+        sourceFederation: FederationEntry,
+        targetFederation: FederationEntry,
+        amountSats: Long,
+        candidates: List<Pair<String, String>>,
+    ): String? {
+        if (candidates.isEmpty()) return null
+        val snapshot = snapshotLiquidityPrefs()
+        var successfulInvoice: String? = null
+        val normalizedNetwork = sourceFederation.network?.trim().orEmpty().ifBlank { "bitcoin" }
+        val providerName = "${targetFederation.name} auto"
+
+        for ((nodeId, address) in candidates) {
+            applyCustomLiquidityProvider(
+                name = providerName,
+                network = normalizedNetwork,
+                nodeId = nodeId,
+                address = address,
+            )
+            LdkWalletManager.stop()
+            if (!LdkWalletManager.ensureStartedBlocking(context, sourceFederation)) {
+                FederationDirectoryManager.recordLiquidityProviderOutcome(context, "custom-provider", success = false)
+                continue
+            }
+
+            val invoice = LdkWalletManager.createBolt11Invoice(
+                amountSats = amountSats,
+                memo = "Federation withdraw",
+                expirySeconds = 5 * 60,
+                preferJitChannel = true,
+            )
+            if (!invoice.isNullOrBlank()) {
+                FederationDirectoryManager.recordLiquidityProviderOutcome(context, "custom-provider", success = true)
+                successfulInvoice = invoice
+                break
+            } else {
+                FederationDirectoryManager.recordLiquidityProviderOutcome(context, "custom-provider", success = false)
+            }
+        }
+
+        if (successfulInvoice.isNullOrBlank()) {
+            restoreLiquidityPrefs(snapshot)
+            LdkWalletManager.stop()
+            LdkWalletManager.ensureStartedBlocking(context, sourceFederation)
+        }
+        return successfulInvoice
+    }
+
+    private fun tryAutoLiquidityProviderFromDirectory(
+        sourceFederation: FederationEntry,
+        amountSats: Long,
+        providers: List<LiquidityProviderEntry>,
+    ): String? {
+        if (providers.isEmpty()) return null
+        val snapshot = snapshotLiquidityPrefs()
+        var successfulInvoice: String? = null
+
+        for (provider in providers) {
+            val providerId = provider.id.trim()
+            if (providerId.isBlank()) continue
+            applyManualDirectoryLiquidityProvider(providerId)
+            LdkWalletManager.stop()
+            if (!LdkWalletManager.ensureStartedBlocking(context, sourceFederation)) {
+                FederationDirectoryManager.recordLiquidityProviderOutcome(context, providerId, success = false)
+                continue
+            }
+
+            val invoice = LdkWalletManager.createBolt11Invoice(
+                amountSats = amountSats,
+                memo = "Federation withdraw",
+                expirySeconds = 5 * 60,
+                preferJitChannel = true,
+            )
+            if (!invoice.isNullOrBlank()) {
+                FederationDirectoryManager.recordLiquidityProviderOutcome(context, providerId, success = true)
+                successfulInvoice = invoice
+                break
+            } else {
+                FederationDirectoryManager.recordLiquidityProviderOutcome(context, providerId, success = false)
+            }
+        }
+
+        if (successfulInvoice.isNullOrBlank()) {
+            restoreLiquidityPrefs(snapshot)
+            LdkWalletManager.stop()
+            LdkWalletManager.ensureStartedBlocking(context, sourceFederation)
+        }
+        return successfulInvoice
+    }
+
+    private fun normalizePayDestination(raw: String): String {
+        val trimmed = raw.trim()
+        if (trimmed.isBlank()) return ""
+        val actionToken = WalletTokenParser.findActionToken(trimmed)
+        if (actionToken?.action == WalletTokenParser.WalletAction.PAY) {
+            return actionToken.token.trim().ifBlank { trimmed }
+        }
+        return WalletTokenParser.findPayToken(trimmed)?.trim().orEmpty().ifBlank { trimmed }
     }
 
     class WalletInnerBinding : InnerBinding {

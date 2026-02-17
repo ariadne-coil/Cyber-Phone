@@ -10,6 +10,7 @@ import kotlin.random.Random
 const val THREAD_ID = "thread_id"
 const val THREAD_TITLE = "thread_title"
 const val THREAD_TEXT = "thread_text"
+const val THREAD_AUTO_SEND = "thread_auto_send"
 const val THREAD_NUMBER = "thread_number"
 const val THREAD_ATTACHMENT_URI = "thread_attachment_uri"
 const val THREAD_ATTACHMENT_URIS = "thread_attachment_uris"
@@ -82,10 +83,19 @@ const val E2E_ENCRYPTED_MESSAGE_PREFIX = "E2E1:"
 const val MESH_ADDRESS_MESSAGE_PREFIX = "MESHADDR1:"
 const val MESH_ADDRESS_REPLY_THREADS = "mesh_address_reply_threads"
 const val EXTRA_WALLET_DESTINATION = "org.fossify.phone.extra.WALLET_DESTINATION"
+const val EXTRA_WALLET_FEDERATION_ID_HINT = "org.fossify.phone.extra.WALLET_FEDERATION_ID_HINT"
 // Optional hint for the wallet UI: whether the payment request arrived via an encrypted channel
 // (mesh or E2E). Used for applying high-value safety policy.
 const val EXTRA_WALLET_SECURE_CHANNEL = "org.fossify.phone.extra.WALLET_SECURE_CHANNEL"
 const val EXTRA_WALLET_TOKEN_TEXT = "org.fossify.phone.extra.WALLET_TOKEN_TEXT"
+const val EXTRA_WALLET_PAYMENT_REQUEST_TEXT = "org.fossify.phone.extra.WALLET_PAYMENT_REQUEST_TEXT"
+const val EXTRA_WALLET_REQUEST_ACTION = "org.fossify.phone.extra.WALLET_REQUEST_ACTION"
+const val EXTRA_WALLET_AUTO_PAY = "org.fossify.phone.extra.WALLET_AUTO_PAY"
+const val EXTRA_WALLET_REQUEST_ID = "org.fossify.phone.extra.WALLET_REQUEST_ID"
+const val EXTRA_WALLET_REQUEST_AMOUNT_SATS = "org.fossify.phone.extra.WALLET_REQUEST_AMOUNT_SATS"
+const val EXTRA_WALLET_REQUEST_THREAD_ID = "org.fossify.phone.extra.WALLET_REQUEST_THREAD_ID"
+const val WALLET_REQUEST_ACTION_APPROVE = "approve"
+const val WALLET_REQUEST_ACTION_DENY = "deny"
 
 private const val PATH = "org.fossify.org.fossify.messages.action."
 const val MARK_AS_READ = PATH + "mark_as_read"
@@ -137,6 +147,7 @@ const val PICK_DOCUMENT_INTENT = 47
 const val PICK_CONTACT_INTENT = 48
 const val PICK_SAVE_DIR_INTENT = 50
 const val WALLET_SEND_TOKEN_INTENT = 51
+const val WALLET_RESPOND_REQUEST_INTENT = 52
 
 const val BLOCKED_KEYWORDS_EXPORT_DELIMITER = ","
 const val BLOCKED_KEYWORDS_EXPORT_EXTENSION = ".txt"

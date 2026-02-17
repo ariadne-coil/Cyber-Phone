@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.Manifest
-import android.net.Uri
 import android.os.Bundle
 import android.os.Build
 import android.provider.ContactsContract
@@ -16,6 +15,7 @@ import androidx.core.content.ContextCompat
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
+import org.json.JSONObject
 import org.fossify.commons.dialogs.ConfirmationDialog
 import org.fossify.commons.dialogs.RadioGroupDialog
 import org.fossify.commons.extensions.copyToClipboard
@@ -51,6 +51,17 @@ import org.fossify.mesh.wifiaware.MeshWifiAwareState
 class ManageE2eKeysActivity : SimpleActivity() {
     private val binding by viewBinding(ActivityManageE2eKeysBinding::inflate)
     private var pendingIdentity: CyberIdentityPayload? = null
+
+    private companion object {
+        const val PREFS_NAME = "Prefs"
+        const val WALLET_LIQUIDITY_PROVIDER_MODE = "wallet_liquidity_provider_mode"
+        const val WALLET_LIQUIDITY_PROVIDER_ID = "wallet_liquidity_provider_id"
+        const val WALLET_DIRECTORY_JSON = "wallet_directory_json"
+        const val WALLET_LIQUIDITY_CUSTOM_NAME = "wallet_liquidity_custom_name"
+        const val WALLET_LIQUIDITY_CUSTOM_ADDRESS = "wallet_liquidity_custom_address"
+        const val CUSTOM_PROVIDER_ID = "custom-provider"
+        const val MODE_MANUAL = "manual"
+    }
 
     private val createDocument =
         registerForActivityResult(ActivityResultContracts.CreateDocument(TXT_MIME_TYPE)) { uri ->
@@ -211,6 +222,7 @@ class ManageE2eKeysActivity : SimpleActivity() {
     override fun onResume() {
         super.onResume()
         refreshProfile()
+        updateLiquidityProviderSummary()
         updateMeshStatus(MeshConfig.newInstance(this))
     }
 
@@ -287,6 +299,19 @@ class ManageE2eKeysActivity : SimpleActivity() {
                 updateMeshRoutingUi(meshConfig)
                 updateMeshStatus(meshConfig)
                 MeshManager.sync(this@ManageE2eKeysActivity)
+            }
+        }
+
+        profileMeshLiquidityProviderValue.text = getLiquidityProviderSummary()
+        profileMeshLiquidityProviderHolder.setOnClickListener {
+            val intent = Intent().setClassName(
+                packageName,
+                "org.fossify.phone.activities.WalletLiquidityProviderSettingsActivity"
+            )
+            runCatching {
+                startActivity(intent)
+            }.onFailure {
+                toast(R.string.profile_mesh_liquidity_settings_unavailable)
             }
         }
 
@@ -561,7 +586,7 @@ class ManageE2eKeysActivity : SimpleActivity() {
             meshUri = meshUri,
             e2ePublicKeyBase64 = E2eManager.getPublicKeyBase64(this),
             walletOnchainAddress = getLocalWalletOnchainAddress(),
-            walletLightningInvoice = getLocalWalletLastInvoice(),
+            walletLightningDestination = getLocalWalletLightningDestination(),
         )
         val size = resources.getDimensionPixelSize(R.dimen.profile_qr_size)
         val bitmap = createQrBitmap(content, size) ?: return
@@ -607,7 +632,7 @@ class ManageE2eKeysActivity : SimpleActivity() {
             identity.meshAddress?.let { appendLine("Mesh: $it") }
             identity.e2ePublicKeyBase64?.let { appendLine("E2E: ${it.take(16)}...") }
             identity.walletOnchainAddress?.let { appendLine("BTC: $it") }
-            identity.walletLightningInvoice?.let { appendLine("LN: ${it.take(16)}...") }
+            identity.walletLightningDestination?.let { appendLine("LN: ${it.take(16)}...") }
         }.trim().ifBlank { identity.raw }
         android.app.AlertDialog.Builder(this)
             .setTitle(R.string.profile_mesh_save_title)
@@ -630,7 +655,11 @@ class ManageE2eKeysActivity : SimpleActivity() {
             data = ContactsContract.Contacts.CONTENT_URI
             identity.meshAddress?.let { MeshContactHelper.addMeshPhoneInsertExtras(this, it) }
             identity.e2ePublicKeyBase64?.let { E2eManager.addE2ePublicKeyInsertExtras(this, it) }
-            identity.walletOnchainAddress?.let { WalletContactHelper.addWalletInsertExtras(this, it) }
+            WalletContactHelper.addWalletInsertExtras(
+                intent = this,
+                onchainDestination = identity.walletOnchainAddress?.trim().orEmpty().ifBlank { "bitcoin:" },
+                lightningDestination = identity.walletLightningDestination?.trim().orEmpty().ifBlank { "lightning:" }
+            )
             createContact.launch(this)
         }
     }
@@ -679,30 +708,104 @@ class ManageE2eKeysActivity : SimpleActivity() {
     private fun saveIdentityToRawContact(rawId: Long, identity: CyberIdentityPayload) {
         identity.meshAddress?.let { MeshContactHelper.upsertMeshAddressForRawContact(this, rawId, it) }
         identity.e2ePublicKeyBase64?.let { E2eManager.storeContactPublicKeyForRawContact(this, rawId, it) }
-        buildWalletDestinationFromIdentity(identity)?.let { WalletContactHelper.upsertWalletDestination(this, rawId, it) }
+        identity.walletOnchainAddress?.let { WalletContactHelper.upsertWalletOnchainDestination(this, rawId, it) }
+        identity.walletLightningDestination?.let { WalletContactHelper.upsertWalletLightningDestination(this, rawId, it) }
     }
 
-    private fun buildWalletDestinationFromIdentity(identity: CyberIdentityPayload): String? {
-        val btc = identity.walletOnchainAddress?.trim().orEmpty()
-        val ln = identity.walletLightningInvoice?.trim().orEmpty()
+    private fun updateLiquidityProviderSummary() {
+        binding.profileMeshLiquidityProviderValue.text = getLiquidityProviderSummary()
+    }
 
-        // Prefer a unified BIP21 URI if we have both. This keeps a single stable field in the
-        // contact while preserving both on-chain and Lightning options for the "Pay" action.
-        if (btc.isNotBlank()) {
-            return if (ln.isBlank()) {
-                btc
-            } else {
-                "bitcoin:$btc?lightning=${Uri.encode(ln)}"
+    private fun getLiquidityProviderSummary(): String {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val mode = prefs.getString(WALLET_LIQUIDITY_PROVIDER_MODE, "auto")
+            ?.trim()
+            ?.lowercase()
+            .orEmpty()
+        if (mode != MODE_MANUAL) {
+            return getString(R.string.profile_mesh_liquidity_auto)
+        }
+
+        val providerId = prefs.getString(WALLET_LIQUIDITY_PROVIDER_ID, "")
+            ?.trim()
+            .orEmpty()
+        if (providerId.isBlank()) {
+            return getString(R.string.profile_mesh_liquidity_manual_unset)
+        }
+
+        if (providerId == CUSTOM_PROVIDER_ID) {
+            val customName = prefs.getString(WALLET_LIQUIDITY_CUSTOM_NAME, "")?.trim().orEmpty()
+            val customAddress = prefs.getString(WALLET_LIQUIDITY_CUSTOM_ADDRESS, "")?.trim().orEmpty()
+            val display = when {
+                customName.isNotBlank() -> customName
+                customAddress.isNotBlank() -> customAddress
+                else -> getString(R.string.profile_mesh_liquidity_custom)
+            }
+            return getString(R.string.profile_mesh_liquidity_manual_value, display)
+        }
+
+        val providerName = resolveLiquidityProviderName(prefs.getString(WALLET_DIRECTORY_JSON, "").orEmpty(), providerId)
+        return getString(
+            R.string.profile_mesh_liquidity_manual_value,
+            providerName ?: providerId
+        )
+    }
+
+    private fun resolveLiquidityProviderName(directoryJson: String, providerId: String): String? {
+        val text = directoryJson.trim()
+        if (text.isBlank()) return null
+
+        // Preferred schema.
+        runCatching {
+            val root = JSONObject(text)
+            val providers = root.optJSONArray("liquidity_providers")
+            if (providers != null) {
+                for (i in 0 until providers.length()) {
+                    val obj = providers.optJSONObject(i) ?: continue
+                    val id = obj.optString("id").orEmpty().trim()
+                    if (id == providerId) {
+                        return obj.optString("name").orEmpty().trim().ifBlank { null }
+                    }
+                }
+            }
+
+            // Derived provider ids are "federation:<id>".
+            if (providerId.startsWith("federation:", ignoreCase = true)) {
+                val federationId = providerId.substringAfter("federation:", "").trim()
+                val federations = root.optJSONArray("federations")
+                if (federations != null) {
+                    for (i in 0 until federations.length()) {
+                        val obj = federations.optJSONObject(i) ?: continue
+                        val id = obj.optString("id").orEmpty().trim()
+                        if (id == federationId) {
+                            return obj.optString("name").orEmpty().trim().ifBlank { null }
+                        }
+                    }
+                }
             }
         }
 
-        // Fallback: Lightning-only (may be an invoice, which can expire).
-        return ln.takeIf { it.isNotBlank() }
+        // Legacy/simple schema: raw array of federation entries.
+        runCatching {
+            if (providerId.startsWith("federation:", ignoreCase = true)) {
+                val federationId = providerId.substringAfter("federation:", "").trim()
+                val array = org.json.JSONArray(text)
+                for (i in 0 until array.length()) {
+                    val obj = array.optJSONObject(i) ?: continue
+                    val id = obj.optString("id").orEmpty().trim()
+                    if (id == federationId) {
+                        return obj.optString("name").orEmpty().trim().ifBlank { null }
+                    }
+                }
+            }
+        }
+
+        return null
     }
 
     private fun getLocalWalletOnchainAddress(): String? {
         // Stored by the Wallet feature in the shared BaseConfig prefs ("Prefs").
-        val prefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val selectedId = prefs.getString("wallet_selected_federation_id", "")?.trim().orEmpty()
         val scoped = if (selectedId.isNotBlank()) {
             prefs.getString("wallet_last_onchain_address_$selectedId", "")?.trim().orEmpty()
@@ -714,7 +817,7 @@ class ManageE2eKeysActivity : SimpleActivity() {
     }
 
     private fun getLocalWalletLastInvoice(): String? {
-        val prefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val selectedId = prefs.getString("wallet_selected_federation_id", "")?.trim().orEmpty()
         val scoped = if (selectedId.isNotBlank()) {
             prefs.getString("wallet_last_invoice_$selectedId", "")?.trim().orEmpty()
@@ -723,6 +826,41 @@ class ManageE2eKeysActivity : SimpleActivity() {
         }
         if (scoped.isNotBlank()) return scoped
         return prefs.getString("wallet_last_invoice", "")?.trim()?.takeIf { it.isNotBlank() }
+    }
+
+    private fun getLocalWalletLightningDestination(): String? {
+        val fromProfile = getProfileCustomWalletDestination("Lightning")
+        if (!fromProfile.isNullOrBlank()) return fromProfile
+        return getLocalWalletLastInvoice()
+    }
+
+    private fun getProfileCustomWalletDestination(label: String): String? {
+        if (!hasPermission(PERMISSION_READ_CONTACTS)) return null
+        val profileId = contentResolver.query(
+            ContactsContract.Profile.CONTENT_URI,
+            arrayOf(ContactsContract.Profile._ID),
+            null,
+            null,
+            null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getLong(0) else null
+        } ?: return null
+
+        return contentResolver.query(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
+            "${ContactsContract.CommonDataKinds.Phone.CONTACT_ID}=? AND " +
+                "${ContactsContract.CommonDataKinds.Phone.TYPE}=? AND " +
+                "${ContactsContract.CommonDataKinds.Phone.LABEL}=?",
+            arrayOf(
+                profileId.toString(),
+                ContactsContract.CommonDataKinds.Phone.TYPE_CUSTOM.toString(),
+                label
+            ),
+            null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        }?.trim()?.takeIf { it.isNotBlank() }
     }
 
     private fun getProfileDisplayName(): String? {

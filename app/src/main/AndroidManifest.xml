@@ -226,6 +226,18 @@
             android:parentActivityName=".activities.MainActivity" />
 
         <activity
+            android:name=".activities.WalletRespondRequestActivity"
+            android:exported="false"
+            android:label="@string/wallet_review_request_title"
+            android:parentActivityName=".activities.MainActivity" />
+
+        <activity
+            android:name=".activities.WalletLiquidityProviderSettingsActivity"
+            android:exported="false"
+            android:label="@string/wallet_liquidity_settings_title"
+            android:parentActivityName=".activities.MainActivity" />
+
+        <activity
             android:name="org.fossify.phone.activities.CallActivity"
             android:excludeFromRecents="true"
             android:exported="false"

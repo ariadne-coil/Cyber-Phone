@@ -66,25 +66,145 @@
             tools:drawableEndCompat="@drawable/scheduled_message_icon"
             tools:text="Message content" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/thread_message_pay"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:id="@+id/thread_message_wallet_actions"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_below="@+id/thread_message_body"
+            android:layout_below="@+id/thread_message_reaction"
             android:layout_toEndOf="@id/thread_message_sender_photo"
             android:layout_marginTop="@dimen/tiny_margin"
-            android:insetLeft="0dp"
-            android:insetTop="0dp"
-            android:insetRight="0dp"
-            android:insetBottom="0dp"
-            android:minHeight="0dp"
-            android:paddingHorizontal="@dimen/normal_margin"
-            android:paddingVertical="@dimen/tiny_margin"
-            android:text="@string/wallet_pay"
-            android:textAllCaps="false"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
             android:visibility="gone"
-            tools:visibility="visible" />
+            tools:visibility="visible">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/thread_message_pay"
+                style="@style/Widget.MaterialComponents.Button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="@dimen/tiny_margin"
+                android:layout_weight="1"
+                android:insetLeft="0dp"
+                android:insetTop="0dp"
+                android:insetRight="0dp"
+                android:insetBottom="0dp"
+                android:minHeight="0dp"
+                android:paddingHorizontal="@dimen/normal_margin"
+                android:paddingVertical="@dimen/tiny_margin"
+                android:text="@string/wallet_pay"
+                android:textAllCaps="false"
+                android:visibility="gone"
+                tools:visibility="visible" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/thread_message_wallet_toggle"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/tiny_margin"
+                android:layout_weight="1"
+                android:insetLeft="0dp"
+                android:insetTop="0dp"
+                android:insetRight="0dp"
+                android:insetBottom="0dp"
+                android:minHeight="0dp"
+                android:paddingHorizontal="@dimen/normal_margin"
+                android:paddingVertical="@dimen/tiny_margin"
+                android:text="@string/wallet_show_full_message"
+                android:textAllCaps="false"
+                android:visibility="gone"
+                tools:visibility="visible" />
+        </LinearLayout>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/thread_message_request_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/thread_message_reaction"
+            android:layout_marginTop="@dimen/tiny_margin"
+            android:layout_toEndOf="@id/thread_message_sender_photo"
+            android:visibility="gone"
+            app:cardCornerRadius="@dimen/small_margin"
+            app:cardUseCompatPadding="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="@dimen/normal_margin"
+                android:paddingTop="@dimen/normal_margin"
+                android:paddingEnd="@dimen/normal_margin"
+                android:paddingBottom="@dimen/normal_margin">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/thread_message_request_amount"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="@dimen/smaller_text_size"
+                    android:textStyle="bold"
+                    tools:text="Requested amount: 100 sats" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/thread_message_request_federation"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textSize="@dimen/smaller_text_size"
+                    tools:text="Federation: Global Bitcoin Federation" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/thread_message_request_id"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textSize="@dimen/smaller_text_size"
+                    tools:text="Request ID: 3f0a..." />
+
+                <LinearLayout
+                    android:id="@+id/thread_message_request_actions_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/normal_margin"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/thread_message_request_deny"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="@dimen/tiny_margin"
+                        android:layout_weight="1"
+                        android:insetLeft="0dp"
+                        android:insetTop="0dp"
+                        android:insetRight="0dp"
+                        android:insetBottom="0dp"
+                        android:minHeight="0dp"
+                        android:paddingHorizontal="@dimen/normal_margin"
+                        android:paddingVertical="@dimen/tiny_margin"
+                        android:text="@string/wallet_request_deny"
+                        android:textAllCaps="false" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/thread_message_request_approve"
+                        style="@style/Widget.MaterialComponents.Button"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/tiny_margin"
+                        android:layout_weight="1"
+                        android:insetLeft="0dp"
+                        android:insetTop="0dp"
+                        android:insetRight="0dp"
+                        android:insetBottom="0dp"
+                        android:minHeight="0dp"
+                        android:paddingHorizontal="@dimen/normal_margin"
+                        android:paddingVertical="@dimen/tiny_margin"
+                        android:text="@string/wallet_request_approve"
+                        android:textAllCaps="false" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/thread_message_reaction"

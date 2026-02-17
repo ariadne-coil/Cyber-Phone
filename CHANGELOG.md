@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.4.1 (2026-02-17)
+- Wallet: major stabilization pass after v0.4.0 where wallet flows were partially broken; fixed multiple startup/sync failures that could leave balances unavailable or the wallet non-functional.
+- Wallet: fixed Bitcoin Mainnet regressions around fee-rate updates and hardened LDK recovery with Esplora fee-estimate preflight + endpoint failover during startup/sync.
+- Wallet: upgraded and hardened Fedimint runtime integration (startup/open/join lifecycle, federation compatibility handling, and improved error reporting paths).
+- Wallet: expanded federation directory handling (remote feed integration, deduping/normalization, and improved federation switching behavior).
+- Wallet: added liquidity provider management (auto/manual selection plus custom provider configuration) in Cyber Features.
+- Wallet: added automatic federation top-up plumbing from Bitcoin Mainnet with quote/fee prompts and liquidity bootstrap orchestration.
+- Wallet: added explicit balance transfer actions in the wallet UI (on-chain/Lightning exchange, federation Mint, federation Withdraw).
+- Wallet: rebuilt wallet send/pay flows to support request/approve/deny handshakes for Fedimint payments in conversations.
+- Wallet: improved message-side wallet token parsing/validation and request state tracking to prevent mismatched or duplicate invoice responses.
+- Wallet: improved contact + identity integration for wallet/mesh data (including better QR/field handling and contact wallet metadata updates).
+- Wallet UI: substantial redesign and theme integration across wallet screens, dialogs, and payment review surfaces.
+- Known issue: Fedimint withdrawals are still unreliable and may fail or remain pending.
+
 ## v0.4.0 (2026-02-15)
 - Wallet: introduced a full in-app wallet tab with federation selection, balance view, USD rate display, payment history scaffolding, and send/receive actions.
 - Wallet: added dual-backend support for LDK (Bitcoin on-chain + Lightning) and Fedimint (Lightning + e-cash token flows), including runtime federation switching.

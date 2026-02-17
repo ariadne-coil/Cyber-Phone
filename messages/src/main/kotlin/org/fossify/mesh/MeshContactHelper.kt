@@ -120,6 +120,7 @@ object MeshContactHelper {
         if (updated == 0) {
             context.contentResolver.insert(ContactsContract.Data.CONTENT_URI, values)
         }
+        dedupeMeshPhoneRows(context, rawContactId, meshAddress)
     }
 
     fun deleteMeshAddressForRawContact(context: Context, rawContactId: Long) {
@@ -148,10 +149,12 @@ object MeshContactHelper {
 
     fun ensureMeshPhoneRowForRawContact(context: Context, rawContactId: Long) {
         if (rawContactId <= 0L) return
-        if (hasMeshPhoneRow(context, rawContactId)) return
-        if (!insertMeshPhoneRow(context, rawContactId, MESH_PHONE_PLACEHOLDER)) {
-            insertMeshPhoneRow(context, rawContactId, "mesh:")
+        if (!hasMeshPhoneRow(context, rawContactId)) {
+            if (!insertMeshPhoneRow(context, rawContactId, MESH_PHONE_PLACEHOLDER)) {
+                insertMeshPhoneRow(context, rawContactId, "mesh:")
+            }
         }
+        dedupeMeshPhoneRows(context, rawContactId, preferredNumber = null)
     }
 
     private fun hasMeshPhoneRow(context: Context, rawContactId: Long): Boolean {
@@ -184,6 +187,72 @@ object MeshContactHelper {
             put(ContactsContract.CommonDataKinds.Phone.LABEL, MESH_PHONE_LABEL)
         }
         return context.contentResolver.insert(ContactsContract.Data.CONTENT_URI, values) != null
+    }
+
+    private fun dedupeMeshPhoneRows(context: Context, rawContactId: Long, preferredNumber: String?) {
+        val selection =
+            "${ContactsContract.Data.RAW_CONTACT_ID}=? AND ${ContactsContract.Data.MIMETYPE}=? AND ${ContactsContract.Data.DATA2}=? AND ${ContactsContract.Data.DATA3}=?"
+        val selectionArgs = arrayOf(
+            rawContactId.toString(),
+            ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE,
+            ContactsContract.CommonDataKinds.Phone.TYPE_CUSTOM.toString(),
+            MESH_PHONE_LABEL
+        )
+
+        val rows = ArrayList<Pair<Long, String>>()
+        context.contentResolver.query(
+            ContactsContract.Data.CONTENT_URI,
+            arrayOf(
+                ContactsContract.Data._ID,
+                ContactsContract.CommonDataKinds.Phone.NUMBER
+            ),
+            selection,
+            selectionArgs,
+            "${ContactsContract.Data._ID} ASC"
+        )?.use { cursor ->
+            while (cursor.moveToNext()) {
+                rows.add(cursor.getLong(0) to (cursor.getString(1) ?: ""))
+            }
+        }
+
+        if (rows.size <= 1) return
+
+        val normalizedPreferred = preferredNumber?.let(LxmfAddress::normalize)
+        val keepId = rows.firstOrNull {
+            normalizedPreferred != null &&
+                LxmfAddress.normalize(it.second).equals(normalizedPreferred, ignoreCase = true)
+        }?.first
+            ?: rows.firstOrNull {
+                val normalized = LxmfAddress.normalize(it.second)
+                normalized.isNotBlank() &&
+                    !normalized.equals(MESH_PHONE_PLACEHOLDER, ignoreCase = true)
+            }?.first
+            ?: rows.first().first
+
+        if (!normalizedPreferred.isNullOrBlank()) {
+            val updateValues = ContentValues().apply {
+                put(ContactsContract.CommonDataKinds.Phone.NUMBER, normalizedPreferred)
+            }
+            context.contentResolver.update(
+                ContactsContract.Data.CONTENT_URI,
+                updateValues,
+                "${ContactsContract.Data._ID}=?",
+                arrayOf(keepId.toString())
+            )
+        }
+
+        val duplicateIds = rows.asSequence()
+            .map { it.first }
+            .filter { it != keepId }
+            .toList()
+        if (duplicateIds.isEmpty()) return
+
+        val placeholders = duplicateIds.joinToString(",") { "?" }
+        context.contentResolver.delete(
+            ContactsContract.Data.CONTENT_URI,
+            "${ContactsContract.Data._ID} IN ($placeholders)",
+            duplicateIds.map { it.toString() }.toTypedArray()
+        )
     }
 
     private fun deleteMeshPhoneForRawContact(context: Context, rawContactId: Long) {

@@ -1,8 +1,14 @@
 package org.fossify.phone.activities
 
+import android.content.res.ColorStateList
 import android.os.Bundle
 import androidx.core.view.isVisible
+import org.fossify.commons.extensions.adjustAlpha
 import org.fossify.commons.extensions.getAlertDialogBuilder
+import org.fossify.commons.extensions.getContrastColor
+import org.fossify.commons.extensions.getProperBackgroundColor
+import org.fossify.commons.extensions.getProperPrimaryColor
+import org.fossify.commons.extensions.getProperTextColor
 import org.fossify.commons.extensions.toast
 import org.fossify.commons.extensions.viewBinding
 import org.fossify.commons.helpers.ensureBackgroundThread
@@ -34,6 +40,7 @@ class WalletRedeemTokenActivity : SimpleActivity() {
         setContentView(binding.root)
 
         setupToolbar()
+        applyThemeColors()
         binding.walletRedeemTokenToolbar.setNavigationOnClickListener { finish() }
 
         tokenText = intent?.getStringExtra(EXTRA_WALLET_TOKEN_TEXT)?.trim().orEmpty()
@@ -49,7 +56,7 @@ class WalletRedeemTokenActivity : SimpleActivity() {
         ensureBackgroundThread {
             val p = parsed ?: return@ensureBackgroundThread
             allFederations = FederationDirectoryManager.getFederations(this)
-                .filter { it.kind.trim().equals("fedimint", ignoreCase = true) }
+                .filter { FederationDirectoryManager.isFedimintFederation(it) }
                 .sortedBy { it.name.lowercase() }
             selectedFederation = allFederations.firstOrNull { it.id == p.federationId } ?: allFederations.firstOrNull()
 
@@ -64,6 +71,36 @@ class WalletRedeemTokenActivity : SimpleActivity() {
     private fun setupToolbar() {
         binding.walletRedeemTokenToolbar.setTitle(R.string.wallet_redeem_token_title)
         binding.walletRedeemTokenToolbar.setNavigationIcon(org.fossify.commons.R.drawable.ic_arrow_left_vector)
+    }
+
+    private fun applyThemeColors() {
+        val textColor = getProperTextColor()
+        val secondary = textColor.adjustAlpha(0.72f)
+        val primaryColor = getProperPrimaryColor()
+        val onPrimary = primaryColor.getContrastColor()
+
+        binding.root.setBackgroundColor(getProperBackgroundColor())
+        binding.walletRedeemTokenToolbar.setBackgroundColor(primaryColor)
+        binding.walletRedeemTokenToolbar.setTitleTextColor(onPrimary)
+        binding.walletRedeemTokenToolbar.navigationIcon?.mutate()?.setTint(onPrimary)
+
+        val cardColor = textColor.adjustAlpha(0.06f)
+        val cardStroke = textColor.adjustAlpha(0.14f)
+        binding.walletRedeemTokenCard.setCardBackgroundColor(cardColor)
+        binding.walletRedeemTokenCard.strokeColor = cardStroke
+        binding.walletRedeemTokenCard.strokeWidth = 1
+
+        binding.walletRedeemTokenFederationLabel.setTextColor(secondary)
+        binding.walletRedeemTokenFederationValue.setTextColor(textColor)
+        binding.walletRedeemTokenAmountValue.setTextColor(textColor)
+        binding.walletRedeemTokenExpiresValue.setTextColor(secondary)
+
+        binding.walletRedeemTokenButton.backgroundTintList = ColorStateList.valueOf(primaryColor)
+        binding.walletRedeemTokenButton.setTextColor(onPrimary)
+        binding.walletRedeemTokenButton.rippleColor = ColorStateList.valueOf(onPrimary.adjustAlpha(0.2f))
+
+        binding.walletRedeemTokenProgress.setIndicatorColor(primaryColor)
+        binding.walletRedeemTokenError.setTextColor(getColor(org.fossify.commons.R.color.md_red_400))
     }
 
     private fun renderToken() {

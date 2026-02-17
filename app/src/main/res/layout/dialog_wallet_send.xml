@@ -40,6 +40,7 @@
     </com.google.android.material.textfield.TextInputLayout>
 
     <org.fossify.commons.views.MyTextView
+        android:id="@+id/wallet_send_hint_text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/normal_margin"

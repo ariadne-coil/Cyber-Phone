@@ -27,7 +27,8 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 object FedimintWebEngine {
     private const val TAG = "FedimintWebEngine"
-    private const val ENGINE_URL = "https://appassets.androidplatform.net/assets/fedimint/engine.html"
+    // Versioned query forces WebView to load the latest bundled engine script after updates.
+    private const val ENGINE_URL = "https://appassets.androidplatform.net/assets/fedimint/engine.html?v=20260217d"
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val nextId = AtomicInteger(1)
@@ -124,6 +125,8 @@ object FedimintWebEngine {
         initProbeStarted = false
         lastError = null
 
+        // Avoid stale appassets content across app updates/process reuse.
+        runCatching { wv.clearCache(true) }
         wv.loadUrl(ENGINE_URL)
         // Launch readiness probing immediately; don't rely only on onPageFinished callbacks.
         startReadyProbe(wv)

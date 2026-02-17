@@ -182,14 +182,18 @@ import org.fossify.messages.helpers.PICK_PHOTO_INTENT
 import org.fossify.messages.helpers.PICK_SAVE_DIR_INTENT
 import org.fossify.messages.helpers.PICK_SAVE_FILE_INTENT
 import org.fossify.messages.helpers.PICK_VIDEO_INTENT
+import org.fossify.messages.helpers.WALLET_RESPOND_REQUEST_INTENT
 import org.fossify.messages.helpers.WALLET_SEND_TOKEN_INTENT
 import org.fossify.messages.helpers.SEARCHED_MESSAGE_ID
 import org.fossify.messages.helpers.THREAD_ATTACHMENT_URI
 import org.fossify.messages.helpers.THREAD_ATTACHMENT_URIS
+import org.fossify.messages.helpers.THREAD_AUTO_SEND
 import org.fossify.messages.helpers.THREAD_ID
 import org.fossify.messages.helpers.THREAD_NUMBER
 import org.fossify.messages.helpers.THREAD_TEXT
 import org.fossify.messages.helpers.THREAD_TITLE
+import org.fossify.messages.helpers.EXTRA_WALLET_PAYMENT_REQUEST_TEXT
+import org.fossify.messages.helpers.EXTRA_WALLET_REQUEST_ACTION
 import org.fossify.messages.helpers.EXTRA_WALLET_SECURE_CHANNEL
 import org.fossify.messages.helpers.EXTRA_WALLET_TOKEN_TEXT
 import org.fossify.messages.helpers.MessageCategorizer
@@ -252,6 +256,7 @@ class ThreadActivity : SimpleActivity() {
     private var isRecycleBin = false
     private var isLaunchedFromShortcut = false
     private var hasDeferredThreadRefresh = false
+    private var hasIntentAutoSendTriggered = false
     private var isSpamThread = false
     private var reactionPopup: PopupWindow? = null
     private var suppressReactionDismissForClick = false
@@ -337,11 +342,13 @@ class ThreadActivity : SimpleActivity() {
                 }
             }
 
-            val smsDraft = getSmsDraft(threadId)
-            if (smsDraft.isNotEmpty()) {
-                runOnUiThread {
-                    binding.messageHolder.threadTypeMessage.setText(smsDraft)
-                    binding.messageHolder.threadTypeMessage.setSelection(smsDraft.length)
+            if (!intent.getBooleanExtra(THREAD_AUTO_SEND, false)) {
+                val smsDraft = getSmsDraft(threadId)
+                if (smsDraft.isNotEmpty()) {
+                    runOnUiThread {
+                        binding.messageHolder.threadTypeMessage.setText(smsDraft)
+                        binding.messageHolder.threadTypeMessage.setSelection(smsDraft.length)
+                    }
                 }
             }
 
@@ -656,12 +663,12 @@ class ThreadActivity : SimpleActivity() {
 
     private fun handleActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
         if (resultCode != Activity.RESULT_OK) return
-        if (requestCode == WALLET_SEND_TOKEN_INTENT) {
+        if (requestCode == WALLET_SEND_TOKEN_INTENT || requestCode == WALLET_RESPOND_REQUEST_INTENT) {
             val token = resultData?.getStringExtra(EXTRA_WALLET_TOKEN_TEXT)?.trim().orEmpty()
             if (token.isNotBlank()) {
-                binding.messageHolder.threadTypeMessage.setText(token)
-                // Token generation already performed any necessary confirmations.
-                sendMessage()
+                sendWalletProtocolToken(token)
+            } else {
+                showErrorToast(getString(org.fossify.commons.R.string.unknown_error_occurred))
             }
             return
         }
@@ -683,6 +690,42 @@ class ThreadActivity : SimpleActivity() {
                 PICK_SAVE_DIR_INTENT -> saveAttachments(resultData)
             }
         }
+    }
+
+    private fun sendWalletProtocolToken(token: String) {
+        val cleanToken = token.trim()
+        if (cleanToken.isBlank()) {
+            showErrorToast(getString(org.fossify.commons.R.string.unknown_error_occurred))
+            return
+        }
+
+        // Wallet protocol replies should be sent as plain text only.
+        getAttachmentsAdapter()?.clear()
+        binding.messageHolder.threadTypeMessage.setText("")
+
+        val addresses = participants.getAddresses()
+        val meshDestination = addresses.firstOrNull { LxmfAddress.isMeshLike(it) }
+            ?.let { LxmfAddress.normalize(it) }
+        val hasNonMeshAddress = addresses.any { !LxmfAddress.isMeshLike(it) }
+        val shouldUseMesh = isMeshThread() || !hasNonMeshAddress
+
+        if (shouldUseMesh) {
+            if (meshDestination.isNullOrBlank()) {
+                showErrorToast(getString(R.string.mesh_invalid_address))
+                return
+            }
+            sendMeshMessageToAddress(
+                destination = meshDestination,
+                text = cleanToken,
+                allowFallback = false,
+                fallbackNumber = null
+            )
+            return
+        }
+
+        val subscriptionId = availableSIMCards.getOrNull(currentSIMCardIndex)?.subscriptionId
+            ?: SmsManager.getDefaultSmsSubscriptionId()
+        sendNormalMessage(cleanToken, subscriptionId)
     }
 
     private fun setupCachedMessages(callback: () -> Unit) {
@@ -1141,7 +1184,24 @@ class ThreadActivity : SimpleActivity() {
                 if (searchedMessageId != -1L) {
                     jumpToMessage(searchedMessageId)
                 }
+                maybeTriggerIntentAutoSend()
             }
+        }
+    }
+
+    private fun maybeTriggerIntentAutoSend() {
+        if (hasIntentAutoSendTriggered || !intent.getBooleanExtra(THREAD_AUTO_SEND, false)) {
+            return
+        }
+        hasIntentAutoSendTriggered = true
+        intent.removeExtra(THREAD_AUTO_SEND)
+        val hasTypedText = binding.messageHolder.threadTypeMessage.value.isNotBlank()
+        val hasAttachment = getAttachmentSelections().isNotEmpty()
+        if (!hasTypedText && !hasAttachment) {
+            return
+        }
+        binding.messageHolder.threadTypeMessage.post {
+            sendMessage()
         }
     }
 
@@ -2812,23 +2872,39 @@ class ThreadActivity : SimpleActivity() {
 	                launchScheduleSendDialog(scheduledDateTime)
 	            } else {
 	                launchScheduleSendDialog()
-	            }
-	        }
+            }
+        }
 
-	        sendSats.setOnClickListener {
-	            launchWalletSendToken()
-	        }
-	    }
+        sendSats.setOnClickListener {
+            launchWalletSendToken()
+        }
+    }
 
-	    private fun launchWalletSendToken() {
-	        val secure = isMeshThread() ||
-	            (E2eManager.hasSharedSecret(this, threadId) && E2eManager.isThreadEncrypted(this, threadId))
-	        val intent = Intent().apply {
-	            setClassName(this@ThreadActivity, "org.fossify.phone.activities.WalletSendTokenActivity")
-	            putExtra(EXTRA_WALLET_SECURE_CHANNEL, secure)
-	        }
-	        launchActivityForResult(intent, WALLET_SEND_TOKEN_INTENT)
-	    }
+    private fun launchWalletSendToken() {
+        val secure = isMeshThread() ||
+            (E2eManager.hasSharedSecret(this, threadId) && E2eManager.isThreadEncrypted(this, threadId))
+        val intent = Intent().apply {
+            setClassName(this@ThreadActivity, "org.fossify.phone.activities.WalletSendTokenActivity")
+            putExtra(EXTRA_WALLET_SECURE_CHANNEL, secure)
+        }
+        launchActivityForResult(intent, WALLET_SEND_TOKEN_INTENT)
+    }
+
+    fun launchWalletRespondToPaymentRequest(requestText: String, action: String? = null) {
+        val token = requestText.trim()
+        if (token.isBlank()) return
+        val secure = isMeshThread() ||
+            (E2eManager.hasSharedSecret(this, threadId) && E2eManager.isThreadEncrypted(this, threadId))
+        val intent = Intent().apply {
+            setClassName(this@ThreadActivity, "org.fossify.phone.activities.WalletRespondRequestActivity")
+            putExtra(EXTRA_WALLET_PAYMENT_REQUEST_TEXT, token)
+            putExtra(EXTRA_WALLET_SECURE_CHANNEL, secure)
+            action?.trim()?.takeIf { it.isNotBlank() }?.let {
+                putExtra(EXTRA_WALLET_REQUEST_ACTION, it)
+            }
+        }
+        launchActivityForResult(intent, WALLET_RESPOND_REQUEST_INTENT)
+    }
 
     private fun showAttachmentPicker() {
         binding.messageHolder.attachmentPickerDivider.showWithAnimation()

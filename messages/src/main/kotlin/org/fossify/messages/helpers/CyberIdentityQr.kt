@@ -11,7 +11,7 @@ data class CyberIdentityPayload(
     val meshAddress: String? = null,
     val e2ePublicKeyBase64: String? = null,
     val walletOnchainAddress: String? = null,
-    val walletLightningInvoice: String? = null,
+    val walletLightningDestination: String? = null,
 )
 
 object CyberIdentityQr {
@@ -55,7 +55,7 @@ object CyberIdentityQr {
                     }
                     trimmed.startsWith(X_LN, ignoreCase = true) -> {
                         val candidate = trimmed.substringAfter(':', "").trim()
-                        ln = extractBolt11(candidate) ?: ln
+                        ln = extractLightningDestination(candidate) ?: ln
                     }
                 }
             }
@@ -65,7 +65,7 @@ object CyberIdentityQr {
         if (mesh.isNullOrBlank()) mesh = MeshDiscoveryManager.extractMeshAddress(text)
         if (e2e.isNullOrBlank()) e2e = extractE2ePublicKey(text)
         if (btc.isNullOrBlank()) btc = extractOnchainAddress(text)
-        if (ln.isNullOrBlank()) ln = extractBolt11(text)
+        if (ln.isNullOrBlank()) ln = extractLightningDestination(text)
 
         if (mesh.isNullOrBlank() && e2e.isNullOrBlank() && btc.isNullOrBlank() && ln.isNullOrBlank()) {
             return null
@@ -76,7 +76,7 @@ object CyberIdentityQr {
             meshAddress = mesh?.trim()?.takeIf { it.isNotBlank() },
             e2ePublicKeyBase64 = e2e?.trim()?.takeIf { it.isNotBlank() },
             walletOnchainAddress = btc?.trim()?.takeIf { it.isNotBlank() },
-            walletLightningInvoice = ln?.trim()?.takeIf { it.isNotBlank() },
+            walletLightningDestination = ln?.trim()?.takeIf { it.isNotBlank() },
         )
     }
 
@@ -86,7 +86,7 @@ object CyberIdentityQr {
         meshUri: String,
         e2ePublicKeyBase64: String?,
         walletOnchainAddress: String?,
-        walletLightningInvoice: String?,
+        walletLightningDestination: String?,
     ): String {
         val fn = (displayName ?: "Cyber Phone").trim().ifBlank { "Cyber Phone" }
         val tel = phoneNumber?.trim().orEmpty().ifBlank { "" }
@@ -113,7 +113,7 @@ object CyberIdentityQr {
             lines.add("$X_BTC:$btc")
         }
 
-        val ln = walletLightningInvoice?.trim().orEmpty()
+        val ln = walletLightningDestination?.trim().orEmpty()
         if (ln.isNotBlank()) {
             lines.add("$X_LN:$ln")
         }
@@ -130,9 +130,26 @@ object CyberIdentityQr {
         return e2eRegex.find(t)?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotBlank() }
     }
 
-    private fun extractBolt11(text: String): String? {
+    private fun extractLightningDestination(text: String): String? {
         val t = text.trim()
-        return bolt11Regex.find(t)?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotBlank() }
+        val bolt11 = bolt11Regex.find(t)?.groupValues?.getOrNull(1)?.trim()
+        if (!bolt11.isNullOrBlank()) return bolt11
+
+        if (t.startsWith("lightning:", ignoreCase = true)) {
+            val candidate = t.substringAfter("lightning:", "").trim()
+            if (candidate.isNotBlank()) return candidate
+        }
+
+        if (t.startsWith("lnurl", ignoreCase = true) || t.startsWith("ln", ignoreCase = true)) {
+            return t.takeIf { it.isNotBlank() }
+        }
+
+        // Lightning Address (name@domain) support.
+        if (t.contains('@') && !t.contains(' ') && !t.contains('\n')) {
+            return t
+        }
+
+        return null
     }
 
     private fun extractOnchainAddress(text: String): String? {
@@ -172,4 +189,3 @@ object CyberIdentityQr {
             .replace(",", "\\,")
     }
 }
-

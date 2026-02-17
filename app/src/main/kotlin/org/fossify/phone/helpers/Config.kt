@@ -193,6 +193,38 @@ class Config(context: Context) : BaseConfig(context) {
         get() = prefs.getLong(WALLET_LAST_ONCHAIN_ADDRESS_CREATED_MS, 0L)
         set(value) = prefs.edit().putLong(WALLET_LAST_ONCHAIN_ADDRESS_CREATED_MS, value).apply()
 
+    var walletLiquidityProviderMode: String
+        get() = prefs.getString(WALLET_LIQUIDITY_PROVIDER_MODE, "auto") ?: "auto"
+        set(value) = prefs.edit().putString(WALLET_LIQUIDITY_PROVIDER_MODE, value.trim().ifBlank { "auto" }).apply()
+
+    var walletLiquidityProviderId: String
+        get() = prefs.getString(WALLET_LIQUIDITY_PROVIDER_ID, "") ?: ""
+        set(value) = prefs.edit().putString(WALLET_LIQUIDITY_PROVIDER_ID, value.trim()).apply()
+
+    var walletLiquidityProviderStatsJson: String
+        get() = prefs.getString(WALLET_LIQUIDITY_PROVIDER_STATS_JSON, "") ?: ""
+        set(value) = prefs.edit().putString(WALLET_LIQUIDITY_PROVIDER_STATS_JSON, value).apply()
+
+    var walletLiquidityCustomName: String
+        get() = prefs.getString(WALLET_LIQUIDITY_CUSTOM_NAME, "") ?: ""
+        set(value) = prefs.edit().putString(WALLET_LIQUIDITY_CUSTOM_NAME, value.trim()).apply()
+
+    var walletLiquidityCustomNetwork: String
+        get() = prefs.getString(WALLET_LIQUIDITY_CUSTOM_NETWORK, "") ?: ""
+        set(value) = prefs.edit().putString(WALLET_LIQUIDITY_CUSTOM_NETWORK, value.trim()).apply()
+
+    var walletLiquidityCustomNodeId: String
+        get() = prefs.getString(WALLET_LIQUIDITY_CUSTOM_NODE_ID, "") ?: ""
+        set(value) = prefs.edit().putString(WALLET_LIQUIDITY_CUSTOM_NODE_ID, value.trim()).apply()
+
+    var walletLiquidityCustomAddress: String
+        get() = prefs.getString(WALLET_LIQUIDITY_CUSTOM_ADDRESS, "") ?: ""
+        set(value) = prefs.edit().putString(WALLET_LIQUIDITY_CUSTOM_ADDRESS, value.trim()).apply()
+
+    var walletLiquidityCustomToken: String
+        get() = prefs.getString(WALLET_LIQUIDITY_CUSTOM_TOKEN, "") ?: ""
+        set(value) = prefs.edit().putString(WALLET_LIQUIDITY_CUSTOM_TOKEN, value.trim()).apply()
+
     // Wallet receive cache should be federation-specific, otherwise switching between mainnet/testnet
     // will show invalid addresses/invoices. Keep the legacy global keys for migration/backward compat.
     private fun walletKey(prefix: String, federationId: String): String {

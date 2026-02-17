@@ -576,8 +576,9 @@ class MainActivity : SimpleActivity() {
 
     private fun updateTabUi(tabType: Int) {
         val isMessagesTab = tabType == TAB_MESSAGES
+        val hideDialerButton = isMessagesTab || tabType == TAB_WALLET
         binding.mainMenu.beGoneIf(isMessagesTab)
-        binding.mainDialpadButton.beGoneIf(isMessagesTab)
+        binding.mainDialpadButton.beGoneIf(hideDialerButton)
         updateMainHolderBehavior(isMessagesTab)
         if (isMessagesTab) {
             binding.mainMenu.closeSearch()

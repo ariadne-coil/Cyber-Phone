@@ -16,7 +16,20 @@
             android:id="@+id/contact_wallet_address"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="@string/wallet_send_destination_hint"
+            android:hint="@string/contact_wallet_onchain_hint"
+            android:inputType="textNoSuggestions" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/normal_margin">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/contact_wallet_lightning"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/contact_wallet_lightning_hint"
             android:inputType="textNoSuggestions" />
     </com.google.android.material.textfield.TextInputLayout>
 
@@ -29,4 +42,3 @@
         android:textSize="@dimen/smaller_text_size" />
 
 </LinearLayout>
-

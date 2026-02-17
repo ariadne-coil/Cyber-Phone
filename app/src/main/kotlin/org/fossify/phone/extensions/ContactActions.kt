@@ -29,12 +29,14 @@ import org.fossify.phone.wallet.ExchangeRateManager
 import org.fossify.phone.wallet.FedimintWalletManager
 import org.fossify.phone.wallet.LdkWalletManager
 import org.fossify.phone.wallet.WalletContactHelper
+import org.fossify.phone.wallet.WalletUiDialogs
 import org.fossify.phone.databinding.DialogWalletCreateInvoiceBinding
 import org.fossify.phone.wallet.FederationEntry
 import org.fossify.phone.wallet.WalletPolicy
 import org.fossify.commons.extensions.getAlertDialogBuilder
 import org.fossify.commons.extensions.setupDialogStuff
 import org.fossify.commons.helpers.ensureBackgroundThread
+import org.fossify.messages.helpers.WalletTokenParser
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -52,9 +54,13 @@ fun SimpleActivity.showContactActionsDialog(contact: Contact) {
     val isFavorite = contact.starred == 1
     val favoriteLabel = if (isFavorite) R.string.remove_from_favorites else R.string.add_to_favorites
     val isPrivateContact = contact.rawId > 1_000_000 && contact.contactId > 1_000_000 && contact.rawId == contact.contactId
-    val walletDest = if (isPrivateContact) null else
-        WalletContactHelper.getWalletDestination(this, contact.rawId.toLong(), contact.contactId)
-    val hasWallet = !walletDest.isNullOrBlank()
+    val walletDestinations = if (isPrivateContact) {
+        WalletContactHelper.WalletDestinations()
+    } else {
+        WalletContactHelper.getWalletDestinations(this, contact.rawId.toLong(), contact.contactId)
+    }
+    val walletDest = walletDestinations.preferred().orEmpty()
+    val hasWallet = !walletDestinations.isEmpty()
     val walletEditLabel = if (hasWallet) R.string.contact_action_edit_wallet_address else R.string.contact_action_set_wallet_address
 
     val list = ArrayList<SimpleListItem>()
@@ -82,9 +88,13 @@ fun SimpleActivity.showContactActionsDialog(contact: Contact) {
         when (selected.id) {
             ACTION_CALL -> handleContactCall(contact)
             ACTION_MESSAGE -> handleContactMessage(contact)
-            ACTION_WALLET_PAY -> handleWalletPay(walletDest.orEmpty())
+            ACTION_WALLET_PAY -> handleWalletPay(walletDest)
             ACTION_WALLET_REQUEST -> handleWalletRequest(contact)
-            ACTION_WALLET_SET_ADDRESS -> handleWalletSetAddress(contact, existing = walletDest)
+            ACTION_WALLET_SET_ADDRESS -> handleWalletSetAddress(
+                contact = contact,
+                existingOnchain = walletDestinations.onchain,
+                existingLightning = walletDestinations.lightning
+            )
             ACTION_EDIT -> startContactDetailsIntent(contact)
             ACTION_TOGGLE_FAVORITE -> toggleContactFavorite(contact)
             ACTION_DELETE -> askConfirmDeleteContact(contact)
@@ -105,12 +115,17 @@ private fun SimpleActivity.handleWalletPay(destination: String) {
     startActivity(intent)
 }
 
-private fun SimpleActivity.handleWalletSetAddress(contact: Contact, existing: String?) {
+private fun SimpleActivity.handleWalletSetAddress(
+    contact: Contact,
+    existingOnchain: String?,
+    existingLightning: String?
+) {
     handlePermission(PERMISSION_WRITE_CONTACTS) { granted ->
         if (!granted) return@handlePermission
 
         val vb = DialogContactWalletAddressBinding.inflate(this@handleWalletSetAddress.layoutInflater)
-        vb.contactWalletAddress.setText(existing.orEmpty())
+        vb.contactWalletAddress.setText(existingOnchain.orEmpty())
+        vb.contactWalletLightning.setText(existingLightning.orEmpty())
 
         getAlertDialogBuilder()
             .setNegativeButton(R.string.cancel, null)
@@ -124,16 +139,28 @@ private fun SimpleActivity.handleWalletSetAddress(contact: Contact, existing: St
             .apply {
                 setupDialogStuff(vb.root, this, R.string.contact_wallet_address) { alertDialog ->
                     alertDialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                        val value = vb.contactWalletAddress.text?.toString()?.trim().orEmpty()
-                        if (value.isBlank()) {
-                            toast(R.string.wallet_send_destination_required)
+                        val onchain = vb.contactWalletAddress.text?.toString()?.trim().orEmpty()
+                        val lightning = vb.contactWalletLightning.text?.toString()?.trim().orEmpty()
+                        if (onchain.isBlank() && lightning.isBlank()) {
+                            toast(R.string.contact_wallet_destination_required)
                             return@setOnClickListener
                         }
                         if (contact.rawId <= 0) {
                             toast(org.fossify.commons.R.string.unknown_error_occurred)
                             return@setOnClickListener
                         }
-                        WalletContactHelper.upsertWalletDestination(this@handleWalletSetAddress, contact.rawId.toLong(), value)
+                        val rawId = contact.rawId.toLong()
+                        if (onchain.isBlank()) {
+                            WalletContactHelper.deleteWalletOnchainDestination(this@handleWalletSetAddress, rawId)
+                        } else {
+                            WalletContactHelper.upsertWalletOnchainDestination(this@handleWalletSetAddress, rawId, onchain)
+                        }
+
+                        if (lightning.isBlank()) {
+                            WalletContactHelper.deleteWalletLightningDestination(this@handleWalletSetAddress, rawId)
+                        } else {
+                            WalletContactHelper.upsertWalletLightningDestination(this@handleWalletSetAddress, rawId, lightning)
+                        }
                         toast(R.string.done)
                         alertDialog.dismiss()
                     }
@@ -148,7 +175,7 @@ private fun SimpleActivity.handleWalletRequest(contact: Contact) {
         toast(R.string.wallet_select_federation)
         return
     }
-    val isFm = selectedFederation.kind.trim().equals("fedimint", ignoreCase = true)
+    val isFm = FederationDirectoryManager.isFedimintFederation(selectedFederation)
 
     val address = contact.pickBestAddressForMessaging()
     if (address.isNullOrBlank()) {
@@ -182,7 +209,7 @@ private fun SimpleActivity.showInvoiceAndPrefillThread(
     threadAddress: String,
     federation: FederationEntry,
 ) {
-    val isFm = federation.kind.trim().equals("fedimint", ignoreCase = true)
+    val isFm = FederationDirectoryManager.isFedimintFederation(federation)
     val vb = DialogWalletCreateInvoiceBinding.inflate(this@showInvoiceAndPrefillThread.layoutInflater)
     vb.walletInvoiceAmount.setText("")
     vb.walletInvoiceMemo.setText(getString(R.string.app_launcher_name))
@@ -239,7 +266,19 @@ private fun SimpleActivity.showInvoiceAndPrefillThread(
                                 val err = if (isFm) FedimintWalletManager.getLastErrorMessage() else LdkWalletManager.getLastErrorMessage()
                                 toast(getString(R.string.wallet_invoice_failed, err.orEmpty()))
                             } else {
-                                openThreadWithPrefill(contact, threadAddress, invoice)
+                                val invoiceMessage = WalletTokenParser.buildLightningInvoiceMessage(
+                                    invoice = invoice,
+                                    federationId = federation.id,
+                                    federationName = federation.name,
+                                ).ifBlank { invoice }
+                                WalletUiDialogs.showInvoicePreviewDialog(
+                                    activity = this@showInvoiceAndPrefillThread,
+                                    federation = federation,
+                                    invoiceMessage = invoiceMessage,
+                                    onSendInMessages = { payload ->
+                                        openThreadWithPrefill(contact, threadAddress, payload)
+                                    }
+                                )
                             }
                         }
                     }
@@ -253,7 +292,7 @@ private fun SimpleActivity.showAddressAndPrefillThread(
     threadAddress: String,
     federation: FederationEntry,
 ) {
-    if (federation.kind.trim().equals("fedimint", ignoreCase = true)) {
+    if (FederationDirectoryManager.isFedimintFederation(federation)) {
         toast(R.string.wallet_fedimint_no_onchain)
         return
     }
@@ -397,10 +436,12 @@ private fun Contact.pickBestPhoneNumberForCall(): String? {
     fun isWallet(p: org.fossify.commons.models.PhoneNumber): Boolean {
         val candidate = normalizedValue(p)
         val labeled =
-            p.type == ContactsContract.CommonDataKinds.Phone.TYPE_CUSTOM && p.label.equals("Bitcoin", ignoreCase = true)
+            p.type == ContactsContract.CommonDataKinds.Phone.TYPE_CUSTOM &&
+                (p.label.equals("Bitcoin", ignoreCase = true) || p.label.equals("Lightning", ignoreCase = true))
         return labeled ||
             candidate.startsWith("bitcoin:", ignoreCase = true) ||
             candidate.startsWith("ln", ignoreCase = true) ||
+            (candidate.contains('@') && !candidate.contains(' ')) ||
             candidate.startsWith("bc1", ignoreCase = true) ||
             candidate.startsWith("tb1", ignoreCase = true) ||
             candidate.startsWith("bcrt1", ignoreCase = true)
@@ -457,10 +498,12 @@ private fun Contact.pickBestAddressForMessaging(): String? {
     fun isWallet(p: org.fossify.commons.models.PhoneNumber): Boolean {
         val candidate = normalizedValue(p)
         val labeled =
-            p.type == ContactsContract.CommonDataKinds.Phone.TYPE_CUSTOM && p.label.equals("Bitcoin", ignoreCase = true)
+            p.type == ContactsContract.CommonDataKinds.Phone.TYPE_CUSTOM &&
+                (p.label.equals("Bitcoin", ignoreCase = true) || p.label.equals("Lightning", ignoreCase = true))
         return labeled ||
             candidate.startsWith("bitcoin:", ignoreCase = true) ||
             candidate.startsWith("ln", ignoreCase = true) ||
+            (candidate.contains('@') && !candidate.contains(' ')) ||
             candidate.startsWith("bc1", ignoreCase = true) ||
             candidate.startsWith("tb1", ignoreCase = true) ||
             candidate.startsWith("bcrt1", ignoreCase = true)

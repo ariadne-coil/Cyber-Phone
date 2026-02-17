@@ -201,6 +201,31 @@
                                 </LinearLayout>
 
                                 <LinearLayout
+                                    android:id="@+id/wallet_exchange_holder"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="match_parent"
+                                    android:gravity="center"
+                                    android:paddingStart="@dimen/small_margin"
+                                    android:paddingEnd="@dimen/small_margin"
+                                    android:visibility="gone">
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/wallet_exchange"
+                                        style="@style/Widget.MaterialComponents.Button"
+                                        android:layout_width="48dp"
+                                        android:layout_height="48dp"
+                                        android:insetTop="0dp"
+                                        android:insetBottom="0dp"
+                                        android:minWidth="0dp"
+                                        android:minHeight="0dp"
+                                        android:padding="0dp"
+                                        app:cornerRadius="24dp"
+                                        app:icon="@drawable/ic_swap_horizontal_vector"
+                                        app:iconGravity="textStart"
+                                        app:iconPadding="0dp" />
+                                </LinearLayout>
+
+                                <LinearLayout
                                     android:layout_width="0dp"
                                     android:layout_height="wrap_content"
                                     android:layout_weight="1"
@@ -333,6 +358,84 @@
                                         android:layout_height="wrap_content"
                                         android:layout_marginTop="@dimen/small_margin"
                                         android:text="@string/wallet_sync"
+                                        android:textSize="@dimen/normal_text_size"
+                                        android:textStyle="bold" />
+                                </LinearLayout>
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:id="@+id/wallet_fedimint_actions_row"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/normal_margin"
+                                android:gravity="center"
+                                android:orientation="horizontal"
+                                android:visibility="gone">
+
+                                <LinearLayout
+                                    android:id="@+id/wallet_mint_holder"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:gravity="center_horizontal"
+                                    android:orientation="vertical"
+                                    android:visibility="gone">
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/wallet_mint"
+                                        style="@style/Widget.MaterialComponents.Button"
+                                        android:layout_width="56dp"
+                                        android:layout_height="56dp"
+                                        android:insetTop="0dp"
+                                        android:insetBottom="0dp"
+                                        android:minWidth="0dp"
+                                        android:minHeight="0dp"
+                                        android:padding="0dp"
+                                        app:cornerRadius="28dp"
+                                        app:icon="@drawable/ic_call_received_vector"
+                                        app:iconGravity="textStart"
+                                        app:iconPadding="0dp" />
+
+                                    <org.fossify.commons.views.MyTextView
+                                        android:id="@+id/wallet_mint_label"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="@dimen/small_margin"
+                                        android:text="@string/wallet_mint"
+                                        android:textSize="@dimen/normal_text_size"
+                                        android:textStyle="bold" />
+                                </LinearLayout>
+
+                                <LinearLayout
+                                    android:id="@+id/wallet_withdraw_holder"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:gravity="center_horizontal"
+                                    android:orientation="vertical"
+                                    android:visibility="gone">
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/wallet_withdraw"
+                                        style="@style/Widget.MaterialComponents.Button"
+                                        android:layout_width="56dp"
+                                        android:layout_height="56dp"
+                                        android:insetTop="0dp"
+                                        android:insetBottom="0dp"
+                                        android:minWidth="0dp"
+                                        android:minHeight="0dp"
+                                        android:padding="0dp"
+                                        app:cornerRadius="28dp"
+                                        app:icon="@drawable/ic_call_made_vector"
+                                        app:iconGravity="textStart"
+                                        app:iconPadding="0dp" />
+
+                                    <org.fossify.commons.views.MyTextView
+                                        android:id="@+id/wallet_withdraw_label"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="@dimen/small_margin"
+                                        android:text="@string/wallet_withdraw"
                                         android:textSize="@dimen/normal_text_size"
                                         android:textStyle="bold" />
                                 </LinearLayout>

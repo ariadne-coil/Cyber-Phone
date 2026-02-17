@@ -114,6 +114,20 @@ case "$( uname )" in                #(
   NONSTOP* )        nonstop=true ;;
 esac
 
+# WSL + Windows SDK interop:
+# If this wrapper is executed from WSL, delegate to gradlew.bat so Android build tools
+# resolve exactly like Android Studio on Windows.
+if [ -n "${WSL_DISTRO_NAME:-}" ] && command -v cmd.exe >/dev/null 2>&1 && command -v wslpath >/dev/null 2>&1 && [ -f "$APP_HOME/gradlew.bat" ]; then
+    WIN_APP_HOME=$( wslpath -w "$APP_HOME" )
+    CMD_ARGS=
+    for arg in "$@"
+    do
+        CMD_ARGS="$CMD_ARGS $arg"
+    done
+    # Avoid extra escaped quotes here; cmd.exe can resolve this path with spaces via "cd /d <path>".
+    exec cmd.exe /c "cd /d $WIN_APP_HOME && gradlew.bat$CMD_ARGS"
+fi
+
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
 

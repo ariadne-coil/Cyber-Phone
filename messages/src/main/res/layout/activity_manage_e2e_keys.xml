@@ -213,6 +213,29 @@
             </RelativeLayout>
 
             <RelativeLayout
+                android:id="@+id/profile_mesh_liquidity_provider_holder"
+                style="@style/SettingsHolderTextViewStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_mesh_liquidity_provider_label"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/profile_mesh_liquidity_provider" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_mesh_liquidity_provider_value"
+                    style="@style/SettingsTextValueStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@+id/profile_mesh_liquidity_provider_label"
+                    tools:text="@string/profile_mesh_liquidity_auto" />
+
+            </RelativeLayout>
+
+            <RelativeLayout
                 android:id="@+id/profile_mesh_call_quality_holder"
                 style="@style/SettingsHolderTextViewStyle"
                 android:layout_width="match_parent"

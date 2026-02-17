@@ -4,6 +4,7 @@ import android.content.Context
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -21,6 +22,7 @@ import java.time.format.DateTimeParseException
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import java.security.MessageDigest
+import org.json.JSONObject
 
 @Serializable
 data class FederationDirectory(
@@ -28,6 +30,8 @@ data class FederationDirectory(
     @SerialName("updated_at")
     val updatedAt: String? = null,
     val federations: List<FederationEntry> = emptyList(),
+    @SerialName("liquidity_providers")
+    val liquidityProviders: List<LiquidityProviderEntry> = emptyList(),
 )
 
 @Serializable
@@ -51,6 +55,26 @@ data class FederationEntry(
     val lsps1Address: String? = null,
     @SerialName("lsps1_token")
     val lsps1Token: String? = null,
+    @SerialName("onchain_deposits_disabled")
+    val onchainDepositsDisabled: Boolean? = null,
+    @SerialName("vetted_gateways")
+    val vettedGateways: List<String> = emptyList(),
+)
+
+@Serializable
+data class LiquidityProviderEntry(
+    val id: String,
+    val name: String,
+    val network: String? = null,
+    @SerialName("node_id")
+    val nodeId: String,
+    val address: String,
+    val token: String? = null,
+    val priority: Int = 0,
+    @SerialName("federation_ids")
+    val federationIds: List<String> = emptyList(),
+    @SerialName("source_federation_id")
+    val sourceFederationId: String? = null,
 )
 
 object FederationDirectoryManager {
@@ -65,6 +89,17 @@ object FederationDirectoryManager {
     private const val MAX_DIRECTORY_BYTES = 1024 * 1024
     private const val ROLLBACK_TOLERANCE_MS = 6L * 60L * 60L * 1000L
     private const val TRUSTED_DIRECTORY_HOST = "meta.dev.fedibtc.com"
+    private const val LIQUIDITY_MODE_AUTO = "auto"
+    private const val LIQUIDITY_MODE_MANUAL = "manual"
+    private const val PROVIDER_ID_PREFIX_FEDERATION = "federation:"
+    private const val CUSTOM_PROVIDER_ID = "custom-provider"
+
+    private data class ProviderOutcomeStats(
+        var successes: Int = 0,
+        var failures: Int = 0,
+        var lastSuccessMs: Long = 0L,
+        var lastFailureMs: Long = 0L,
+    )
 
     // Hard fallback entries shipped in code so we always expose at least one Fedimint federation,
     // even if remote + cached + asset data is stale/incomplete.
@@ -188,6 +223,12 @@ object FederationDirectoryManager {
                 val website = obj["meta_external_url"]?.jsonPrimitive?.contentOrNull?.trim()
                     ?: obj["tos_url"]?.jsonPrimitive?.contentOrNull?.trim()
                 val description = previewMessage.ifBlank { welcomeMessage }
+                val onchainDisabled = parseBooleanish(
+                    obj["onchain_deposits_disabled"]?.jsonPrimitive?.contentOrNull
+                )
+                val vettedGateways = parseGatewayNodeIds(
+                    obj["vetted_gateways"]?.jsonPrimitive?.contentOrNull
+                )
 
                 FederationEntry(
                     id = key.trim().ifBlank { name.lowercase().replace(" ", "-") },
@@ -197,6 +238,8 @@ object FederationDirectoryManager {
                     network = if (name.contains("testnet", ignoreCase = true) || name.contains("signet", ignoreCase = true)) "testnet" else "bitcoin",
                     website = website,
                     description = description.ifBlank { "Public Fedimint federation." },
+                    onchainDepositsDisabled = onchainDisabled,
+                    vettedGateways = vettedGateways,
                 )
             }.distinctBy { it.id }
 
@@ -242,6 +285,19 @@ object FederationDirectoryManager {
             }
         }
 
+        val mergedProviders = linkedMapOf<String, LiquidityProviderEntry>()
+        fallback?.liquidityProviders.orEmpty().forEach { provider ->
+            val normalized = normalizeLiquidityProvider(provider) ?: return@forEach
+            mergedProviders[normalized.id] = normalized
+        }
+        primary?.liquidityProviders.orEmpty().forEach { provider ->
+            val normalized = normalizeLiquidityProvider(provider) ?: return@forEach
+            mergedProviders[normalized.id] = mergeLiquidityProviderKeepingValidFallback(
+                mergedProviders[normalized.id],
+                normalized,
+            )
+        }
+
         val mergedUpdatedAt = when {
             !primary?.updatedAt.isNullOrBlank() -> primary?.updatedAt
             else -> fallback?.updatedAt
@@ -251,6 +307,7 @@ object FederationDirectoryManager {
             version = maxOf(primary?.version ?: 1, fallback?.version ?: 1),
             updatedAt = mergedUpdatedAt,
             federations = dedupeFederations(merged.values.toList()),
+            liquidityProviders = dedupeLiquidityProviders(mergedProviders.values.toList()),
         )
     }
 
@@ -279,12 +336,124 @@ object FederationDirectoryManager {
         return dedupedReversed
     }
 
+    private fun dedupeLiquidityProviders(entries: List<LiquidityProviderEntry>): List<LiquidityProviderEntry> {
+        if (entries.isEmpty()) return entries
+
+        // Pass 1: dedupe by id.
+        val byId = linkedMapOf<String, LiquidityProviderEntry>()
+        entries.forEach { entry ->
+            byId[entry.id] = entry
+        }
+
+        // Pass 2: dedupe by canonical connection key (network + node + endpoint).
+        val seenCanonical = hashSetOf<String>()
+        val dedupedReversed = arrayListOf<LiquidityProviderEntry>()
+        for (entry in byId.values.toList().asReversed()) {
+            val key = canonicalLiquidityProviderKey(entry)
+            if (seenCanonical.add(key)) {
+                dedupedReversed.add(entry)
+            }
+        }
+        dedupedReversed.reverse()
+        return dedupedReversed
+    }
+
+    private fun canonicalLiquidityProviderKey(entry: LiquidityProviderEntry): String {
+        return listOf(
+            normalizeNetwork(entry.network),
+            entry.nodeId.trim().lowercase(),
+            entry.address.trim().lowercase(),
+        ).joinToString(separator = "|")
+    }
+
+    private fun normalizeLiquidityProvider(provider: LiquidityProviderEntry): LiquidityProviderEntry? {
+        val nodeId = provider.nodeId.trim()
+        val address = provider.address.trim()
+        if (nodeId.isBlank() || address.isBlank()) {
+            return null
+        }
+
+        val generatedId = "lp-${sha256Hex("$nodeId|$address").take(12)}"
+        val id = provider.id.trim().ifBlank { generatedId }
+        val name = provider.name.trim().ifBlank { "Liquidity Provider" }
+        val network = provider.network?.trim()?.ifBlank { null }?.let { normalizeNetwork(it) }
+        val token = provider.token?.trim()?.ifBlank { null }
+        val federationIds = provider.federationIds
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+        val sourceFederationId = provider.sourceFederationId?.trim()?.ifBlank { null }
+
+        return provider.copy(
+            id = id,
+            name = name,
+            network = network,
+            nodeId = nodeId,
+            address = address,
+            token = token,
+            federationIds = federationIds,
+            sourceFederationId = sourceFederationId,
+        )
+    }
+
+    private fun mergeLiquidityProviderKeepingValidFallback(
+        fallback: LiquidityProviderEntry?,
+        primary: LiquidityProviderEntry,
+    ): LiquidityProviderEntry {
+        if (fallback == null) return primary
+        return primary.copy(
+            name = primary.name.trim().ifBlank { fallback.name.trim().ifBlank { "Liquidity Provider" } },
+            network = primary.network?.takeIf { it.isNotBlank() } ?: fallback.network,
+            nodeId = primary.nodeId.trim().ifBlank { fallback.nodeId.trim() },
+            address = primary.address.trim().ifBlank { fallback.address.trim() },
+            token = primary.token?.takeIf { it.isNotBlank() } ?: fallback.token,
+            priority = if (primary.priority != 0) primary.priority else fallback.priority,
+            federationIds = (fallback.federationIds + primary.federationIds)
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .distinct(),
+            sourceFederationId = primary.sourceFederationId?.takeIf { it.isNotBlank() } ?: fallback.sourceFederationId,
+        )
+    }
+
     private fun normalizeEntry(entry: FederationEntry): FederationEntry {
-        val normalizedKind = entry.kind.trim().ifBlank { "ldk" }
+        val normalizedInvite = normalizeInviteCode(entry.invite)
+        val normalizedKind = inferKind(entry, normalizedInvite)
+        val normalizedGateways = entry.vettedGateways
+            .map { it.trim() }
+            .filter { it.matches(Regex("^(02|03)[0-9a-fA-F]{64}$")) }
+            .distinct()
         return entry.copy(
             kind = normalizedKind,
-            invite = normalizeInviteCode(entry.invite),
+            invite = normalizedInvite,
+            vettedGateways = normalizedGateways,
         )
+    }
+
+    private fun inferKind(entry: FederationEntry, normalizedInvite: String): String {
+        val kind = entry.kind.trim().lowercase()
+        val fedimintLikeMetadata = hasFedimintLikeMetadata(entry)
+        // Any federation-like invite should be treated as Fedimint, even if older cached entries
+        // were missing/incorrectly defaulted kind metadata.
+        if (normalizedInvite.startsWith("fed1", ignoreCase = true)) return "fedimint"
+        if (kind == "fedimint") return "fedimint"
+        if (fedimintLikeMetadata) return "fedimint"
+        return when (kind) {
+            "ldk" -> "ldk"
+            else -> if (kind.isBlank()) "ldk" else kind
+        }
+    }
+
+    private fun hasFedimintLikeMetadata(entry: FederationEntry): Boolean {
+        val website = entry.website.orEmpty().trim().lowercase()
+        val id = entry.id.trim().lowercase()
+        val name = entry.name.trim().lowercase()
+
+        val websiteLooksFedimint = website.contains("fedimint") || website.contains("fedibtc.com") || website.contains("fedi")
+        val idLooksFedimint = id.startsWith("fedimint-")
+        val nameLooksFedimint = name.contains("fedimint")
+
+        return websiteLooksFedimint || idLooksFedimint || nameLooksFedimint
     }
 
     private fun mergeEntryKeepingValidFallback(
@@ -303,6 +472,11 @@ object FederationDirectoryManager {
             lsps1NodeId = primary.lsps1NodeId?.takeIf { it.isNotBlank() } ?: fallback.lsps1NodeId,
             lsps1Address = primary.lsps1Address?.takeIf { it.isNotBlank() } ?: fallback.lsps1Address,
             lsps1Token = primary.lsps1Token?.takeIf { it.isNotBlank() } ?: fallback.lsps1Token,
+            onchainDepositsDisabled = primary.onchainDepositsDisabled ?: fallback.onchainDepositsDisabled,
+            vettedGateways = (fallback.vettedGateways + primary.vettedGateways)
+                .map { it.trim() }
+                .filter { it.matches(Regex("^(02|03)[0-9a-fA-F]{64}$")) }
+                .distinct(),
         )
     }
 
@@ -378,6 +552,44 @@ object FederationDirectoryManager {
         }
     }
 
+    private fun parseBooleanish(raw: String?): Boolean? {
+        val text = raw?.trim()?.lowercase().orEmpty()
+        if (text.isBlank()) return null
+        return when (text) {
+            "true", "1", "yes", "y" -> true
+            "false", "0", "no", "n" -> false
+            else -> null
+        }
+    }
+
+    private fun parseGatewayNodeIds(raw: String?): List<String> {
+        val text = raw?.trim().orEmpty()
+        if (text.isBlank()) return emptyList()
+
+        val fromJson = runCatching {
+            val parsed = json.parseToJsonElement(text)
+            if (parsed is JsonArray) {
+                parsed.mapNotNull { it.jsonPrimitive.contentOrNull?.trim() }
+            } else {
+                emptyList()
+            }
+        }.getOrDefault(emptyList())
+
+        val fallback = if (fromJson.isNotEmpty()) {
+            fromJson
+        } else {
+            text.removePrefix("[").removeSuffix("]")
+                .split(',')
+                .map { it.trim().trim('"', '\'') }
+                .filter { it.isNotBlank() }
+        }
+
+        return fallback
+            .map { it.trim() }
+            .filter { it.matches(Regex("^(02|03)[0-9a-fA-F]{64}$")) }
+            .distinct()
+    }
+
     private fun isAllowedDirectoryUrl(url: String): Boolean {
         val parsed = url.toHttpUrlOrNull() ?: return false
         return parsed.isHttps &&
@@ -430,6 +642,7 @@ object FederationDirectoryManager {
                     version = 2,
                     updatedAt = Instant.ofEpochMilli(now).toString(),
                     federations = current?.federations.orEmpty() + normalized,
+                    liquidityProviders = current?.liquidityProviders.orEmpty(),
                 ),
                 fallback
             ) ?: return false
@@ -455,6 +668,246 @@ object FederationDirectoryManager {
         // Never silently switch to another federation/network if the selected id disappears.
         // The UI should force an explicit user choice instead.
         return federations.firstOrNull { it.id == selectedId }
+    }
+
+    fun getLiquidityProviders(context: Context, network: String? = null): List<LiquidityProviderEntry> {
+        val all = collectLiquidityProviders(context, loadDirectory(context))
+        if (all.isEmpty()) return emptyList()
+        val targetNetwork = normalizeNetwork(network)
+        val filtered = if (targetNetwork.isBlank()) {
+            all
+        } else {
+            all.filter { providerMatchesNetwork(it, targetNetwork) }
+        }
+        return filtered.ifEmpty { all }.sortedWith(
+            compareByDescending<LiquidityProviderEntry> { it.priority }
+                .thenBy { it.name.lowercase() }
+                .thenBy { it.id.lowercase() }
+        )
+    }
+
+    fun resolveLiquidityProvider(context: Context, federation: FederationEntry): LiquidityProviderEntry? {
+        val cfg = context.config
+        val all = getLiquidityProviders(context, network = null)
+        if (all.isEmpty()) return legacyLiquidityProviderForFederation(federation)
+
+        val manualId = cfg.walletLiquidityProviderId.trim()
+        val mode = cfg.walletLiquidityProviderMode.trim().lowercase()
+        if (mode == LIQUIDITY_MODE_MANUAL && manualId.isNotBlank()) {
+            all.firstOrNull { it.id == manualId }?.let { manual ->
+                return manual
+            }
+        }
+
+        val candidates = getLiquidityProviders(context, federation.network)
+        if (candidates.isEmpty()) {
+            return legacyLiquidityProviderForFederation(federation)
+        }
+        val stats = loadProviderOutcomeStats(cfg.walletLiquidityProviderStatsJson)
+        return candidates.maxByOrNull { provider ->
+            scoreLiquidityProvider(
+                provider = provider,
+                federation = federation,
+                stats = stats[provider.id],
+            )
+        } ?: legacyLiquidityProviderForFederation(federation)
+    }
+
+    fun recordLiquidityProviderOutcome(context: Context, providerId: String?, success: Boolean) {
+        val id = providerId?.trim().orEmpty()
+        if (id.isBlank()) return
+
+        val cfg = context.config
+        val stats = loadProviderOutcomeStats(cfg.walletLiquidityProviderStatsJson)
+        val item = stats[id] ?: ProviderOutcomeStats()
+        val now = System.currentTimeMillis()
+        if (success) {
+            item.successes += 1
+            item.lastSuccessMs = now
+        } else {
+            item.failures += 1
+            item.lastFailureMs = now
+        }
+        stats[id] = item
+        cfg.walletLiquidityProviderStatsJson = encodeProviderOutcomeStats(stats)
+    }
+
+    private fun collectLiquidityProviders(context: Context, directory: FederationDirectory?): List<LiquidityProviderEntry> {
+        if (directory == null) return emptyList()
+        val explicit = directory.liquidityProviders.mapNotNull { normalizeLiquidityProvider(it) }
+        val explicitById = explicit.associateBy { it.id }
+        val derived = directory.federations.mapNotNull { entry ->
+            val lspsNodeId = entry.lsps1NodeId?.trim().orEmpty()
+            val lspsAddress = entry.lsps1Address?.trim().orEmpty()
+            if (lspsNodeId.isBlank() || lspsAddress.isBlank()) {
+                return@mapNotNull null
+            }
+            val derivedId = "$PROVIDER_ID_PREFIX_FEDERATION${entry.id}"
+            normalizeLiquidityProvider(
+                LiquidityProviderEntry(
+                    id = derivedId,
+                    name = "${entry.name} liquidity",
+                    network = entry.network,
+                    nodeId = lspsNodeId,
+                    address = lspsAddress,
+                    token = entry.lsps1Token,
+                    priority = 10,
+                    federationIds = listOf(entry.id),
+                    sourceFederationId = entry.id,
+                )
+            )
+        }
+        val custom = customLiquidityProviderFromConfig(context.config)
+        val merged = explicit +
+            derived.filterNot { explicitById.containsKey(it.id) } +
+            listOfNotNull(custom)
+        return dedupeLiquidityProviders(merged)
+    }
+
+    private fun customLiquidityProviderFromConfig(cfg: org.fossify.phone.helpers.Config): LiquidityProviderEntry? {
+        val nodeId = cfg.walletLiquidityCustomNodeId.trim()
+        val address = cfg.walletLiquidityCustomAddress.trim()
+        if (nodeId.isBlank() || address.isBlank()) return null
+        return normalizeLiquidityProvider(
+            LiquidityProviderEntry(
+                id = CUSTOM_PROVIDER_ID,
+                name = cfg.walletLiquidityCustomName.trim().ifBlank { "Custom provider" },
+                network = cfg.walletLiquidityCustomNetwork.trim().ifBlank { null },
+                nodeId = nodeId,
+                address = address,
+                token = cfg.walletLiquidityCustomToken.trim().ifBlank { null },
+                priority = 100,
+            )
+        )
+    }
+
+    private fun legacyLiquidityProviderForFederation(federation: FederationEntry): LiquidityProviderEntry? {
+        val lspsNodeId = federation.lsps1NodeId?.trim().orEmpty()
+        val lspsAddress = federation.lsps1Address?.trim().orEmpty()
+        if (lspsNodeId.isBlank() || lspsAddress.isBlank()) return null
+        return normalizeLiquidityProvider(
+            LiquidityProviderEntry(
+                id = "$PROVIDER_ID_PREFIX_FEDERATION${federation.id}",
+                name = "${federation.name} liquidity",
+                network = federation.network,
+                nodeId = lspsNodeId,
+                address = lspsAddress,
+                token = federation.lsps1Token,
+                priority = 5,
+                federationIds = listOf(federation.id),
+                sourceFederationId = federation.id,
+            )
+        )
+    }
+
+    private fun providerMatchesNetwork(provider: LiquidityProviderEntry, targetNetwork: String?): Boolean {
+        val providerNetwork = normalizeNetwork(provider.network)
+        val normalizedTarget = normalizeNetwork(targetNetwork)
+        if (providerNetwork.isBlank() || normalizedTarget.isBlank()) return true
+        return providerNetwork == normalizedTarget
+    }
+
+    private fun normalizeNetwork(network: String?): String {
+        val normalized = network?.trim()?.lowercase().orEmpty()
+        return when (normalized) {
+            "bitcoin", "mainnet", "btc" -> "bitcoin"
+            "testnet", "test" -> "testnet"
+            "signet" -> "signet"
+            "regtest" -> "regtest"
+            else -> normalized
+        }
+    }
+
+    private fun scoreLiquidityProvider(
+        provider: LiquidityProviderEntry,
+        federation: FederationEntry,
+        stats: ProviderOutcomeStats?,
+    ): Int {
+        var score = provider.priority * 10
+
+        val targetNetwork = normalizeNetwork(federation.network)
+        val providerNetwork = normalizeNetwork(provider.network)
+        score += when {
+            providerNetwork.isBlank() -> 40
+            targetNetwork.isBlank() -> 10
+            providerNetwork == targetNetwork -> 120
+            else -> -300
+        }
+
+        if (provider.sourceFederationId?.equals(federation.id, ignoreCase = true) == true) {
+            score += 60
+        }
+        if (provider.federationIds.any { it.equals(federation.id, ignoreCase = true) }) {
+            score += 60
+        }
+
+        if (stats != null) {
+            score += stats.successes * 8
+            score -= stats.failures * 12
+
+            val now = System.currentTimeMillis()
+            if (stats.lastSuccessMs > 0L && now - stats.lastSuccessMs < 7L * 24L * 60L * 60L * 1000L) {
+                score += 20
+            }
+            if (stats.lastFailureMs > 0L && now - stats.lastFailureMs < 60L * 60L * 1000L) {
+                score -= 35
+            }
+        }
+
+        return score
+    }
+
+    private fun loadProviderOutcomeStats(raw: String): MutableMap<String, ProviderOutcomeStats> {
+        val out = linkedMapOf<String, ProviderOutcomeStats>()
+        val text = raw.trim()
+        if (text.isBlank()) return out
+        val root = runCatching { JSONObject(text) }.getOrNull() ?: return out
+        val keys = root.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()?.trim().orEmpty()
+            if (key.isBlank()) continue
+            val obj = root.optJSONObject(key) ?: continue
+            out[key] = ProviderOutcomeStats(
+                successes = obj.optInt("successes", 0).coerceAtLeast(0),
+                failures = obj.optInt("failures", 0).coerceAtLeast(0),
+                lastSuccessMs = obj.optLong("last_success_ms", 0L).coerceAtLeast(0L),
+                lastFailureMs = obj.optLong("last_failure_ms", 0L).coerceAtLeast(0L),
+            )
+        }
+        return out
+    }
+
+    private fun encodeProviderOutcomeStats(stats: Map<String, ProviderOutcomeStats>): String {
+        val root = JSONObject()
+        stats.forEach { (providerId, item) ->
+            if (providerId.isBlank()) return@forEach
+            root.put(providerId, JSONObject().apply {
+                put("successes", item.successes.coerceAtLeast(0))
+                put("failures", item.failures.coerceAtLeast(0))
+                put("last_success_ms", item.lastSuccessMs.coerceAtLeast(0L))
+                put("last_failure_ms", item.lastFailureMs.coerceAtLeast(0L))
+            })
+        }
+        return root.toString()
+    }
+
+    fun isFedimintFederation(entry: FederationEntry?): Boolean {
+        if (entry == null) return false
+        if (entry.kind.trim().equals("fedimint", ignoreCase = true)) return true
+        if (normalizeInviteCode(entry.invite).startsWith("fed1", ignoreCase = true)) return true
+        return hasFedimintLikeMetadata(entry)
+    }
+
+    fun shouldTryFedimintFallback(entry: FederationEntry?): Boolean {
+        if (entry == null) return false
+        if (isFedimintFederation(entry)) return false
+
+        val id = entry.id.trim().lowercase()
+        val isKnownLdkBuiltIn = id == "btc-mainnet" || id == "btc-testnet"
+        if (isKnownLdkBuiltIn) return false
+
+        val hasExplicitLdkConfig = !entry.esploraUrl.isNullOrBlank() || !entry.rgsUrl.isNullOrBlank()
+        return !hasExplicitLdkConfig
     }
 
     fun refreshIfStale(
@@ -549,6 +1002,12 @@ object FederationDirectoryManager {
             return try {
                 val parsedCached = decodeDirectory(cached)
                 val dir = mergeDirectories(parsedCached, fallback) ?: return null
+                val normalizedEncoded = json.encodeToString(FederationDirectory.serializer(), dir)
+                if (normalizedEncoded != cached) {
+                    // One-time migration path: persist normalized entries so stale cached metadata
+                    // (e.g. missing/incorrect kind for invite-based federations) is repaired.
+                    cfg.walletDirectoryJson = normalizedEncoded
+                }
 
                 // Migration guard: refresh soon if cache only has local LDK entries
                 // and no usable Fedimint production federation.
@@ -573,8 +1032,7 @@ object FederationDirectoryManager {
                 }
 
                 if (cfg.walletDirectoryLastHash.isBlank()) {
-                    val encoded = json.encodeToString(FederationDirectory.serializer(), dir)
-                    cfg.walletDirectoryLastHash = sha256Hex(encoded)
+                    cfg.walletDirectoryLastHash = sha256Hex(normalizedEncoded)
                 }
                 if (cfg.walletDirectoryLastUpdatedAtMs <= 0L) {
                     cfg.walletDirectoryLastUpdatedAtMs = parseUpdatedAtMs(dir.updatedAt) ?: 0L

@@ -9,10 +9,10 @@
         android:layout_height="wrap_content">
 
         <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/wallet_redeem_token_toolbar"
+            android:id="@+id/wallet_respond_request_toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:title="@string/wallet_redeem_token_title" />
+            app:title="@string/wallet_review_request_title" />
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.core.widget.NestedScrollView
@@ -31,7 +31,7 @@
             android:paddingBottom="@dimen/activity_margin">
 
             <com.google.android.material.card.MaterialCardView
-                android:id="@+id/wallet_redeem_token_card"
+                android:id="@+id/wallet_respond_request_card"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 app:cardCornerRadius="@dimen/small_margin"
@@ -48,7 +48,7 @@
                     android:paddingBottom="@dimen/normal_margin">
 
                     <org.fossify.commons.views.MyTextView
-                        android:id="@+id/wallet_redeem_token_federation_label"
+                        android:id="@+id/wallet_respond_request_federation_label"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:alpha="0.75"
@@ -57,7 +57,7 @@
                         android:textStyle="bold" />
 
                     <org.fossify.commons.views.MyTextView
-                        android:id="@+id/wallet_redeem_token_federation_value"
+                        android:id="@+id/wallet_respond_request_federation_value"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
@@ -65,36 +65,84 @@
                         android:textStyle="bold" />
 
                     <org.fossify.commons.views.MyTextView
-                        android:id="@+id/wallet_redeem_token_amount_value"
-                        android:layout_width="match_parent"
+                        android:id="@+id/wallet_respond_request_amount_label"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/tiny_margin"
-                        android:alpha="0.9"
-                        android:textSize="@dimen/smaller_text_size" />
+                        android:layout_marginTop="@dimen/normal_margin"
+                        android:alpha="0.75"
+                        android:text="@string/wallet_review_request_amount"
+                        android:textSize="@dimen/smaller_text_size"
+                        android:textStyle="bold" />
 
                     <org.fossify.commons.views.MyTextView
-                        android:id="@+id/wallet_redeem_token_expires_value"
+                        android:id="@+id/wallet_respond_request_amount_value"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
+                        android:textSize="@dimen/normal_text_size"
+                        android:textStyle="bold" />
+
+                    <org.fossify.commons.views.MyTextView
+                        android:id="@+id/wallet_respond_request_id_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/normal_margin"
                         android:alpha="0.75"
-                        android:textSize="@dimen/smaller_text_size" />
+                        android:text="@string/wallet_review_request_id"
+                        android:textSize="@dimen/smaller_text_size"
+                        android:textStyle="bold" />
+
+                    <org.fossify.commons.views.MyTextView
+                        android:id="@+id/wallet_respond_request_id_value"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textSize="@dimen/smaller_text_size"
+                        android:textStyle="bold" />
 
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/wallet_redeem_token_button"
-                style="@style/Widget.MaterialComponents.Button"
+            <org.fossify.commons.views.MyTextView
+                android:id="@+id/wallet_respond_request_channel_hint"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/normal_margin"
-                android:text="@string/wallet_redeem_token_button"
-                android:textAllCaps="false"
-                android:textStyle="bold" />
+                android:alpha="0.85"
+                android:textSize="@dimen/smaller_text_size" />
+
+            <LinearLayout
+                android:id="@+id/wallet_respond_request_button_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/normal_margin"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/wallet_respond_request_deny"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="@dimen/normal_margin"
+                    android:layout_weight="1"
+                    android:text="@string/wallet_review_request_deny"
+                    android:textAllCaps="false"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/wallet_respond_request_approve"
+                    style="@style/Widget.MaterialComponents.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/wallet_review_request_approve"
+                    android:textAllCaps="false"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <com.google.android.material.progressindicator.CircularProgressIndicator
-                android:id="@+id/wallet_redeem_token_progress"
+                android:id="@+id/wallet_respond_request_progress"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_horizontal"
@@ -103,7 +151,7 @@
                 android:visibility="gone" />
 
             <org.fossify.commons.views.MyTextView
-                android:id="@+id/wallet_redeem_token_error"
+                android:id="@+id/wallet_respond_request_error"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/normal_margin"
