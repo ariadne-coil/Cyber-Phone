@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.4.2 (2026-02-18)
+- Wallet reliability: hardened Esplora endpoint handling with health scoring, remembered-good endpoint preference, retry-aware preflight checks, and stronger feerate recovery during startup/sync/balance refresh.
+- Wallet reliability: fixed federation-switch behavior that could leave Bitcoin Mainnet in recurring "fee rates unavailable" states by adding safer restart/retry paths and federation-scoped balance snapshot handling.
+- Fedimint payments: expanded `payInvoice` compatibility fallback (wrapper + raw RPC probing) across module/method/payload variations used by different runtime/API shapes.
+- Fedimint payments: improved retry/error classification to continue probing on RPC discovery/shape mismatches while surfacing real payment execution failures earlier.
+- Withdraw flow: improved receive-invoice creation resilience with deterministic stop/start handling and pre-invoice sync/recovery logic.
+- Known issue: Fedimint withdrawals can still be unreliable on some federation/runtime combinations.
+
 ## v0.4.1 (2026-02-17)
 - Wallet: major stabilization pass after v0.4.0 where wallet flows were partially broken; fixed multiple startup/sync failures that could leave balances unavailable or the wallet non-functional.
 - Wallet: fixed Bitcoin Mainnet regressions around fee-rate updates and hardened LDK recovery with Esplora fee-estimate preflight + endpoint failover during startup/sync.

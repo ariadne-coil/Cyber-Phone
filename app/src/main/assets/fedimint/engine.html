@@ -341,8 +341,37 @@
                 msg.includes("missing field `force_internal`") ||
                 msg.includes("unknown field forceinternal") ||
                 msg.includes("unknown field force_internal") ||
-                msg.includes("invalid type") ||
-                msg.includes("invalid arguments")
+                msg.includes("invalid arguments") ||
+                msg.includes("expected object") ||
+                msg.includes("expected struct") ||
+                (msg.includes("invalid type") && (
+                  msg.includes("expected") || msg.includes("argument") || msg.includes("field")
+                ))
+              );
+            };
+            const isRpcDiscoveryError = (err) => {
+              const msg = String((err && err.message) || err || "").toLowerCase();
+              return (
+                msg.includes("unknown module") ||
+                msg.includes("module not found") ||
+                msg.includes("unknown method") ||
+                msg.includes("method not found") ||
+                msg.includes("no such method") ||
+                msg.includes("not implemented")
+              );
+            };
+            const isLikelyPaymentExecutionError = (err) => {
+              const msg = String((err && err.message) || err || "").toLowerCase();
+              return (
+                msg.includes("insufficient") ||
+                msg.includes("no route") ||
+                msg.includes("already paid") ||
+                msg.includes("expired") ||
+                msg.includes("invalid invoice") ||
+                msg.includes("payment failed") ||
+                msg.includes("gateway") ||
+                msg.includes("liquidity") ||
+                msg.includes("timed out")
               );
             };
 
@@ -363,18 +392,18 @@
                 return ok(res);
               } catch (e) {
                 lastErr = e;
-                if (!isArgumentShapeError(e)) {
+                if (!isArgumentShapeError(e) && !isRpcDiscoveryError(e)) {
                   throw e;
                 }
               }
             }
 
             // Wrapper signatures vary across SDK versions. If wrapper calls fail due to
-            // argument shape changes, fallback to raw module RPCs with force_internal set.
+            // argument-shape/method drift, fallback to broad raw module RPC probing.
             const bridgeClient = getWalletClientBridge(w);
             if (bridgeClient && typeof bridgeClient.rpcSingle === "function") {
               const modules = ["ln", "lightning", 1, 2];
-              const rpcMethods = [
+              const methods = [
                 "pay_invoice",
                 "payInvoice",
                 "pay_bolt11_invoice",
@@ -383,19 +412,37 @@
               ];
               const payloads = [
                 { invoice, force_internal: false },
+                { invoice, forceInternal: false },
+                { invoice },
                 { bolt11: invoice, force_internal: false },
+                { bolt11: invoice, forceInternal: false },
+                { bolt11: invoice },
                 { payment_request: invoice, force_internal: false },
+                { payment_request: invoice, forceInternal: false },
+                { payment_request: invoice },
                 { invoice, options: { force_internal: false } },
+                { invoice, options: { forceInternal: false } },
               ];
 
+              const seen = new Set();
               for (const module of modules) {
-                for (const rpcMethod of rpcMethods) {
+                for (const rpcMethod of methods) {
                   for (const payload of payloads) {
+                    const key = `${String(module)}|${rpcMethod}|${JSON.stringify(payload)}`;
+                    if (seen.has(key)) continue;
+                    seen.add(key);
                     try {
                       const res = await bridgeClient.rpcSingle(module, rpcMethod, payload);
                       return ok(res);
                     } catch (e) {
                       lastErr = e;
+                      if (isArgumentShapeError(e) || isRpcDiscoveryError(e)) {
+                        continue;
+                      }
+                      if (isLikelyPaymentExecutionError(e)) {
+                        throw e;
+                      }
+                      // Unknown error: keep probing remaining compatibility combos.
                     }
                   }
                 }

@@ -499,7 +499,9 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                 }
 
                 if (!isFm && selected != null && ldkStartedForSelection) {
-                    balances = LdkWalletManager.listBalances()
+                    // Clear stale lastError so a transient sync fee-rate failure doesn't
+                    // persist into the rendered snapshot when listBalances succeeds.
+                    balances = loadLdkBalancesWithRecovery(selected)
                     payments = LdkWalletManager.listPayments(limit = 20)
                 }
                 rate = ExchangeRateManager.getCachedUsdRate(context)
@@ -846,9 +848,10 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
             return
         }
 
-        if (balances == null && !LdkWalletManager.getLastErrorMessage().isNullOrBlank()) {
+        val ldkError = LdkWalletManager.getLastErrorMessage()
+        if (balances == null && !ldkError.isNullOrBlank()) {
             binding.walletError.text =
-                context.getString(R.string.wallet_status_error, LdkWalletManager.getLastErrorMessage().orEmpty())
+                context.getString(R.string.wallet_status_error, ldkError)
             binding.walletError.beVisible()
         } else {
             binding.walletError.beGone()
@@ -1717,11 +1720,15 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                     return@ensureBackgroundThread
                 }
 
-                var receiveInvoice = LdkWalletManager.createBolt11Invoice(
+                // Prime chain state before invoice creation to reduce transient fee-rate failures.
+                // Use no-recovery variant so the recovery budget is preserved for invoice creation.
+                LdkWalletManager.syncWalletsBlockingNoRecovery()
+
+                var receiveInvoice = createWithdrawReceiveInvoiceWithRecovery(
+                    sourceFederation = source,
                     amountSats = amountSats,
-                    memo = "Federation withdraw",
-                    expirySeconds = 5 * 60,
                     preferJitChannel = true,
+                    maxAttempts = 3,
                 )
                 if (receiveInvoice.isNullOrBlank()) {
                     val firstError = LdkWalletManager.getLastErrorMessage().orEmpty()
@@ -1730,63 +1737,26 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
 
                     if (shouldRetryAfterRestart) {
                         // Rebuild the node so a newly resolved provider gets applied deterministically.
-                        LdkWalletManager.stop()
-                        val restarted = LdkWalletManager.ensureStartedBlocking(context, source)
+                        val restarted = restartLdkWalletBlocking(source)
                         if (restarted) {
                             inboundLiquidity = LdkWalletManager.getUsableInboundLiquiditySats() ?: inboundLiquidity
-                            receiveInvoice = LdkWalletManager.createBolt11Invoice(
+                            receiveInvoice = createWithdrawReceiveInvoiceWithRecovery(
+                                sourceFederation = source,
                                 amountSats = amountSats,
-                                memo = "Federation withdraw",
-                                expirySeconds = 5 * 60,
                                 preferJitChannel = true,
+                                maxAttempts = 2,
                             )
                         }
                     }
 
                     // If inbound is already available but JIT path keeps failing, fallback to standard receive.
                     if (receiveInvoice.isNullOrBlank() && inboundLiquidity >= amountSats) {
-                        receiveInvoice = LdkWalletManager.createBolt11Invoice(
+                        receiveInvoice = createWithdrawReceiveInvoiceWithRecovery(
+                            sourceFederation = source,
                             amountSats = amountSats,
-                            memo = "Federation withdraw",
-                            expirySeconds = 5 * 60,
                             preferJitChannel = false,
+                            maxAttempts = 2,
                         )
-                    }
-
-                    if (receiveInvoice.isNullOrBlank()) {
-                        val feeError = LdkWalletManager.getLastErrorMessage().orEmpty()
-                        if (isLikelyFeerateError(feeError)) {
-                            // Feerate estimation can be transient. Retry JIT a few times after sync.
-                            repeat(2) {
-                                LdkWalletManager.syncWalletsBlocking()
-                                receiveInvoice = LdkWalletManager.createBolt11Invoice(
-                                    amountSats = amountSats,
-                                    memo = "Federation withdraw",
-                                    expirySeconds = 5 * 60,
-                                    preferJitChannel = true,
-                                )
-                                if (!receiveInvoice.isNullOrBlank()) {
-                                    return@repeat
-                                }
-                                try {
-                                    Thread.sleep(750L)
-                                } catch (_: InterruptedException) {
-                                    Thread.currentThread().interrupt()
-                                    return@repeat
-                                }
-                            }
-
-                            // Degraded mode: if feerates still fail for JIT, attempt a standard invoice
-                            // so withdraw can continue when inbound liquidity is already available.
-                            if (receiveInvoice.isNullOrBlank()) {
-                                receiveInvoice = LdkWalletManager.createBolt11Invoice(
-                                    amountSats = amountSats,
-                                    memo = "Federation withdraw",
-                                    expirySeconds = 5 * 60,
-                                    preferJitChannel = false,
-                                )
-                            }
-                        }
                     }
 
                     if (receiveInvoice.isNullOrBlank() && autoGatewayCandidates.isNotEmpty()) {
@@ -3048,6 +3018,102 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
         return NumberFormat.getIntegerInstance().format(asLong.absoluteValue)
     }
 
+    private fun restartLdkWalletBlocking(sourceFederation: FederationEntry): Boolean {
+        LdkWalletManager.stopBlocking()
+        val restarted = LdkWalletManager.ensureStartedBlocking(context, sourceFederation)
+        if (!restarted) return false
+        // Best-effort sync keeps wallet state coherent before invoice generation.
+        LdkWalletManager.syncWalletsBlocking()
+        return true
+    }
+
+    private fun loadLdkBalancesWithRecovery(selectedFederation: FederationEntry): org.lightningdevkit.ldknode.BalanceDetails? {
+        val initial = LdkWalletManager.listBalances()
+        if (initial != null) return initial
+
+        var lastError = LdkWalletManager.getLastErrorMessage()
+        if (!isLikelyFeerateError(lastError)) {
+            return null
+        }
+
+        repeat(2) { attempt ->
+            if (attempt == 1) {
+                if (!restartLdkWalletBlocking(selectedFederation)) {
+                    return@repeat
+                }
+            } else {
+                LdkWalletManager.syncWalletsBlocking()
+            }
+
+            try {
+                Thread.sleep(350L)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return null
+            }
+
+            val retried = LdkWalletManager.listBalances()
+            if (retried != null) {
+                return retried
+            }
+
+            lastError = LdkWalletManager.getLastErrorMessage()
+            if (!isLikelyFeerateError(lastError)) {
+                return null
+            }
+        }
+
+        return null
+    }
+
+    private fun createWithdrawReceiveInvoiceWithRecovery(
+        sourceFederation: FederationEntry,
+        amountSats: Long,
+        preferJitChannel: Boolean,
+        maxAttempts: Int,
+    ): String? {
+        val attempts = maxAttempts.coerceIn(1, 5)
+        var lastError: String? = null
+
+        repeat(attempts) { attempt ->
+            if (attempt > 0) {
+                LdkWalletManager.syncWalletsBlockingNoRecovery()
+                try {
+                    Thread.sleep(450L)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return null
+                }
+            }
+
+            val invoice = LdkWalletManager.createBolt11Invoice(
+                amountSats = amountSats,
+                memo = "Federation withdraw",
+                expirySeconds = 5 * 60,
+                preferJitChannel = preferJitChannel,
+            )
+            if (!invoice.isNullOrBlank()) {
+                return invoice
+            }
+
+            lastError = LdkWalletManager.getLastErrorMessage()
+            val shouldRestart =
+                isLikelyFeerateError(lastError) ||
+                    (preferJitChannel && isLikelyLiquiditySetupError(lastError))
+            if (shouldRestart && attempt < attempts - 1) {
+                if (!restartLdkWalletBlocking(sourceFederation)) {
+                    return null
+                }
+            }
+        }
+
+        if (isLikelyFeerateError(lastError)) {
+            LdkWalletManager.syncWalletsBlockingNoRecovery()
+        }
+
+        return null
+    }
+
     private fun parseFixedInvoiceSats(text: String): Long? {
         val invoice = runCatching { Bolt11Invoice.fromStr(text.trim()) }.getOrNull() ?: return null
         val msat = runCatching { invoice.amountMilliSatoshis() }.getOrNull() ?: return null
@@ -3151,11 +3217,12 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                 nodeId = nodeId,
                 address = address,
             )
-            LdkWalletManager.stop()
+            LdkWalletManager.stopBlocking()
             if (!LdkWalletManager.ensureStartedBlocking(context, sourceFederation)) {
                 FederationDirectoryManager.recordLiquidityProviderOutcome(context, "custom-provider", success = false)
                 continue
             }
+            LdkWalletManager.syncWalletsBlocking()
 
             val invoice = LdkWalletManager.createBolt11Invoice(
                 amountSats = amountSats,
@@ -3174,7 +3241,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
 
         if (successfulInvoice.isNullOrBlank()) {
             restoreLiquidityPrefs(snapshot)
-            LdkWalletManager.stop()
+            LdkWalletManager.stopBlocking()
             LdkWalletManager.ensureStartedBlocking(context, sourceFederation)
         }
         return successfulInvoice
@@ -3193,11 +3260,12 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
             val providerId = provider.id.trim()
             if (providerId.isBlank()) continue
             applyManualDirectoryLiquidityProvider(providerId)
-            LdkWalletManager.stop()
+            LdkWalletManager.stopBlocking()
             if (!LdkWalletManager.ensureStartedBlocking(context, sourceFederation)) {
                 FederationDirectoryManager.recordLiquidityProviderOutcome(context, providerId, success = false)
                 continue
             }
+            LdkWalletManager.syncWalletsBlocking()
 
             val invoice = LdkWalletManager.createBolt11Invoice(
                 amountSats = amountSats,
@@ -3216,7 +3284,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
 
         if (successfulInvoice.isNullOrBlank()) {
             restoreLiquidityPrefs(snapshot)
-            LdkWalletManager.stop()
+            LdkWalletManager.stopBlocking()
             LdkWalletManager.ensureStartedBlocking(context, sourceFederation)
         }
         return successfulInvoice

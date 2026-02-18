@@ -429,12 +429,32 @@ object FedimintWalletManager {
 
         if (!ensureStartedBlocking(context, federation)) return false
 
+        val result = attemptPayInvoice(context, cleaned)
+        if (result) return true
+
+        // Single retry for transient gateway errors after a short backoff.
+        val errorMsg = lastError?.message.orEmpty()
+        if (isTransientGatewayError(errorMsg)) {
+            Log.d(TAG, "Retrying payment after transient gateway error: $errorMsg")
+            try { Thread.sleep(2_000L) } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return false
+            }
+            // Re-verify federation is still open before retrying.
+            if (!ensureStartedBlocking(context, federation)) return false
+            return attemptPayInvoice(context, cleaned)
+        }
+
+        return false
+    }
+
+    private fun attemptPayInvoice(context: Context, invoice: String): Boolean {
         return try {
             val res = FedimintWebEngine.callBlocking(
                 context = context,
                 method = "payInvoice",
                 params = JSONObject().apply {
-                    put("invoice", cleaned)
+                    put("invoice", invoice)
                     put("force_internal", false)
                     put("forceInternal", false)
                 },
@@ -461,6 +481,15 @@ object FedimintWalletManager {
             clearRunningStateIfNotInitialized(t.message)
             false
         }
+    }
+
+    private fun isTransientGatewayError(msg: String): Boolean {
+        val lower = msg.lowercase()
+        return lower.contains("timeout") ||
+            lower.contains("timed out") ||
+            (lower.contains("connection") && lower.contains("refused")) ||
+            lower.contains("no route") ||
+            (lower.contains("gateway") && lower.contains("unavailable"))
     }
 
     /**
@@ -1013,8 +1042,8 @@ object FedimintWalletManager {
         if (text.contains("wallet not open") ||
             text.contains("not initialized") ||
             text.contains("client is not initialized") ||
-            text.contains("runtimeerror") && text.contains("unreachable") ||
-            text.contains("incompatible")
+            (text.contains("runtimeerror") && (text.contains("unreachable") ||
+                text.contains("incompatible")))
         ) {
             federationId = null
         }

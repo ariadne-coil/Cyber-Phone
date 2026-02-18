@@ -35,14 +35,18 @@ object LdkWalletManager {
     private const val GATEWAY_BOOTSTRAP_MAX_RANKING_NODES = 12
     private const val GATEWAY_BOOTSTRAP_PENDING_TTL_MS = 45L * 60L * 1000L
     private const val BOOTSTRAP_HTTP_TIMEOUT_SEC = 8L
-    private const val ESPLORA_PREFLIGHT_TIMEOUT_MS = 2_500L
+    private const val ESPLORA_PREFLIGHT_TIMEOUT_MS = 3_500L
+    private const val ESPLORA_PREFLIGHT_ATTEMPTS = 2
+    private const val ESPLORA_PREFLIGHT_RETRY_DELAY_MS = 350L
+    private const val ESPLORA_RECENT_HEALTH_WINDOW_MS = 20L * 60L * 1000L
+    private const val ESPLORA_RECENT_FAILURE_WINDOW_MS = 2L * 60L * 1000L
     private const val LIGHTNING_SEND_AWAIT_TIMEOUT_MS = 25_000L
     private const val LIGHTNING_SEND_AWAIT_POLL_MS = 1_000L
     private const val LIGHTNING_RECEIVE_AWAIT_TIMEOUT_MS = 45_000L
     private const val LIGHTNING_RECEIVE_AWAIT_POLL_MS = 1_000L
     private const val BALANCE_SNAPSHOT_MAX_AGE_MS = 10L * 60L * 1000L
     private const val FEERATE_RECOVERY_FAILURE_WINDOW_MS = 2L * 60L * 1000L
-    private const val FEERATE_RECOVERY_ATTEMPT_COOLDOWN_MS = 90_000L
+    private const val FEERATE_RECOVERY_ATTEMPT_COOLDOWN_MS = 15_000L
     private const val FEERATE_RECOVERY_MIN_FAILURES = 1
     private const val MEMPOOL_MAINNET_NODE_API = "https://mempool.space/api/v1/lightning/nodes/"
     private const val MEMPOOL_TESTNET_NODE_API = "https://mempool.space/testnet/api/v1/lightning/nodes/"
@@ -91,11 +95,9 @@ object LdkWalletManager {
     @Volatile
     private var activeEsploraUrl: String? = null
 
-    @Volatile
-    private var cachedBalanceSnapshot: BalanceDetails? = null
-
-    @Volatile
-    private var cachedBalanceSnapshotUpdatedAtMs: Long = 0L
+    private val knownGoodEsploraByFederationId = HashMap<String, String>()
+    private val esploraHealthStatsByUrl = HashMap<String, EsploraHealthStats>()
+    private val cachedBalanceSnapshotByFederationId = HashMap<String, Pair<BalanceDetails, Long>>()
 
     @Volatile
     private var consecutiveFeerateFailures: Int = 0
@@ -116,6 +118,13 @@ object LdkWalletManager {
         val readyForSpend: Boolean,
         val shouldKeepWaiting: Boolean,
         val message: String? = null,
+    )
+
+    private data class EsploraHealthStats(
+        val successCount: Int = 0,
+        val failureCount: Int = 0,
+        val lastSuccessAtMs: Long = 0L,
+        val lastFailureAtMs: Long = 0L,
     )
 
     private val builtInBootstrapPeersByNetwork = mapOf(
@@ -355,24 +364,30 @@ object LdkWalletManager {
             val n = runningNodeOrNull(operation = "list balances") ?: return getFreshBalanceSnapshotOrNull()
             val balances = n.listBalances()
             cacheBalanceSnapshot(balances)
+            rememberActiveEsploraAsHealthy()
             resetFeerateFailureTracking()
             lastError = null
             balances
         } catch (t: Throwable) {
             if (allowFeerateRecovery && t.isLikelyFeerateFailure()) {
-                if (noteFeerateFailureAndShouldRecover() &&
-                    recoverFromFeerateFailureBlocking(
+                noteActiveEsploraFailure()
+                noteFeerateFailureAndShouldRecover()
+
+                // Return a fresh cached snapshot if available — keep the wallet
+                // usable during transient esplora outages without tearing down
+                // the running node.
+                getFreshBalanceSnapshotOrNull()?.let { snapshot ->
+                    lastError = t
+                    return snapshot
+                }
+
+                // No cached snapshot available. Escalate to full recovery.
+                if (recoverFromFeerateFailureBlocking(
                         operation = "list balances",
                         allowRunningNodeRebuild = true,
                     )
                 ) {
                     return listBalancesInternal(allowFeerateRecovery = false)
-                }
-
-                getFreshBalanceSnapshotOrNull()?.let { snapshot ->
-                    // Keep the wallet usable in the UI if current feerate fetch is transiently failing.
-                    lastError = t
-                    return snapshot
                 }
             }
             lastError = t
@@ -479,6 +494,9 @@ object LdkWalletManager {
                         .getOrDefault(0L)
                     if (inboundSats < amountSats) {
                         val jitErr = jitFailure.exceptionOrNull() ?: jitAttempt.exceptionOrNull()
+                        if (allowFeerateRecovery && jitErr != null && jitErr.isLikelyFeerateFailure()) {
+                            noteActiveEsploraFailure()
+                        }
                         if (allowFeerateRecovery &&
                             jitErr != null &&
                             jitErr.isLikelyFeerateFailure() &&
@@ -525,6 +543,9 @@ object LdkWalletManager {
             invoice.toString()
         } catch (t: Throwable) {
             lastError = t
+            if (allowFeerateRecovery && t.isLikelyFeerateFailure()) {
+                noteActiveEsploraFailure()
+            }
             if (allowFeerateRecovery && t.isLikelyFeerateFailure() &&
                 recoverFromFeerateFailureBlocking("create invoice")
             ) {
@@ -701,6 +722,9 @@ object LdkWalletManager {
                     .filter { paymentMatchesHash(it, paymentHash) }
                     .maxByOrNull { it.latestUpdateTimestamp }
             }.getOrElse {
+                if (it.isLikelyFeerateFailure()) {
+                    noteActiveEsploraFailure()
+                }
                 if (it.isLikelyFeerateFailure() &&
                     recoverFromFeerateFailureBlocking("check incoming invoice status")
                 ) {
@@ -737,6 +761,9 @@ object LdkWalletManager {
 
             var recoveredAfterSync = false
             runCatching { n.syncWallets() }.onFailure { syncErr ->
+                if (syncErr.isLikelyFeerateFailure()) {
+                    noteActiveEsploraFailure()
+                }
                 if (syncErr.isLikelyFeerateFailure() &&
                     recoverFromFeerateFailureBlocking("check incoming invoice status")
                 ) {
@@ -1649,32 +1676,132 @@ object LdkWalletManager {
         }.getOrNull()
     }
 
+    private fun canonicalizeEsploraUrl(raw: String?): String {
+        return raw?.trim().orEmpty().removeSuffix("/").lowercase()
+    }
+
+    private fun noteEsploraProbeSuccess(esploraBaseUrl: String) {
+        val key = canonicalizeEsploraUrl(esploraBaseUrl)
+        if (key.isBlank()) return
+        val now = System.currentTimeMillis()
+        synchronized(lock) {
+            val prev = esploraHealthStatsByUrl[key] ?: EsploraHealthStats()
+            esploraHealthStatsByUrl[key] = prev.copy(
+                successCount = (prev.successCount + 1).coerceAtMost(10_000),
+                lastSuccessAtMs = now,
+            )
+        }
+    }
+
+    private fun noteEsploraProbeFailure(esploraBaseUrl: String) {
+        val key = canonicalizeEsploraUrl(esploraBaseUrl)
+        if (key.isBlank()) return
+        val now = System.currentTimeMillis()
+        synchronized(lock) {
+            val prev = esploraHealthStatsByUrl[key] ?: EsploraHealthStats()
+            esploraHealthStatsByUrl[key] = prev.copy(
+                failureCount = (prev.failureCount + 1).coerceAtMost(10_000),
+                lastFailureAtMs = now,
+            )
+        }
+    }
+
+    private fun wasEsploraHealthyRecently(esploraBaseUrl: String): Boolean {
+        val key = canonicalizeEsploraUrl(esploraBaseUrl)
+        if (key.isBlank()) return false
+        val stats = synchronized(lock) { esploraHealthStatsByUrl[key] } ?: return false
+        if (stats.lastSuccessAtMs <= 0L) return false
+        return System.currentTimeMillis() - stats.lastSuccessAtMs <= ESPLORA_RECENT_HEALTH_WINDOW_MS
+    }
+
+    private fun esploraHealthScore(esploraBaseUrl: String): Long {
+        val key = canonicalizeEsploraUrl(esploraBaseUrl)
+        if (key.isBlank()) return 0L
+        val stats = synchronized(lock) { esploraHealthStatsByUrl[key] } ?: return 0L
+        val now = System.currentTimeMillis()
+        var score = (stats.successCount * 50L) - (stats.failureCount * 35L)
+        if (stats.lastSuccessAtMs > 0L && now - stats.lastSuccessAtMs <= ESPLORA_RECENT_HEALTH_WINDOW_MS) {
+            score += 5_000L
+        }
+        if (stats.lastFailureAtMs > 0L && now - stats.lastFailureAtMs <= ESPLORA_RECENT_FAILURE_WINDOW_MS) {
+            score -= 3_000L
+        }
+        return score
+    }
+
+    private fun noteActiveEsploraFailure() {
+        val active = synchronized(lock) { activeEsploraUrl.orEmpty() }
+        if (active.isNotBlank()) {
+            noteEsploraProbeFailure(active)
+        }
+    }
+
     private fun hasUsableFeeEstimates(esploraBaseUrl: String): Boolean {
         val base = esploraBaseUrl.trim().removeSuffix("/")
         if (base.isBlank()) return false
         val endpoint = "$base/fee-estimates"
-        val body = httpGetBodyWithTimeout(endpoint, ESPLORA_PREFLIGHT_TIMEOUT_MS) ?: return false
-        val parsed = runCatching { JSONObject(body) }.getOrNull() ?: return false
-        if (parsed.length() == 0) return false
 
-        val keys = parsed.keys()
-        while (keys.hasNext()) {
-            val key = keys.next()
-            val value = parsed.optDouble(key, Double.NaN)
-            if (!value.isNaN() && value >= 0.0) {
-                return true
+        repeat(ESPLORA_PREFLIGHT_ATTEMPTS.coerceAtLeast(1)) { attempt ->
+            val body = httpGetBodyWithTimeout(endpoint, ESPLORA_PREFLIGHT_TIMEOUT_MS)
+            if (!body.isNullOrBlank()) {
+                val parsed = runCatching { JSONObject(body) }.getOrNull()
+                if (parsed != null && parsed.length() > 0) {
+                    val keys = parsed.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        val value = parsed.optDouble(key, Double.NaN)
+                        if (!value.isNaN() && value >= 0.0) {
+                            noteEsploraProbeSuccess(base)
+                            return true
+                        }
+                    }
+                }
+            }
+
+            if (attempt < ESPLORA_PREFLIGHT_ATTEMPTS - 1) {
+                try {
+                    Thread.sleep(ESPLORA_PREFLIGHT_RETRY_DELAY_MS)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    noteEsploraProbeFailure(base)
+                    return false
+                }
             }
         }
+
+        noteEsploraProbeFailure(base)
         return false
     }
 
     private fun orderCandidatesWithFeeEstimatePreflight(candidates: List<String>): List<String> {
-        if (candidates.isEmpty() || candidates.size == 1) return candidates
+        if (candidates.isEmpty()) return emptyList()
+        if (candidates.size == 1) return candidates
 
-        val healthy = ArrayList<String>(candidates.size)
-        val unknownOrUnhealthy = ArrayList<String>(candidates.size)
-        candidates.forEach { candidate ->
-            val healthyCandidate = runCatching { hasUsableFeeEstimates(candidate) }.getOrDefault(false)
+        val active = synchronized(lock) { canonicalizeEsploraUrl(activeEsploraUrl) }
+        val currentFederationId = synchronized(lock) { federationId?.trim().orEmpty() }
+        val knownGood = synchronized(lock) {
+            canonicalizeEsploraUrl(
+                if (currentFederationId.isBlank()) null else knownGoodEsploraByFederationId[currentFederationId]
+            )
+        }
+        val ranked = candidates
+            .map { it.trim().removeSuffix("/") }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sortedWith(
+                compareByDescending<String> { canonicalizeEsploraUrl(it) == active }
+                    .thenByDescending { canonicalizeEsploraUrl(it) == knownGood }
+                    .thenByDescending { esploraHealthScore(it) }
+            )
+
+        val healthy = ArrayList<String>(ranked.size)
+        val unknownOrUnhealthy = ArrayList<String>(ranked.size)
+        ranked.forEach { candidate ->
+            val healthyCandidate = if (wasEsploraHealthyRecently(candidate)) {
+                true
+            } else {
+                runCatching { hasUsableFeeEstimates(candidate) }.getOrDefault(false)
+            }
             Log.i(TAG, "Esplora preflight ${if (healthyCandidate) "OK" else "FAIL"}: $candidate")
             if (healthyCandidate) {
                 healthy.add(candidate)
@@ -1684,7 +1811,7 @@ object LdkWalletManager {
         }
 
         // Preserve all candidates. If probes fail due transient connectivity, keep fallbacks.
-        return if (healthy.isNotEmpty()) healthy + unknownOrUnhealthy else candidates
+        return if (healthy.isNotEmpty()) healthy + unknownOrUnhealthy else ranked
     }
 
     fun ensureStarted(
@@ -1736,10 +1863,17 @@ object LdkWalletManager {
 
     fun stop(callback: (() -> Unit)? = null) {
         ensureBackgroundThread {
-            synchronized(lock) {
-                stopLocked()
-            }
+            stopBlocking()
             callback?.invoke()
+        }
+    }
+
+    /**
+     * Synchronous variant of [stop]. Call this off the UI thread.
+     */
+    fun stopBlocking() {
+        synchronized(lock) {
+            stopLocked()
         }
     }
 
@@ -1748,8 +1882,12 @@ object LdkWalletManager {
             try {
                 val n = runningNodeOrNull(operation = "sync wallet", setError = false) ?: return@ensureBackgroundThread
                 n.syncWallets()
+                rememberActiveEsploraAsHealthy()
                 lastError = null
             } catch (t: Throwable) {
+                if (t.isLikelyFeerateFailure()) {
+                    noteActiveEsploraFailure()
+                }
                 Log.w(TAG, "syncWallets() failed", t)
                 lastError = t
             }
@@ -1763,15 +1901,28 @@ object LdkWalletManager {
         return syncWalletsBlockingInternal(allowFeerateRecovery = true)
     }
 
+    /**
+     * Best-effort sync that does NOT trigger feerate recovery.
+     *
+     * Use this before an operation that performs its own recovery
+     * (e.g. invoice creation) so the sync doesn't consume the
+     * recovery budget.
+     */
+    fun syncWalletsBlockingNoRecovery(): Boolean {
+        return syncWalletsBlockingInternal(allowFeerateRecovery = false)
+    }
+
     private fun syncWalletsBlockingInternal(allowFeerateRecovery: Boolean): Boolean {
         return try {
             val n = runningNodeOrNull(operation = "sync wallet") ?: return false
             n.syncWallets()
+            rememberActiveEsploraAsHealthy()
             resetFeerateFailureTracking()
             lastError = null
             true
         } catch (t: Throwable) {
             if (allowFeerateRecovery && t.isLikelyFeerateFailure()) {
+                noteActiveEsploraFailure()
                 if (noteFeerateFailureAndShouldRecover() &&
                     recoverFromFeerateFailureBlocking(
                         operation = "sync wallet",
@@ -1848,10 +1999,18 @@ object LdkWalletManager {
             }
 
             val network = parseNetwork(federation.network)
+            val rememberedEsplora = synchronized(lock) {
+                knownGoodEsploraByFederationId[federation.id]?.trim().orEmpty()
+            }
             val preferredEsplora = preferredEsploraOverride?.trim().orEmpty()
+                .ifBlank { rememberedEsplora }
                 .ifBlank { federation.esploraUrl?.trim().orEmpty() }
                 .ifBlank { defaultEsploraUrl(network) }
-            val esploraCandidates = candidateEsploraUrls(network, preferredEsplora)
+            val esploraCandidates = candidateEsploraUrls(
+                network = network,
+                preferred = preferredEsplora,
+                secondaryPreferred = rememberedEsplora,
+            )
             val preflightedCandidates = orderCandidatesWithFeeEstimatePreflight(esploraCandidates)
             Log.i(TAG, "Esplora startup candidates for ${federation.id}: ${preflightedCandidates.joinToString()}")
             var startError: Throwable? = null
@@ -1872,12 +2031,16 @@ object LdkWalletManager {
                         activeEsploraUrl = esploraUrl
                         lastError = null
                     }
+                    noteEsploraProbeSuccess(esploraUrl)
 
                     // Run the first sync asynchronously to avoid blocking federation switches/UI refreshes.
                     syncWallets()
                     return
                 } catch (t: Throwable) {
                     startError = t
+                    if (t.isLikelyFeerateFailure()) {
+                        noteEsploraProbeFailure(esploraUrl)
+                    }
                     runCatching { built.stop() }
                     runCatching { built.close() }
 
@@ -2057,9 +2220,18 @@ object LdkWalletManager {
         val context = appContextForRecovery ?: return false
         val federation = resolveFederationForRecovery(context) ?: return false
         val network = parseNetwork(federation.network)
-        val preferred = federation.esploraUrl?.trim().orEmpty().ifBlank { defaultEsploraUrl(network) }
+        val rememberedEsplora = synchronized(lock) {
+            knownGoodEsploraByFederationId[federation.id]?.trim().orEmpty()
+        }
+        val preferred = federation.esploraUrl?.trim().orEmpty()
+            .ifBlank { rememberedEsplora }
+            .ifBlank { defaultEsploraUrl(network) }
         val candidates = rotateCandidatesAfterActive(
-            candidates = candidateEsploraUrls(network, preferred),
+            candidates = candidateEsploraUrls(
+                network = network,
+                preferred = preferred,
+                secondaryPreferred = rememberedEsplora,
+            ),
             active = activeEsploraUrl.orEmpty(),
         )
         if (candidates.isEmpty()) return false
@@ -2079,11 +2251,15 @@ object LdkWalletManager {
                 waitForStartupToFinish(START_WAIT_TIMEOUT_MS) && isRunningForFederation(federation.id)
             } catch (t: Throwable) {
                 lastRecoveryError = t
+                if (t.isLikelyFeerateFailure()) {
+                    noteEsploraProbeFailure(candidate)
+                }
                 Log.w(TAG, "Feerate recovery failed on $candidate during $operation", t)
                 false
             }
 
             if (recovered) {
+                noteEsploraProbeSuccess(candidate)
                 resetFeerateFailureTracking()
                 lastError = null
                 Log.i(TAG, "Recovered from feerate failure during $operation via $candidate")
@@ -2098,14 +2274,35 @@ object LdkWalletManager {
     }
 
     private fun cacheBalanceSnapshot(balances: BalanceDetails) {
-        cachedBalanceSnapshot = balances
-        cachedBalanceSnapshotUpdatedAtMs = System.currentTimeMillis()
+        val runningFederationId = synchronized(lock) { federationId?.trim().orEmpty() }
+        if (runningFederationId.isBlank()) return
+        synchronized(lock) {
+            cachedBalanceSnapshotByFederationId[runningFederationId] = balances to System.currentTimeMillis()
+        }
     }
 
     private fun getFreshBalanceSnapshotOrNull(): BalanceDetails? {
-        val snapshot = cachedBalanceSnapshot ?: return null
-        val ageMs = System.currentTimeMillis() - cachedBalanceSnapshotUpdatedAtMs
-        return if (ageMs in 0..BALANCE_SNAPSHOT_MAX_AGE_MS) snapshot else null
+        val runningFederationId = synchronized(lock) { federationId?.trim().orEmpty() }
+        if (runningFederationId.isBlank()) return null
+        val snapshot = synchronized(lock) {
+            cachedBalanceSnapshotByFederationId[runningFederationId]
+        } ?: return null
+        val ageMs = System.currentTimeMillis() - snapshot.second
+        return if (ageMs in 0..BALANCE_SNAPSHOT_MAX_AGE_MS) snapshot.first else null
+    }
+
+    private fun rememberActiveEsploraAsHealthy() {
+        synchronized(lock) {
+            val fedId = federationId?.trim().orEmpty()
+            val esplora = activeEsploraUrl?.trim().orEmpty()
+            if (fedId.isNotBlank() && esplora.isNotBlank()) {
+                knownGoodEsploraByFederationId[fedId] = esplora
+            }
+        }
+        val active = synchronized(lock) { activeEsploraUrl.orEmpty() }
+        if (active.isNotBlank()) {
+            noteEsploraProbeSuccess(active)
+        }
     }
 
     private fun resetFeerateFailureTracking() {
@@ -2159,7 +2356,11 @@ object LdkWalletManager {
         return candidates.drop(index + 1) + candidates.take(index + 1)
     }
 
-    private fun candidateEsploraUrls(network: Network, preferred: String): List<String> {
+    private fun candidateEsploraUrls(
+        network: Network,
+        preferred: String,
+        secondaryPreferred: String = "",
+    ): List<String> {
         val defaults = when (network) {
             Network.BITCOIN -> listOf(
                 "https://blockstream.info/api",
@@ -2181,7 +2382,7 @@ object LdkWalletManager {
             )
         }
 
-        return (listOf(preferred.trim()) + defaults)
+        return (listOf(preferred.trim(), secondaryPreferred.trim()) + defaults)
             .map { it.trim() }
             .filter { it.isNotBlank() }
             .distinct()
@@ -2297,8 +2498,10 @@ object LdkWalletManager {
             msgLower.contains("feerateestimationupdatetimeout") ||
             (msgLower.contains("feerate") &&
                 (msgLower.contains("update") || msgLower.contains("estimate"))) ||
-            msgLower.contains("fee rate") ||
-            msgLower.contains("fee rates")
+            ((msgLower.contains("fee rate") || msgLower.contains("fee rates")) &&
+                (msgLower.contains("fetch") || msgLower.contains("update") ||
+                    msgLower.contains("estimate") || msgLower.contains("unavailable") ||
+                    msgLower.contains("failed")))
         ) {
             return "Could not fetch current Bitcoin fee rates. Check connectivity, tap Sync, and retry."
         }
