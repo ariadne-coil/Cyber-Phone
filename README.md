@@ -26,7 +26,7 @@ It is a Hardened Interface combining the utility of a modern dialer/messenger wi
 ## The Architecture
 1. Sovereign Interface
 
-A fully functional replacement for the stock Phone and SMS apps, built on the Fossify foundation.
+A fully functional replacement for the stock Phone and SMS apps, built on hardened open-source telephony and messaging modules.
 
 *   Rich Dialer & In-Call UI
 
@@ -112,7 +112,7 @@ This is a strategic choice. It prevents Tivoization and Corporate Capture. If yo
 The Code belongs to the Commons.
 
 ## Acknowledgements
-- Fossify (https://www.fossify.org)
+- Fossify Commons (https://github.com/FossifyOrg/Commons)
 - Yet Another Call Blocker (https://gitlab.com/xynngh/YetAnotherCallBlocker)
 - Reticulum Network Stack (https://github.com/markqvist/Reticulum)
 - LXMF (https://github.com/markqvist/LXMF)

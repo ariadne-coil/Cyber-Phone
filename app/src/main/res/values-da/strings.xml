@@ -79,7 +79,7 @@
     <string name="call_is_being_connected">Dit opkald bliver tilsluttet…</string>
     <string name="faq_3_title">Hvorfor mangler nogle af mine kontakter i appen?</string>
     <string name="faq_2_title">Hvorfor fungerer nødopkald ikke korrekt?</string>
-    <string name="faq_3_text">Fossify Telefon viser kun kontakter med et telefonnummer. Kontakter uden telefonnummer vises ikke.</string>
+    <string name="faq_3_text">Cyber Phone viser kun kontakter med et telefonnummer. Kontakter uden telefonnummer vises ikke.</string>
     <string name="faq_2_text">Grundet systembegrænsninger kan nødopkald kun foretages via systemets standardopkaldsapp. Sørg for, at den er installeret og aktiveret for at sikre, at nødopkald virker.</string>
     <string name="call_notification_channel">Opkaldsstatus</string>
     <string name="call_notification_channel_high_priority">Opkaldsstatus (høj prioritet)</string>

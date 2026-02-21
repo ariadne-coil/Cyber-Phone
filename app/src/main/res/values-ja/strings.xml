@@ -76,5 +76,5 @@
     <string name="faq_2_title">緊急通話が正しく機能しないのはなぜですか?</string>
     <string name="faq_2_text">システムの制限により、緊急通報はシステムのデフォルトのダイヤラーまたは電話アプリからのみ可能です。緊急通報が正しく機能するには、システムアプリをインストールし、有効にしておく必要があります。</string>
     <string name="faq_3_title">一部の連絡先がアプリから消えてしまうのはなぜですか?</string>
-    <string name="faq_3_text">Fossify Phone は、電話番号が関連付けられている連絡先のみを表示します。電話番号が関連付けられていない連絡先はアプリに表示されませ ん 。</string>
+    <string name="faq_3_text">Cyber Phone は、電話番号が関連付けられている連絡先のみを表示します。電話番号が関連付けられていない連絡先はアプリに表示されませ ん 。</string>
 </resources>

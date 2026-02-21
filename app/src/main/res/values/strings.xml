@@ -386,13 +386,13 @@ Estimated Lightning routing fee: up to %6$s sats.</string>
     <string name="faq_2_title">Why emergency calls don\'t work properly?</string>
     <string name="faq_2_text">Due to system restrictions, emergency calls can only be made through your system\'s default dialer or phone app. To ensure emergency calls work properly, you need to keep the system app installed and enabled.</string>
     <string name="faq_3_title">Why are some of my contacts missing from the app?</string>
-    <string name="faq_3_text">Fossify Phone only displays contacts that have a phone number associated with them. Contacts without a phone number are not shown in the app.</string>
+    <string name="faq_3_text">Cyber Phone only displays contacts that have a phone number associated with them. Contacts without a phone number are not shown in the app.</string>
 
     <!-- About -->
     <string name="about_author_title">Author</string>
     <string name="about_author_text">https://ariadnecyber.substack.com/</string>
     <string name="about_ack_title">Acknowledgements</string>
-    <string name="about_ack_text">Fossify Phone\nFossify Messages\nFossify Commons\nYet Another Call Blocker</string>
+    <string name="about_ack_text">Cyber Phone\nFossify Messages\nFossify Commons\nYet Another Call Blocker</string>
     <string name="about_app_icon">App icon</string>
     <string name="about_version_placeholder">Version</string>
     <string name="about_version_format">Version %1$s</string>

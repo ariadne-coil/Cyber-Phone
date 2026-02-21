@@ -69,7 +69,7 @@
     <string name="export_call_history">Ekspor riwayat panggilan</string>
     <string name="import_call_history">Impor riwayat panggilan</string>
     <string name="app_launcher_name">Telepon</string>
-    <string name="faq_3_text">Fossify Phone hanya menampilkan kontak yang memiliki nomor telepon terkait. Kontak tanpa nomor telepon tidak akan ditampilkan di aplikasi.</string>
+    <string name="faq_3_text">Cyber Phone hanya menampilkan kontak yang memiliki nomor telepon terkait. Kontak tanpa nomor telepon tidak akan ditampilkan di aplikasi.</string>
     <string name="call_is_being_connected">Panggilan Anda sedang dihubungkan…</string>
     <string name="faq_2_title">Mengapa panggilan darurat tidak berfungsi dengan baik?</string>
     <string name="faq_2_text">Karena pembatasan sistem, panggilan darurat hanya dapat dilakukan melalui aplikasi dialer atau telepon bawaan sistem Anda. Untuk memastikan panggilan darurat berfungsi dengan baik, Anda perlu mempertahankan aplikasi sistem terpasang dan aktif.</string>

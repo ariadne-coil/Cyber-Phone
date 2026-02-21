@@ -10,7 +10,7 @@
     <string name="faq_2_title">Kial krizaj vokoj ne ĝuste funkcias?</string>
     <string name="faq_2_text">Pro sistemaj limigoj, krizaj vokoj nur fareblas per la defaŭlta numerumilo aŭ telefona aplikaĵo de via sistemo. Por certigi, ke krizaj vokoj ĝuste funkcias, la sistema aplikaĵo devas esti instalita kaj ŝaltita.</string>
     <string name="faq_3_title">Kial kelkaj kontaktoj miaj mankas al la aplikaĵo?</string>
-    <string name="faq_3_text">Fossify Telefono nur montras kontaktojn kun asociita telefonnumero. Kontaktoj sen telefonnumero ne aperas en la aplikaĵo.</string>
+    <string name="faq_3_text">Cyber Phone nur montras kontaktojn kun asociita telefonnumero. Kontaktoj sen telefonnumero ne aperas en la aplikaĵo.</string>
     <string name="default_phone_app_prompt">Bonvolu igi tiun ĉi aplikaĵon la defaŭlta telefona aplikaĵo</string>
     <string name="allow_displaying_over_other_apps">Bonvolu permesi aperi sur aliaj aplikaĵoj por fidebla konduko</string>
     <string name="show_grouped_calls">Montri grupigitajn vokojn</string>

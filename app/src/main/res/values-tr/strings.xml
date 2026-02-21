@@ -73,7 +73,7 @@
     <string name="faq_2_text">Sistem kısıtlamaları nedeniyle, acil durum çağrıları yalnızca sisteminizin varsayılan çeviricisi veya telefon uygulaması aracılığıyla yapılabilir. Acil durum çağrılarının düzgün çalışmasını sağlamak için sistem uygulamasını yüklemeli ve etkin tutmanız gerekir.</string>
     <string name="faq_2_title">Acil durum çağrıları neden düzgün çalışmıyor?</string>
     <string name="faq_3_title">Neden uygulamada bazı kişiler eksik?</string>
-    <string name="faq_3_text">Fossify telefon yalnızca kendileriyle ilişkili bir telefon numarası olan kişileri görüntüler. Telefon numarası olmayan kişiler uygulamada gösterilmemiştir.</string>
+    <string name="faq_3_text">Cyber Phone yalnızca kendileriyle ilişkili bir telefon numarası olan kişileri görüntüler. Telefon numarası olmayan kişiler uygulamada gösterilmemiştir.</string>
     <string name="call_notification_channel">Arama durumu</string>
     <string name="call_notification_channel_high_priority">Arama durumu (yüksek öncelik)</string>
     <string name="calling_accounts">Arama hesapları</string>
