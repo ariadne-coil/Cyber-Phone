@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
 import org.fossify.commons.extensions.getMyContactsCursor
+import org.fossify.commons.helpers.ContactLookupResult
 import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.models.PhoneNumber
@@ -99,10 +100,10 @@ class SmsReceiver : BroadcastReceiver() {
         val photoUri = SimpleContactsHelper(context).getPhotoUriFromPhoneNumber(address)
         val bitmap = context.getNotificationBitmap(photoUri)
 
+        val isKnownContact = isKnownContactOrLookupUnavailable(context, address)
         val senderName = context.getMyContactsCursor(favoritesOnly = false, withPhoneNumbersOnly = true).use {
             context.getNameFromAddress(address, it)
         }
-        val isKnownContact = senderName != address
         val displayResult = E2eManager.getDisplayResult(context, threadId, body, date / 1000L)
         val displayBody = displayResult.body
         val tapback = ReactionHelper.parseTapback(displayBody)
@@ -218,5 +219,11 @@ class SmsReceiver : BroadcastReceiver() {
                 bitmap = bitmap
             )
         }
+    }
+
+    private fun isKnownContactOrLookupUnavailable(context: Context, address: String): Boolean {
+        val privateCursor = context.getMyContactsCursor(favoritesOnly = false, withPhoneNumbersOnly = true)
+        val lookupResult = SimpleContactsHelper(context).existsSync(address, privateCursor)
+        return lookupResult != ContactLookupResult.NotFound
     }
 }

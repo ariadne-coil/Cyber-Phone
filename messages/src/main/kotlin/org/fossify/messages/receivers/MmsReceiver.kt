@@ -6,6 +6,8 @@ import com.bumptech.glide.Glide
 import com.klinker.android.send_message.MmsReceivedReceiver
 import org.fossify.commons.extensions.getMyContactsCursor
 import org.fossify.commons.extensions.showErrorToast
+import org.fossify.commons.helpers.ContactLookupResult
+import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.messages.R
 import org.fossify.messages.extensions.getConversations
@@ -40,7 +42,7 @@ class MmsReceiver : MmsReceivedReceiver() {
 
     override fun onMessageReceived(context: Context, messageUri: Uri) {
         val mms = context.getLatestMMS() ?: return
-        val address = mms.getSender()?.phoneNumbers?.first()?.normalizedNumber ?: ""
+        val address = mms.getSender()?.phoneNumbers?.firstOrNull()?.normalizedNumber ?: ""
         val size = context.resources.getDimension(R.dimen.notification_large_icon_size).toInt()
         ensureBackgroundThread {
             handleMmsMessage(context, mms, size, address)
@@ -69,6 +71,7 @@ class MmsReceiver : MmsReceivedReceiver() {
         }
 
 
+        val isKnownContact = isKnownContactOrLookupUnavailable(context, address)
         val senderName = context.getMyContactsCursor(favoritesOnly = false, withPhoneNumbersOnly = true).use {
             context.getNameFromAddress(address, it)
         }
@@ -103,7 +106,6 @@ class MmsReceiver : MmsReceivedReceiver() {
             refreshConversations()
             return
         }
-        val isKnownContact = senderName != address
         val isBlocked = MessageCategorizer.isBlockedMessage(context, address, displayBody, isKnownContact)
         val category = MessageCategorizer.categorizeMessage(context, address, displayBody, isKnownContact, isBlocked)
         if (!isBlocked && category != org.fossify.messages.helpers.MessageCategory.SPAM) {
@@ -147,5 +149,11 @@ class MmsReceiver : MmsReceivedReceiver() {
         }
         refreshMessages()
         refreshConversations()
+    }
+
+    private fun isKnownContactOrLookupUnavailable(context: Context, address: String): Boolean {
+        val privateCursor = context.getMyContactsCursor(favoritesOnly = false, withPhoneNumbersOnly = true)
+        val lookupResult = SimpleContactsHelper(context).existsSync(address, privateCursor)
+        return lookupResult != ContactLookupResult.NotFound
     }
 }

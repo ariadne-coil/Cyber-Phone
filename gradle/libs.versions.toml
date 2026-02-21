@@ -1,6 +1,6 @@
 [versions]
 #jetbrains
-geocoderVersion = "3.22"
+geocoderVersion = "3.24"
 carrierVersion = "2.22"
 kotlin = "2.3.0"
 kotlinxSerializationJson = "1.10.0"
@@ -20,17 +20,17 @@ eventbus = "3.3.1"
 #Room
 room = "2.8.4"
 #Commons stack
-commons = "6.1.3"
+commons = "6.1.5"
 commons-compress = "1.28.0"
 mmslib = "1.0.0"
 indicator-fast-scroll = "4524cd0b61"
 #Gradle
 gradlePlugins-agp = "9.0.1"
 #Helpers
-ez-vcard = "0.12.1"
+ez-vcard = "0.12.2"
 #Other
 autofitTextView = "0.2.1"
-libphonenumberVersion = "9.0.23"
+libphonenumberVersion = "9.0.24"
 libphonenumberinfo = "c77bdd2b69"
 tfLiteTaskTextVersion = "0.4.4"
 okhttp = "5.3.2"

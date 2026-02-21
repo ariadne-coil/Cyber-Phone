@@ -6,6 +6,7 @@ import org.fossify.commons.extensions.getMyContactsCursor
 import org.fossify.commons.extensions.hasPermission
 import org.fossify.commons.extensions.isNumberBlocked
 import org.fossify.commons.extensions.normalizePhoneNumber
+import org.fossify.commons.helpers.ContactLookupResult
 import org.fossify.commons.helpers.PERMISSION_READ_CONTACTS
 import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.phone.extensions.config
@@ -43,47 +44,31 @@ class YacbBlockingEngine(private val context: Context) {
             return
         }
 
-        contactsProvider.isInContacts(number) { exists ->
-            if (exists) {
-                callback(
-                    BlockDecision(
-                        shouldBlock = false,
-                        reason = null,
-                        callInfo = CallInfo(number = number, rating = null, displayName = null)
-                    )
+        if (contactsProvider.isInContactsOrUnavailable(number)) {
+            callback(
+                BlockDecision(
+                    shouldBlock = false,
+                    reason = null,
+                    callInfo = CallInfo(number = number, rating = null, displayName = null)
                 )
-                return@isInContacts
-            }
+            )
+            return
+        }
 
-            val yacbEnabled = context.messagesConfig.yacbCommunityEnabled
-            val rating = if (yacbEnabled) YacbSiaManager.getRating(normalizedNumber) else null
-            if (config.blockNegativeRatings && rating == YacbSiaManager.Rating.NEGATIVE) {
-                callback(
-                    BlockDecision(
-                        shouldBlock = true,
-                        reason = BlockingReason.NEGATIVE_RATING,
-                        callInfo = CallInfo(number = number, rating = rating, displayName = null)
-                    )
+        val yacbEnabled = context.messagesConfig.yacbCommunityEnabled
+        val rating = if (yacbEnabled) YacbSiaManager.getRating(normalizedNumber) else null
+        if (config.blockNegativeRatings && rating == YacbSiaManager.Rating.NEGATIVE) {
+            callback(
+                BlockDecision(
+                    shouldBlock = true,
+                    reason = BlockingReason.NEGATIVE_RATING,
+                    callInfo = CallInfo(number = number, rating = rating, displayName = null)
                 )
-                return@isInContacts
-            }
+            )
+            return
+        }
 
-            if (config.blockUnknownNumbers) {
-                val displayName = if (yacbEnabled) {
-                    YacbSiaManager.getFeaturedName(normalizedNumber)
-                } else {
-                    null
-                }
-                callback(
-                    BlockDecision(
-                        shouldBlock = true,
-                        reason = BlockingReason.UNKNOWN_NUMBER,
-                        callInfo = CallInfo(number = number, rating = rating, displayName = displayName)
-                    )
-                )
-                return@isInContacts
-            }
-
+        if (config.blockUnknownNumbers) {
             val displayName = if (yacbEnabled) {
                 YacbSiaManager.getFeaturedName(normalizedNumber)
             } else {
@@ -91,12 +76,26 @@ class YacbBlockingEngine(private val context: Context) {
             }
             callback(
                 BlockDecision(
-                    shouldBlock = false,
-                    reason = null,
+                    shouldBlock = true,
+                    reason = BlockingReason.UNKNOWN_NUMBER,
                     callInfo = CallInfo(number = number, rating = rating, displayName = displayName)
                 )
             )
+            return
         }
+
+        val displayName = if (yacbEnabled) {
+            YacbSiaManager.getFeaturedName(normalizedNumber)
+        } else {
+            null
+        }
+        callback(
+            BlockDecision(
+                shouldBlock = false,
+                reason = null,
+                callInfo = CallInfo(number = number, rating = rating, displayName = displayName)
+            )
+        )
     }
 }
 
@@ -120,17 +119,14 @@ data class CallInfo(
 )
 
 private class YacbContactsProvider(private val context: Context) {
-    fun isInContacts(number: String, callback: (Boolean) -> Unit) {
+    fun isInContactsOrUnavailable(number: String): Boolean {
         if (!context.hasPermission(PERMISSION_READ_CONTACTS)) {
-            callback(false)
-            return
+            return true
         }
 
-        val simpleContactsHelper = SimpleContactsHelper(context)
         val privateCursor = context.getMyContactsCursor(favoritesOnly = false, withPhoneNumbersOnly = true)
-        simpleContactsHelper.exists(number, privateCursor) { exists ->
-            callback(exists)
-        }
+        val lookupResult = SimpleContactsHelper(context).existsSync(number, privateCursor)
+        return lookupResult != ContactLookupResult.NotFound
     }
 }
 
