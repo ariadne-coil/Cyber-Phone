@@ -2731,20 +2731,23 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
         }
         val isFm = isFedimint(selected)
 
-        val items = if (isFm) {
-            arrayOf(host.getString(R.string.wallet_receive_lightning))
-        } else {
-            arrayOf(
-                host.getString(R.string.wallet_receive_lightning),
-                host.getString(R.string.wallet_receive_onchain),
-            )
+        // Fedimint currently supports Lightning invoices only.
+        // Skip the one-item protocol chooser and open invoice creation directly.
+        if (isFm) {
+            showCreateInvoiceDialog()
+            return
         }
+
+        val items = arrayOf(
+            host.getString(R.string.wallet_receive_lightning),
+            host.getString(R.string.wallet_receive_onchain),
+        )
 
         host.getAlertDialogBuilder()
             .setItems(items) { _, which ->
                 when {
                     which == 0 -> showCreateInvoiceDialog()
-                    !isFm && which == 1 -> showNewAddressDialog()
+                    which == 1 -> showNewAddressDialog()
                 }
             }
             .setNegativeButton(R.string.cancel, null)

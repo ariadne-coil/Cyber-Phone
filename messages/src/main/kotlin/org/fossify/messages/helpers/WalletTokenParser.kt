@@ -170,18 +170,9 @@ object WalletTokenParser {
         val cleanedInvoice = cleanToken(invoice)
         if (cleanedInvoice.isBlank()) return ""
         val fedId = federationId.trim().ifBlank { "unknown" }
-        val fedLine = federationName?.trim().takeIf { !it.isNullOrBlank() }?.let {
-            "Federation: $it ($fedId)"
-        } ?: "Federation: $fedId"
-        return buildString {
-            append("lightning:")
-            append(cleanedInvoice)
-            append('\n')
-            append(fedLine)
-            append('\n')
-            append(FEDERATION_HINT_PREFIX)
-            append(fedId)
-        }
+        // Keep invoice payloads compact so they stay below mesh direct-packet limits whenever possible.
+        // Thread UI still renders federation + pay action from this tokenized form.
+        return "$FEDERATION_INVOICE_PREFIX$fedId:lightning:$cleanedInvoice"
     }
 
     fun buildFedimintEcashMessage(
