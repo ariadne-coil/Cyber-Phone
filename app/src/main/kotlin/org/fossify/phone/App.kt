@@ -12,6 +12,7 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequest
 import androidx.work.WorkManager
 import org.fossify.commons.FossifyApp
+import org.fossify.commons.extensions.baseConfig
 import org.fossify.commons.extensions.hasPermission
 import org.fossify.commons.helpers.PERMISSION_READ_CONTACTS
 import org.fossify.mesh.MeshManager
@@ -28,6 +29,8 @@ class App : FossifyApp() {
 
     override fun onCreate() {
         super.onCreate()
+        // Keep premium-gated customization features unlocked in this fork.
+        baseConfig.hadThankYouInstalled = true
         configureWalletNativeLoading()
         if (config.yacbCommunityEnabled) {
             runCatching { YacbSiaManager.init(this) }.onFailure {
