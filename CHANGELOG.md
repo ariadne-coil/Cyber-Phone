@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.4.3 (2026-02-21)
+- Branding: normalized product naming to **Cyber Phone** across repo metadata/templates and app-facing assets; removed leftover Truecaller/OpenCaller references.
+- Reliability: backported upstream Phone/Messages fixes for long caller-name rendering (call screen + recents marquee) and unknown-number blocking behavior to avoid false global blocking on lookup/permission issues.
+- Dependencies: updated key shared libs for compatibility and fixes (`org.fossify:commons` 6.1.5, `geocoder` 3.24, `libphonenumber` 9.0.24, `ez-vcard` 0.12.2).
+- Contacts UX: aligned contact-profile icon tap selector behavior with upstream drawable handling.
+- Customization: unlocked font-selection paths in this fork by disabling Google-relation gating and forcing local thank-you entitlement state for gated commons checks.
+
 ## v0.4.2 (2026-02-18)
 - Wallet reliability: hardened Esplora endpoint handling with health scoring, remembered-good endpoint preference, retry-aware preflight checks, and stronger feerate recovery during startup/sync/balance refresh.
 - Wallet reliability: fixed federation-switch behavior that could leave Bitcoin Mainnet in recurring "fee rates unavailable" states by adding safer restart/retry paths and federation-scoped balance snapshot handling.
