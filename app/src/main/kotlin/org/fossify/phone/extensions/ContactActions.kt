@@ -183,21 +183,23 @@ private fun SimpleActivity.handleWalletRequest(contact: Contact) {
         return
     }
 
-    // Let the user decide between Lightning invoice and on-chain address (if supported).
-    val items = if (isFm) {
-        arrayOf(getString(R.string.wallet_receive_lightning))
-    } else {
-        arrayOf(
-            getString(R.string.wallet_receive_lightning),
-            getString(R.string.wallet_receive_onchain),
-        )
+    // Fedimint currently supports Lightning invoices only, so skip a one-item protocol dialog.
+    if (isFm) {
+        showInvoiceAndPrefillThread(contact, address, selectedFederation)
+        return
     }
+
+    // Bitcoin mainnet/testnet keeps protocol choice.
+    val items = arrayOf(
+        getString(R.string.wallet_receive_lightning),
+        getString(R.string.wallet_receive_onchain),
+    )
 
     getAlertDialogBuilder()
         .setItems(items) { _, which ->
             when {
                 which == 0 -> showInvoiceAndPrefillThread(contact, address, selectedFederation)
-                !isFm && which == 1 -> showAddressAndPrefillThread(contact, address, selectedFederation)
+                which == 1 -> showAddressAndPrefillThread(contact, address, selectedFederation)
             }
         }
         .setNegativeButton(R.string.cancel, null)

@@ -67,4 +67,21 @@ class WalletTokenParserTest {
         assertEquals(WalletAction.REDEEM, act!!.action)
         assertTrue(act.token.startsWith("CPFM1:", ignoreCase = true))
     }
+
+    @Test
+    fun buildLightningInvoiceMessage_compactTokenRoundTrip() {
+        val invoice = "lnbc1abc123"
+        val message = WalletTokenParser.buildLightningInvoiceMessage(
+            invoice = invoice,
+            federationId = "bitcoin-principles",
+            federationName = "Bitcoin Principles",
+        )
+        assertEquals("CPINV1:bitcoin-principles:lightning:$invoice", message)
+
+        val action = WalletTokenParser.findActionToken(message)
+        assertNotNull(action)
+        assertEquals(WalletAction.PAY, action!!.action)
+        assertEquals(invoice, action.token)
+        assertEquals("bitcoin-principles", action.federationIdHint)
+    }
 }
