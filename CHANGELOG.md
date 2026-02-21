@@ -1,7 +1,8 @@
 # Changelog
 
 ## v0.4.3 (2026-02-21)
-- Branding: normalized product naming to **Cyber Phone** across repo metadata/templates and app-facing assets; removed leftover Truecaller/OpenCaller references.
+- Branding: normalized product naming to **Cyber Phone** across repo metadata/templates and app-facing assets.
+- Wallet/Mesh: fixed Bitcoin over mesh delivery by switching wallet invoice messages to a compact payload format suitable for mesh transport.
 - Reliability: backported upstream Phone/Messages fixes for long caller-name rendering (call screen + recents marquee) and unknown-number blocking behavior to avoid false global blocking on lookup/permission issues.
 - Dependencies: updated key shared libs for compatibility and fixes (`org.fossify:commons` 6.1.5, `geocoder` 3.24, `libphonenumber` 9.0.24, `ez-vcard` 0.12.2).
 - Contacts UX: aligned contact-profile icon tap selector behavior with upstream drawable handling.
