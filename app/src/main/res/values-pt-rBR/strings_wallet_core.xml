@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="wallet_tab">Carteira</string>
+    <string name="wallet_select_federation">Selecionar federação</string>
+    <string name="wallet_change_federation">Alterar federação</string>
+    <string name="wallet_federation">Federação</string>
+    <string name="wallet_balance">Saldo</string>
+    <string name="wallet_onchain">On-chain</string>
+    <string name="wallet_lightning">Lightning</string>
+    <string name="wallet_recent_activity">Atividade recente</string>
+    <string name="wallet_send">Enviar</string>
+    <string name="wallet_receive">Receber</string>
+    <string name="wallet_sync">Sincronizar</string>
+    <string name="wallet_mint">Cunhar</string>
+    <string name="wallet_withdraw">Sacar</string>
+    <string name="wallet_unknown">Desconhecido</string>
+    <string name="wallet_balance_unknown">Saldo indisponível</string>
+    <string name="wallet_send_success">Pagamento enviado</string>
+    <string name="wallet_send_failed">Não foi possível enviar o pagamento: %1$s</string>
+    <string name="wallet_mint_success">Cunhagem enviada</string>
+    <string name="wallet_mint_failed">Não foi possível cunhar sats: %1$s</string>
+    <string name="wallet_withdraw_success">Saque enviado</string>
+    <string name="wallet_withdraw_failed">Não foi possível sacar sats: %1$s</string>
+    <string name="wallet_create_invoice">Criar fatura</string>
+    <string name="wallet_invoice">Fatura</string>
+    <string name="wallet_onchain_address">Endereço on-chain</string>
+    <string name="wallet_tap_to_copy">Toque para copiar</string>
+    <string name="wallet_generate_new">Gerar novo</string>
+    <string name="wallet_backup">Backup</string>
+    <string name="wallet_restore">Restaurar</string>
+    <string name="wallet_unknown_error">Erro desconhecido</string>
+    <string name="mesh_address">Endereço Mesh</string>
+    <string name="mesh_address_saved">Endereço Mesh salvo</string>
+    <string name="mesh_address_invalid">Endereço Mesh inválido</string>
+    <string name="contact_action_pay">Pagar</string>
+    <string name="contact_action_request_payment">Solicitar pagamento</string>
+    <string name="contact_action_set_wallet_address">Definir endereço da carteira</string>
+    <string name="contact_action_call">Ligar</string>
+    <string name="contact_action_message">Mensagem</string>
+    <string name="contact_action_edit">Editar</string>
+    <string name="add_to_favorites">Adicionar aos favoritos</string>
+    <string name="remove_from_favorites">Remover dos favoritos</string>
+    <string name="delete_contact">Excluir contato</string>
+    <string name="contact_action_cancel">Cancelar</string>
+    <string name="no_phone_numbers_found">Nenhum número de telefone encontrado</string>
+</resources>

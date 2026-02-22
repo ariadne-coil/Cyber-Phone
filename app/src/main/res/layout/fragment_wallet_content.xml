@@ -113,10 +113,13 @@
 
                                 <org.fossify.commons.views.MyTextView
                                     android:id="@+id/wallet_federation_label"
-                                    android:layout_width="wrap_content"
+                                    android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
                                     android:layout_centerHorizontal="true"
+                                    android:paddingStart="36dp"
+                                    android:paddingEnd="36dp"
                                     android:text="@string/wallet_federation"
+                                    android:gravity="center"
                                     android:textSize="@dimen/normal_text_size"
                                     android:textStyle="bold" />
 
@@ -127,6 +130,7 @@
                                     android:layout_below="@id/wallet_federation_label"
                                     android:layout_marginTop="2dp"
                                     android:gravity="center"
+                                    android:paddingStart="36dp"
                                     android:paddingEnd="36dp"
                                     android:textSize="@dimen/bigger_text_size"
                                     android:textStyle="bold" />
@@ -170,85 +174,81 @@
                                 android:textStyle="bold"
                                 android:visibility="gone" />
 
-                            <LinearLayout
+                            <androidx.constraintlayout.widget.ConstraintLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/normal_margin"
-                                android:orientation="horizontal">
+                                android:layout_marginTop="@dimen/normal_margin">
 
-                                <LinearLayout
+                                <org.fossify.commons.views.MyTextView
+                                    android:id="@+id/wallet_balance_onchain_label"
                                     android:layout_width="0dp"
                                     android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:gravity="center_horizontal"
-                                    android:orientation="vertical">
-
-                                    <org.fossify.commons.views.MyTextView
-                                        android:id="@+id/wallet_balance_onchain_label"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:text="@string/wallet_onchain"
-                                        android:textSize="@dimen/normal_text_size"
-                                        android:textStyle="bold" />
-
-                                    <org.fossify.commons.views.MyTextView
-                                        android:id="@+id/wallet_balance_onchain_value"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="2dp"
-                                        android:textSize="@dimen/bigger_text_size"
-                                        android:textStyle="bold" />
-                                </LinearLayout>
-
-                                <LinearLayout
-                                    android:id="@+id/wallet_exchange_holder"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="match_parent"
                                     android:gravity="center"
-                                    android:paddingStart="@dimen/small_margin"
-                                    android:paddingEnd="@dimen/small_margin"
-                                    android:visibility="gone">
+                                    android:text="@string/wallet_onchain"
+                                    android:textSize="@dimen/normal_text_size"
+                                    android:textStyle="bold"
+                                    app:layout_constraintEnd_toStartOf="@id/wallet_exchange"
+                                    app:layout_constraintStart_toStartOf="parent"
+                                    app:layout_constraintTop_toTopOf="parent" />
 
-                                    <com.google.android.material.button.MaterialButton
-                                        android:id="@+id/wallet_exchange"
-                                        style="@style/Widget.MaterialComponents.Button"
-                                        android:layout_width="48dp"
-                                        android:layout_height="48dp"
-                                        android:insetTop="0dp"
-                                        android:insetBottom="0dp"
-                                        android:minWidth="0dp"
-                                        android:minHeight="0dp"
-                                        android:padding="0dp"
-                                        app:cornerRadius="24dp"
-                                        app:icon="@drawable/ic_swap_horizontal_vector"
-                                        app:iconGravity="textStart"
-                                        app:iconPadding="0dp" />
-                                </LinearLayout>
-
-                                <LinearLayout
+                                <org.fossify.commons.views.MyTextView
+                                    android:id="@+id/wallet_balance_onchain_value"
                                     android:layout_width="0dp"
                                     android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:gravity="center_horizontal"
-                                    android:orientation="vertical">
+                                    android:layout_marginTop="2dp"
+                                    android:gravity="center"
+                                    android:textSize="@dimen/bigger_text_size"
+                                    android:textStyle="bold"
+                                    app:layout_constraintEnd_toEndOf="@id/wallet_balance_onchain_label"
+                                    app:layout_constraintStart_toStartOf="@id/wallet_balance_onchain_label"
+                                    app:layout_constraintTop_toBottomOf="@id/wallet_balance_onchain_label" />
 
-                                    <org.fossify.commons.views.MyTextView
-                                        android:id="@+id/wallet_balance_ln_label"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:text="@string/wallet_lightning"
-                                        android:textSize="@dimen/normal_text_size"
-                                        android:textStyle="bold" />
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/wallet_exchange"
+                                    style="@style/Widget.MaterialComponents.Button"
+                                    android:layout_width="48dp"
+                                    android:layout_height="48dp"
+                                    android:layout_marginStart="@dimen/small_margin"
+                                    android:layout_marginEnd="@dimen/small_margin"
+                                    android:insetTop="0dp"
+                                    android:insetBottom="0dp"
+                                    android:minWidth="0dp"
+                                    android:minHeight="0dp"
+                                    android:padding="0dp"
+                                    android:visibility="gone"
+                                    app:cornerRadius="24dp"
+                                    app:icon="@drawable/ic_swap_horizontal_vector"
+                                    app:iconGravity="textStart"
+                                    app:iconPadding="0dp"
+                                    app:layout_constraintBottom_toBottomOf="parent"
+                                    app:layout_constraintEnd_toStartOf="@id/wallet_balance_ln_label"
+                                    app:layout_constraintStart_toEndOf="@id/wallet_balance_onchain_label"
+                                    app:layout_constraintTop_toTopOf="parent" />
 
-                                    <org.fossify.commons.views.MyTextView
-                                        android:id="@+id/wallet_balance_ln_value"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="2dp"
-                                        android:textSize="@dimen/bigger_text_size"
-                                        android:textStyle="bold" />
-                                </LinearLayout>
-                            </LinearLayout>
+                                <org.fossify.commons.views.MyTextView
+                                    android:id="@+id/wallet_balance_ln_label"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="center"
+                                    android:text="@string/wallet_lightning"
+                                    android:textSize="@dimen/normal_text_size"
+                                    android:textStyle="bold"
+                                    app:layout_constraintEnd_toEndOf="parent"
+                                    app:layout_constraintStart_toEndOf="@id/wallet_exchange"
+                                    app:layout_constraintTop_toTopOf="parent" />
+
+                                <org.fossify.commons.views.MyTextView
+                                    android:id="@+id/wallet_balance_ln_value"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:gravity="center"
+                                    android:textSize="@dimen/bigger_text_size"
+                                    android:textStyle="bold"
+                                    app:layout_constraintEnd_toEndOf="@id/wallet_balance_ln_label"
+                                    app:layout_constraintStart_toStartOf="@id/wallet_balance_ln_label"
+                                    app:layout_constraintTop_toBottomOf="@id/wallet_balance_ln_label" />
+                            </androidx.constraintlayout.widget.ConstraintLayout>
 
                             <org.fossify.commons.views.MyTextView
                                 android:id="@+id/wallet_exchange_rate"
@@ -259,187 +259,192 @@
                                 android:textSize="@dimen/normal_text_size"
                                 android:textStyle="bold" />
 
-                            <LinearLayout
+                            <androidx.constraintlayout.widget.ConstraintLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/normal_margin"
-                                android:gravity="center"
-                                android:orientation="horizontal">
+                                android:layout_marginTop="@dimen/normal_margin">
 
-                                <LinearLayout
-                                    android:layout_width="0dp"
+                                <androidx.constraintlayout.widget.Guideline
+                                    android:id="@+id/wallet_actions_split_one"
+                                    android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:gravity="center_horizontal"
-                                    android:orientation="vertical">
+                                    android:orientation="vertical"
+                                    app:layout_constraintGuide_percent="0.3333" />
 
-                                    <com.google.android.material.button.MaterialButton
-                                        android:id="@+id/wallet_send"
-                                        style="@style/Widget.MaterialComponents.Button"
-                                        android:layout_width="56dp"
-                                        android:layout_height="56dp"
-                                        android:insetTop="0dp"
-                                        android:insetBottom="0dp"
-                                        android:minWidth="0dp"
-                                        android:minHeight="0dp"
-                                        android:padding="0dp"
-                                        app:cornerRadius="28dp"
-                                        app:icon="@drawable/ic_call_made_vector"
-                                        app:iconGravity="textStart"
-                                        app:iconPadding="0dp" />
-
-                                    <org.fossify.commons.views.MyTextView
-                                        android:id="@+id/wallet_send_label"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="@dimen/small_margin"
-                                        android:text="@string/wallet_send"
-                                        android:textSize="@dimen/normal_text_size"
-                                        android:textStyle="bold" />
-                                </LinearLayout>
-
-                                <LinearLayout
-                                    android:layout_width="0dp"
+                                <androidx.constraintlayout.widget.Guideline
+                                    android:id="@+id/wallet_actions_split_two"
+                                    android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:gravity="center_horizontal"
-                                    android:orientation="vertical">
+                                    android:orientation="vertical"
+                                    app:layout_constraintGuide_percent="0.6666" />
 
-                                    <com.google.android.material.button.MaterialButton
-                                        android:id="@+id/wallet_receive"
-                                        style="@style/Widget.MaterialComponents.Button"
-                                        android:layout_width="56dp"
-                                        android:layout_height="56dp"
-                                        android:insetTop="0dp"
-                                        android:insetBottom="0dp"
-                                        android:minWidth="0dp"
-                                        android:minHeight="0dp"
-                                        android:padding="0dp"
-                                        app:cornerRadius="28dp"
-                                        app:icon="@drawable/ic_call_received_vector"
-                                        app:iconGravity="textStart"
-                                        app:iconPadding="0dp" />
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/wallet_send"
+                                    style="@style/Widget.MaterialComponents.Button"
+                                    android:layout_width="56dp"
+                                    android:layout_height="56dp"
+                                    android:insetTop="0dp"
+                                    android:insetBottom="0dp"
+                                    android:minWidth="0dp"
+                                    android:minHeight="0dp"
+                                    android:padding="0dp"
+                                    app:cornerRadius="28dp"
+                                    app:icon="@drawable/ic_call_made_vector"
+                                    app:iconGravity="textStart"
+                                    app:iconPadding="0dp"
+                                    app:layout_constraintEnd_toStartOf="@id/wallet_actions_split_one"
+                                    app:layout_constraintStart_toStartOf="parent"
+                                    app:layout_constraintTop_toTopOf="parent" />
 
-                                    <org.fossify.commons.views.MyTextView
-                                        android:id="@+id/wallet_receive_label"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="@dimen/small_margin"
-                                        android:text="@string/wallet_receive"
-                                        android:textSize="@dimen/normal_text_size"
-                                        android:textStyle="bold" />
-                                </LinearLayout>
-
-                                <LinearLayout
-                                    android:layout_width="0dp"
+                                <org.fossify.commons.views.MyTextView
+                                    android:id="@+id/wallet_send_label"
+                                    android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:gravity="center_horizontal"
-                                    android:orientation="vertical">
+                                    android:layout_marginTop="@dimen/small_margin"
+                                    android:text="@string/wallet_send"
+                                    android:textSize="@dimen/normal_text_size"
+                                    android:textStyle="bold"
+                                    app:layout_constraintEnd_toEndOf="@id/wallet_send"
+                                    app:layout_constraintStart_toStartOf="@id/wallet_send"
+                                    app:layout_constraintTop_toBottomOf="@id/wallet_send" />
 
-                                    <com.google.android.material.button.MaterialButton
-                                        android:id="@+id/wallet_sync"
-                                        style="@style/Widget.MaterialComponents.Button"
-                                        android:layout_width="56dp"
-                                        android:layout_height="56dp"
-                                        android:insetTop="0dp"
-                                        android:insetBottom="0dp"
-                                        android:minWidth="0dp"
-                                        android:minHeight="0dp"
-                                        android:padding="0dp"
-                                        app:cornerRadius="28dp"
-                                        app:icon="@drawable/ic_call_swap_vector"
-                                        app:iconGravity="textStart"
-                                        app:iconPadding="0dp" />
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/wallet_receive"
+                                    style="@style/Widget.MaterialComponents.Button"
+                                    android:layout_width="56dp"
+                                    android:layout_height="56dp"
+                                    android:insetTop="0dp"
+                                    android:insetBottom="0dp"
+                                    android:minWidth="0dp"
+                                    android:minHeight="0dp"
+                                    android:padding="0dp"
+                                    app:cornerRadius="28dp"
+                                    app:icon="@drawable/ic_call_received_vector"
+                                    app:iconGravity="textStart"
+                                    app:iconPadding="0dp"
+                                    app:layout_constraintEnd_toStartOf="@id/wallet_actions_split_two"
+                                    app:layout_constraintStart_toStartOf="@id/wallet_actions_split_one"
+                                    app:layout_constraintTop_toTopOf="parent" />
 
-                                    <org.fossify.commons.views.MyTextView
-                                        android:id="@+id/wallet_sync_label"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="@dimen/small_margin"
-                                        android:text="@string/wallet_sync"
-                                        android:textSize="@dimen/normal_text_size"
-                                        android:textStyle="bold" />
-                                </LinearLayout>
-                            </LinearLayout>
+                                <org.fossify.commons.views.MyTextView
+                                    android:id="@+id/wallet_receive_label"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="@dimen/small_margin"
+                                    android:text="@string/wallet_receive"
+                                    android:textSize="@dimen/normal_text_size"
+                                    android:textStyle="bold"
+                                    app:layout_constraintEnd_toEndOf="@id/wallet_receive"
+                                    app:layout_constraintStart_toStartOf="@id/wallet_receive"
+                                    app:layout_constraintTop_toBottomOf="@id/wallet_receive" />
 
-                            <LinearLayout
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/wallet_sync"
+                                    style="@style/Widget.MaterialComponents.Button"
+                                    android:layout_width="56dp"
+                                    android:layout_height="56dp"
+                                    android:insetTop="0dp"
+                                    android:insetBottom="0dp"
+                                    android:minWidth="0dp"
+                                    android:minHeight="0dp"
+                                    android:padding="0dp"
+                                    app:cornerRadius="28dp"
+                                    app:icon="@drawable/ic_call_swap_vector"
+                                    app:iconGravity="textStart"
+                                    app:iconPadding="0dp"
+                                    app:layout_constraintEnd_toEndOf="parent"
+                                    app:layout_constraintStart_toStartOf="@id/wallet_actions_split_two"
+                                    app:layout_constraintTop_toTopOf="parent" />
+
+                                <org.fossify.commons.views.MyTextView
+                                    android:id="@+id/wallet_sync_label"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="@dimen/small_margin"
+                                    android:text="@string/wallet_sync"
+                                    android:textSize="@dimen/normal_text_size"
+                                    android:textStyle="bold"
+                                    app:layout_constraintBottom_toBottomOf="parent"
+                                    app:layout_constraintEnd_toEndOf="@id/wallet_sync"
+                                    app:layout_constraintStart_toStartOf="@id/wallet_sync"
+                                    app:layout_constraintTop_toBottomOf="@id/wallet_sync" />
+                            </androidx.constraintlayout.widget.ConstraintLayout>
+
+                            <androidx.constraintlayout.widget.ConstraintLayout
                                 android:id="@+id/wallet_fedimint_actions_row"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/normal_margin"
-                                android:gravity="center"
-                                android:orientation="horizontal"
                                 android:visibility="gone">
 
-                                <LinearLayout
-                                    android:id="@+id/wallet_mint_holder"
-                                    android:layout_width="0dp"
+                                <androidx.constraintlayout.widget.Guideline
+                                    android:id="@+id/wallet_fedimint_split"
+                                    android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:gravity="center_horizontal"
                                     android:orientation="vertical"
-                                    android:visibility="gone">
+                                    app:layout_constraintGuide_percent="0.5" />
 
-                                    <com.google.android.material.button.MaterialButton
-                                        android:id="@+id/wallet_mint"
-                                        style="@style/Widget.MaterialComponents.Button"
-                                        android:layout_width="56dp"
-                                        android:layout_height="56dp"
-                                        android:insetTop="0dp"
-                                        android:insetBottom="0dp"
-                                        android:minWidth="0dp"
-                                        android:minHeight="0dp"
-                                        android:padding="0dp"
-                                        app:cornerRadius="28dp"
-                                        app:icon="@drawable/ic_call_received_vector"
-                                        app:iconGravity="textStart"
-                                        app:iconPadding="0dp" />
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/wallet_mint"
+                                    style="@style/Widget.MaterialComponents.Button"
+                                    android:layout_width="56dp"
+                                    android:layout_height="56dp"
+                                    android:insetTop="0dp"
+                                    android:insetBottom="0dp"
+                                    android:minWidth="0dp"
+                                    android:minHeight="0dp"
+                                    android:padding="0dp"
+                                    app:cornerRadius="28dp"
+                                    app:icon="@drawable/ic_call_received_vector"
+                                    app:iconGravity="textStart"
+                                    app:iconPadding="0dp"
+                                    app:layout_constraintEnd_toStartOf="@id/wallet_fedimint_split"
+                                    app:layout_constraintStart_toStartOf="parent"
+                                    app:layout_constraintTop_toTopOf="parent" />
 
-                                    <org.fossify.commons.views.MyTextView
-                                        android:id="@+id/wallet_mint_label"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="@dimen/small_margin"
-                                        android:text="@string/wallet_mint"
-                                        android:textSize="@dimen/normal_text_size"
-                                        android:textStyle="bold" />
-                                </LinearLayout>
-
-                                <LinearLayout
-                                    android:id="@+id/wallet_withdraw_holder"
-                                    android:layout_width="0dp"
+                                <org.fossify.commons.views.MyTextView
+                                    android:id="@+id/wallet_mint_label"
+                                    android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:gravity="center_horizontal"
-                                    android:orientation="vertical"
-                                    android:visibility="gone">
+                                    android:layout_marginTop="@dimen/small_margin"
+                                    android:text="@string/wallet_mint"
+                                    android:textSize="@dimen/normal_text_size"
+                                    android:textStyle="bold"
+                                    app:layout_constraintEnd_toEndOf="@id/wallet_mint"
+                                    app:layout_constraintStart_toStartOf="@id/wallet_mint"
+                                    app:layout_constraintTop_toBottomOf="@id/wallet_mint" />
 
-                                    <com.google.android.material.button.MaterialButton
-                                        android:id="@+id/wallet_withdraw"
-                                        style="@style/Widget.MaterialComponents.Button"
-                                        android:layout_width="56dp"
-                                        android:layout_height="56dp"
-                                        android:insetTop="0dp"
-                                        android:insetBottom="0dp"
-                                        android:minWidth="0dp"
-                                        android:minHeight="0dp"
-                                        android:padding="0dp"
-                                        app:cornerRadius="28dp"
-                                        app:icon="@drawable/ic_call_made_vector"
-                                        app:iconGravity="textStart"
-                                        app:iconPadding="0dp" />
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/wallet_withdraw"
+                                    style="@style/Widget.MaterialComponents.Button"
+                                    android:layout_width="56dp"
+                                    android:layout_height="56dp"
+                                    android:insetTop="0dp"
+                                    android:insetBottom="0dp"
+                                    android:minWidth="0dp"
+                                    android:minHeight="0dp"
+                                    android:padding="0dp"
+                                    app:cornerRadius="28dp"
+                                    app:icon="@drawable/ic_call_made_vector"
+                                    app:iconGravity="textStart"
+                                    app:iconPadding="0dp"
+                                    app:layout_constraintEnd_toEndOf="parent"
+                                    app:layout_constraintStart_toStartOf="@id/wallet_fedimint_split"
+                                    app:layout_constraintTop_toTopOf="parent" />
 
-                                    <org.fossify.commons.views.MyTextView
-                                        android:id="@+id/wallet_withdraw_label"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginTop="@dimen/small_margin"
-                                        android:text="@string/wallet_withdraw"
-                                        android:textSize="@dimen/normal_text_size"
-                                        android:textStyle="bold" />
-                                </LinearLayout>
-                            </LinearLayout>
+                                <org.fossify.commons.views.MyTextView
+                                    android:id="@+id/wallet_withdraw_label"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="@dimen/small_margin"
+                                    android:text="@string/wallet_withdraw"
+                                    android:textSize="@dimen/normal_text_size"
+                                    android:textStyle="bold"
+                                    app:layout_constraintBottom_toBottomOf="parent"
+                                    app:layout_constraintEnd_toEndOf="@id/wallet_withdraw"
+                                    app:layout_constraintStart_toStartOf="@id/wallet_withdraw"
+                                    app:layout_constraintTop_toBottomOf="@id/wallet_withdraw" />
+                            </androidx.constraintlayout.widget.ConstraintLayout>
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 

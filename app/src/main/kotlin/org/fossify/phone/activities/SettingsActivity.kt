@@ -80,12 +80,112 @@ import org.fossify.messages.helpers.SHORT_CODE_FILTER_NEVER_SPAM
 import org.fossify.messages.helpers.SHORT_CODE_FILTER_STANDARD
 import org.fossify.messages.helpers.AiSpamModelManager
 import org.fossify.messages.helpers.refreshConversations
+import java.io.ByteArrayOutputStream
 import java.util.Locale
 import kotlin.system.exitProcess
+
+private val ActivitySettingsBinding.settingsDialpadSectionLabel
+    get() = settingsDialpadSection.settingsDialpadSectionLabel
+private val ActivitySettingsBinding.settingsManageSpeedDialHolder
+    get() = settingsDialpadSection.settingsManageSpeedDialHolder
+private val ActivitySettingsBinding.settingsDialpadVibration
+    get() = settingsDialpadSection.settingsDialpadVibration
+private val ActivitySettingsBinding.settingsDialpadVibrationHolder
+    get() = settingsDialpadSection.settingsDialpadVibrationHolder
+private val ActivitySettingsBinding.settingsHideDialpadNumbers
+    get() = settingsDialpadSection.settingsHideDialpadNumbers
+private val ActivitySettingsBinding.settingsHideDialpadNumbersHolder
+    get() = settingsDialpadSection.settingsHideDialpadNumbersHolder
+private val ActivitySettingsBinding.settingsDialpadBeeps
+    get() = settingsDialpadSection.settingsDialpadBeeps
+private val ActivitySettingsBinding.settingsDialpadBeepsHolder
+    get() = settingsDialpadSection.settingsDialpadBeepsHolder
+
+private val ActivitySettingsBinding.settingsNotificationsLabel
+    get() = settingsMoreSections.settingsNotificationsLabel
+private val ActivitySettingsBinding.settingsOutgoingMessagesLabel
+    get() = settingsMoreSections.settingsOutgoingMessagesLabel
+private val ActivitySettingsBinding.settingsArchivedMessagesLabel
+    get() = settingsMoreSections.settingsArchivedMessagesLabel
+private val ActivitySettingsBinding.settingsRecycleBinLabel
+    get() = settingsMoreSections.settingsRecycleBinLabel
+private val ActivitySettingsBinding.settingsSecurityLabel
+    get() = settingsMoreSections.settingsSecurityLabel
+private val ActivitySettingsBinding.settingsMessagesMigratingLabel
+    get() = settingsMoreSections.settingsMessagesMigratingLabel
+private val ActivitySettingsBinding.settingsMigrationSectionLabel
+    get() = settingsMoreSections.settingsMigrationSectionLabel
+private val ActivitySettingsBinding.settingsCustomizeNotificationsHolder
+    get() = settingsMoreSections.settingsCustomizeNotificationsHolder
+private val ActivitySettingsBinding.settingsShowCharacterCounter
+    get() = settingsMoreSections.settingsShowCharacterCounter
+private val ActivitySettingsBinding.settingsShowCharacterCounterHolder
+    get() = settingsMoreSections.settingsShowCharacterCounterHolder
+private val ActivitySettingsBinding.settingsUseSimpleCharacters
+    get() = settingsMoreSections.settingsUseSimpleCharacters
+private val ActivitySettingsBinding.settingsUseSimpleCharactersHolder
+    get() = settingsMoreSections.settingsUseSimpleCharactersHolder
+private val ActivitySettingsBinding.settingsSendOnEnter
+    get() = settingsMoreSections.settingsSendOnEnter
+private val ActivitySettingsBinding.settingsSendOnEnterHolder
+    get() = settingsMoreSections.settingsSendOnEnterHolder
+private val ActivitySettingsBinding.settingsEnableDeliveryReports
+    get() = settingsMoreSections.settingsEnableDeliveryReports
+private val ActivitySettingsBinding.settingsEnableDeliveryReportsHolder
+    get() = settingsMoreSections.settingsEnableDeliveryReportsHolder
+private val ActivitySettingsBinding.settingsSendLongMessageMms
+    get() = settingsMoreSections.settingsSendLongMessageMms
+private val ActivitySettingsBinding.settingsSendLongMessageMmsHolder
+    get() = settingsMoreSections.settingsSendLongMessageMmsHolder
+private val ActivitySettingsBinding.settingsSendGroupMessageMms
+    get() = settingsMoreSections.settingsSendGroupMessageMms
+private val ActivitySettingsBinding.settingsSendGroupMessageMmsHolder
+    get() = settingsMoreSections.settingsSendGroupMessageMmsHolder
+private val ActivitySettingsBinding.settingsKeepConversationsArchived
+    get() = settingsMoreSections.settingsKeepConversationsArchived
+private val ActivitySettingsBinding.settingsKeepConversationsArchivedHolder
+    get() = settingsMoreSections.settingsKeepConversationsArchivedHolder
+private val ActivitySettingsBinding.settingsLockScreenVisibility
+    get() = settingsMoreSections.settingsLockScreenVisibility
+private val ActivitySettingsBinding.settingsLockScreenVisibilityHolder
+    get() = settingsMoreSections.settingsLockScreenVisibilityHolder
+private val ActivitySettingsBinding.settingsMmsFileSizeLimit
+    get() = settingsMoreSections.settingsMmsFileSizeLimit
+private val ActivitySettingsBinding.settingsMmsFileSizeLimitHolder
+    get() = settingsMoreSections.settingsMmsFileSizeLimitHolder
+private val ActivitySettingsBinding.settingsUseRecycleBin
+    get() = settingsMoreSections.settingsUseRecycleBin
+private val ActivitySettingsBinding.settingsUseRecycleBinHolder
+    get() = settingsMoreSections.settingsUseRecycleBinHolder
+private val ActivitySettingsBinding.settingsEmptyRecycleBinHolder
+    get() = settingsMoreSections.settingsEmptyRecycleBinHolder
+private val ActivitySettingsBinding.settingsEmptyRecycleBinSize
+    get() = settingsMoreSections.settingsEmptyRecycleBinSize
+private val ActivitySettingsBinding.settingsAppPasswordProtection
+    get() = settingsMoreSections.settingsAppPasswordProtection
+private val ActivitySettingsBinding.settingsAppPasswordProtectionHolder
+    get() = settingsMoreSections.settingsAppPasswordProtectionHolder
+private val ActivitySettingsBinding.settingsExportMessagesHolder
+    get() = settingsMoreSections.settingsExportMessagesHolder
+private val ActivitySettingsBinding.settingsImportMessagesHolder
+    get() = settingsMoreSections.settingsImportMessagesHolder
+private val ActivitySettingsBinding.settingsShowBlockedCallNotifications
+    get() = settingsMoreSections.settingsShowBlockedCallNotifications
+private val ActivitySettingsBinding.settingsShowBlockedCallNotificationsHolder
+    get() = settingsMoreSections.settingsShowBlockedCallNotificationsHolder
+private val ActivitySettingsBinding.settingsShowCallRatingNotifications
+    get() = settingsMoreSections.settingsShowCallRatingNotifications
+private val ActivitySettingsBinding.settingsShowCallRatingNotificationsHolder
+    get() = settingsMoreSections.settingsShowCallRatingNotificationsHolder
+private val ActivitySettingsBinding.settingsExportCallsHolder
+    get() = settingsMoreSections.settingsExportCallsHolder
+private val ActivitySettingsBinding.settingsImportCallsHolder
+    get() = settingsMoreSections.settingsImportCallsHolder
 
 class SettingsActivity : SimpleActivity() {
     companion object {
         private const val CALL_HISTORY_FILE_TYPE = "application/json"
+        private const val MAX_CALL_HISTORY_IMPORT_BYTES = 24L * 1024L * 1024L
         private val IMPORT_CALL_HISTORY_FILE_TYPES = buildList {
             add("application/json")
             if (!isQPlus()) {
@@ -913,28 +1013,49 @@ class SettingsActivity : SimpleActivity() {
     }
 
     private fun importCallHistory(uri: Uri) {
-        try {
-            val jsonString = contentResolver.openInputStream(uri)!!.use { inputStream ->
-                inputStream.bufferedReader().readText()
-            }
+        ensureBackgroundThread {
+            try {
+                val jsonString = readTextFromUriLimited(uri, MAX_CALL_HISTORY_IMPORT_BYTES)
+                    ?: throw IllegalArgumentException("File too large or unreadable")
+                val objects = Json.decodeFromString<List<RecentCall>>(jsonString)
 
-            val objects = Json.decodeFromString<List<RecentCall>>(jsonString)
+                runOnUiThread {
+                    if (objects.isEmpty()) {
+                        toast(R.string.no_entries_for_importing)
+                        return@runOnUiThread
+                    }
 
-            if (objects.isEmpty()) {
-                toast(R.string.no_entries_for_importing)
-                return
+                    RecentsHelper(this).restoreRecentCalls(this, objects) {
+                        toast(R.string.importing_successful)
+                    }
+                }
+            } catch (_: SerializationException) {
+                runOnUiThread { toast(R.string.invalid_file_format) }
+            } catch (_: IllegalArgumentException) {
+                runOnUiThread { toast(R.string.invalid_file_format) }
+            } catch (e: Exception) {
+                runOnUiThread { showErrorToast(e) }
             }
-
-            RecentsHelper(this).restoreRecentCalls(this, objects) {
-                toast(R.string.importing_successful)
-            }
-        } catch (_: SerializationException) {
-            toast(R.string.invalid_file_format)
-        } catch (_: IllegalArgumentException) {
-            toast(R.string.invalid_file_format)
-        } catch (e: Exception) {
-            showErrorToast(e)
         }
+    }
+
+    private fun readTextFromUriLimited(uri: Uri, maxBytes: Long): String? {
+        contentResolver.openInputStream(uri)?.use { inputStream ->
+            val buffer = ByteArray(16 * 1024)
+            val output = ByteArrayOutputStream()
+            var total = 0L
+            while (true) {
+                val read = inputStream.read(buffer)
+                if (read <= 0) break
+                total += read
+                if (total > maxBytes) {
+                    return null
+                }
+                output.write(buffer, 0, read)
+            }
+            return output.toString(Charsets.UTF_8.name())
+        }
+        return null
     }
 
     private fun exportCallHistory(recents: List<RecentCall>, uri: Uri) {

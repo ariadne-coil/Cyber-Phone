@@ -15,6 +15,13 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.READ_SYNC_SETTINGS" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission
+        android:name="android.permission.NEARBY_WIFI_DEVICES"
+        tools:targetApi="tiramisu" />
 
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission
@@ -217,7 +224,7 @@
         <receiver
             android:name=".receivers.MarkAsReadReceiver"
             android:enabled="true"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="org.fossify.messages.action.mark_as_read" />
             </intent-filter>
@@ -226,7 +233,7 @@
         <receiver
             android:name=".receivers.DirectReplyReceiver"
             android:enabled="true"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="org.fossify.messages.action.reply" />
             </intent-filter>
@@ -240,7 +247,7 @@
         <receiver
             android:name=".receivers.DeleteSmsReceiver"
             android:enabled="true"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="org.fossify.messages.action.delete" />
             </intent-filter>

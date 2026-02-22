@@ -9,6 +9,7 @@ import android.telecom.TelecomManager
 import android.widget.Toast
 import org.fossify.commons.dialogs.ConfirmationDialog
 import org.fossify.commons.extensions.*
+import org.fossify.commons.helpers.PERMISSION_CALL_PHONE
 import org.fossify.commons.helpers.REQUEST_CODE_SET_DEFAULT_DIALER
 import org.fossify.phone.R
 import org.fossify.phone.extensions.canLaunchAccountsConfiguration
@@ -96,17 +97,25 @@ class DialerActivity : SimpleActivity() {
 
     // Telecom-based mesh calling has been removed in favor of in-app VoIP mesh calls.
 
+    @SuppressLint("MissingPermission")
     private fun placeTelCall() {
-        getHandleToUse(intent, callNumber.toString()) { handle ->
-            if (handle != null) {
-                Bundle().apply {
-                    putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle)
-                    putBoolean(TelecomManager.EXTRA_START_CALL_WITH_VIDEO_STATE, false)
-                    putBoolean(TelecomManager.EXTRA_START_CALL_WITH_SPEAKERPHONE, false)
-                    telecomManager.placeCall(callNumber, this)
-                }
+        handlePermission(PERMISSION_CALL_PHONE) { granted ->
+            if (!granted) {
+                toast(R.string.unknown_error_occurred)
+                finish()
+                return@handlePermission
             }
-            finish()
+            getHandleToUse(intent, callNumber.toString()) { handle ->
+                if (handle != null) {
+                    Bundle().apply {
+                        putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle)
+                        putBoolean(TelecomManager.EXTRA_START_CALL_WITH_VIDEO_STATE, false)
+                        putBoolean(TelecomManager.EXTRA_START_CALL_WITH_SPEAKERPHONE, false)
+                        telecomManager.placeCall(callNumber, this)
+                    }
+                }
+                finish()
+            }
         }
     }
 

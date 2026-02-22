@@ -12,7 +12,6 @@ import android.util.AttributeSet
 import android.util.Log
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
 import org.fossify.commons.extensions.adjustAlpha
@@ -25,7 +24,10 @@ import org.fossify.commons.extensions.setupDialogStuff
 import org.fossify.commons.extensions.shareTextIntent
 import org.fossify.commons.extensions.toast
 import org.fossify.commons.helpers.ensureBackgroundThread
+import org.fossify.commons.views.MyEditText
+import org.fossify.commons.views.MyTextView
 import org.fossify.phone.R
+import org.fossify.phone.activities.MainActivity
 import org.fossify.phone.databinding.DialogContactWalletAddressBinding
 import org.fossify.phone.databinding.DialogWalletCreateInvoiceBinding
 import org.fossify.phone.databinding.DialogWalletSendBinding
@@ -105,7 +107,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
     @Volatile
     private var lastFedimintStartAttemptMs: Long = 0L
 
-    private var activeSendDestination: com.google.android.material.textfield.TextInputEditText? = null
+    private var activeSendDestination: EditText? = null
 
     private val maxBackupPayloadBytes = 16L * 1024L * 1024L
 
@@ -488,7 +490,12 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                         if (started) {
                             // Run a blocking sync in the refresh worker so feerate failover/recovery
                             // can complete before we render balances.
-                            LdkWalletManager.syncWalletsBlocking()
+                            // Throttle sync frequency to avoid hammering Esplora/fee-estimate endpoints
+                            // on every UI refresh.
+                            LdkWalletManager.syncWalletsBlockingIfStale(
+                                maxAgeMs = 90_000L,
+                                force = force,
+                            )
                         }
                         if (started) {
                             // Generate default receive data once the wallet is enabled (selection made),
@@ -498,11 +505,15 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                     }
                 }
 
-                if (!isFm && selected != null && ldkStartedForSelection) {
-                    // Clear stale lastError so a transient sync fee-rate failure doesn't
-                    // persist into the rendered snapshot when listBalances succeeds.
+                if (!isFm && selected != null) {
+                    // Always attempt balances even when startup failed in this cycle so cached
+                    // snapshots can keep the UI populated during transient startup hiccups.
                     balances = loadLdkBalancesWithRecovery(selected)
-                    payments = LdkWalletManager.listPayments(limit = 20)
+                    // Do not let transient payment-list failures overwrite the primary wallet
+                    // health error used by balances/status rendering.
+                    if (ldkStartedForSelection && LdkWalletManager.isRunning()) {
+                        payments = LdkWalletManager.listPayments(limit = 20, setError = false)
+                    }
                 }
                 rate = ExchangeRateManager.getCachedUsdRate(context)
             } catch (t: Throwable) {
@@ -603,15 +614,30 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
 
         val fedId = selected.id
         val cfg = context.config
+        val now = System.currentTimeMillis()
+        val invoiceMaxAgeMs = 15L * 60L * 1000L
 
         val invoice = cfg.getWalletLastInvoiceForFederation(fedId)
-        if (invoice.isBlank()) {
+        val invoiceCreatedMs = cfg.getWalletLastInvoiceCreatedMsForFederation(fedId)
+        val shouldRefreshInvoice = invoice.isBlank() || invoiceCreatedMs <= 0L || (now - invoiceCreatedMs) > invoiceMaxAgeMs
+        if (shouldRefreshInvoice) {
             val memo = context.getString(R.string.app_launcher_name)
             val expirySeconds = 24 * 60 * 60 // "My receive" defaults should be usable for a while.
-            val created = LdkWalletManager.createBolt11Invoice(amountSats = null, memo = memo, expirySeconds = expirySeconds)
+            val created = LdkWalletManager.createBolt11Invoice(
+                amountSats = null,
+                memo = memo,
+                expirySeconds = expirySeconds,
+                preferJitChannel = true,
+            )
             if (!created.isNullOrBlank()) {
                 cfg.setWalletLastInvoiceForFederation(fedId, created)
-                cfg.setWalletLastInvoiceCreatedMsForFederation(fedId, System.currentTimeMillis())
+                cfg.setWalletLastInvoiceCreatedMsForFederation(fedId, now)
+            } else {
+                val err = LdkWalletManager.getLastErrorMessage()
+                if (shouldInvalidateCachedReceiveInvoice(err)) {
+                    cfg.setWalletLastInvoiceForFederation(fedId, "")
+                    cfg.setWalletLastInvoiceCreatedMsForFederation(fedId, 0L)
+                }
             }
         }
 
@@ -644,10 +670,21 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                 val memo = context.getString(R.string.app_launcher_name)
                 val expirySeconds = 24 * 60 * 60
 
-                val newInvoice = LdkWalletManager.createBolt11Invoice(amountSats = null, memo = memo, expirySeconds = expirySeconds)
+                val newInvoice = LdkWalletManager.createBolt11Invoice(
+                    amountSats = null,
+                    memo = memo,
+                    expirySeconds = expirySeconds,
+                    preferJitChannel = true,
+                )
                 if (!newInvoice.isNullOrBlank()) {
                     context.config.setWalletLastInvoiceForFederation(fed.id, newInvoice)
                     context.config.setWalletLastInvoiceCreatedMsForFederation(fed.id, System.currentTimeMillis())
+                } else {
+                    val err = LdkWalletManager.getLastErrorMessage()
+                    if (shouldInvalidateCachedReceiveInvoice(err)) {
+                        context.config.setWalletLastInvoiceForFederation(fed.id, "")
+                        context.config.setWalletLastInvoiceCreatedMsForFederation(fed.id, 0L)
+                    }
                 }
 
                 val newAddress = LdkWalletManager.newOnchainAddress()
@@ -674,6 +711,13 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                 }
             }
         }
+    }
+
+    private fun shouldInvalidateCachedReceiveInvoice(error: String?): Boolean {
+        val text = error?.trim().orEmpty().lowercase(Locale.ROOT)
+        if (text.isBlank()) return false
+        return text.contains("incoming lightning liquidity is unavailable") ||
+            text.contains("incoming lightning liquidity is too low")
     }
 
     private fun getBip21ForSelected(selected: FederationEntry?): String {
@@ -733,6 +777,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
         }
 
         // Status subtitle.
+        val ldkError = getRenderableLdkError(LdkWalletManager.getLastErrorMessage())
         val walletLine = when {
             selected == null -> ""
             isFm && FedimintWalletManager.isBusy() -> context.getString(R.string.wallet_status_starting)
@@ -750,8 +795,8 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                     context.getString(R.string.wallet_status_running_node, nodeId)
                 }
             }
-            !isFm && !LdkWalletManager.getLastErrorMessage().isNullOrBlank() ->
-                context.getString(R.string.wallet_status_error, LdkWalletManager.getLastErrorMessage().orEmpty())
+            !isFm && !ldkError.isNullOrBlank() ->
+                context.getString(R.string.wallet_status_error, ldkError)
             else -> context.getString(R.string.wallet_status_not_started)
         }
 
@@ -771,10 +816,8 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
 
         val showExchange = selected != null && isBitcoinMainnet(selected)
         val showFedimintActions = selected != null && isFm
-        binding.walletExchangeHolder.beVisibleIf(showExchange)
+        binding.walletExchange.beVisibleIf(showExchange)
         binding.walletFedimintActionsRow.beVisibleIf(showFedimintActions)
-        binding.walletMintHolder.beVisibleIf(showFedimintActions)
-        binding.walletWithdrawHolder.beVisibleIf(showFedimintActions)
     }
 
     private fun renderMyAddresses() {
@@ -848,7 +891,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
             return
         }
 
-        val ldkError = LdkWalletManager.getLastErrorMessage()
+        val ldkError = getRenderableLdkError(LdkWalletManager.getLastErrorMessage())
         if (balances == null && !ldkError.isNullOrBlank()) {
             binding.walletError.text =
                 context.getString(R.string.wallet_status_error, ldkError)
@@ -864,10 +907,10 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
             binding.walletBalanceFiat.beGone()
             binding.walletExchangeRate.text = ""
         } else {
-            val totalOnchain = balances.totalOnchainBalanceSats
             val spendableOnchain = balances.spendableOnchainBalanceSats
             val totalLightning = balances.totalLightningBalanceSats
-            val total = totalOnchain + totalLightning
+            // Keep headline total consistent with the values shown below it.
+            val total = spendableOnchain + totalLightning
 
             binding.walletBalanceTotal.text = context.getString(R.string.wallet_sats_value, formatSats(total))
             binding.walletBalanceOnchainValue.text = context.getString(R.string.wallet_sats_value, formatSats(spendableOnchain))
@@ -955,12 +998,20 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
             }
             vb.walletSendHintText.text = host.getString(R.string.wallet_send_hint)
         }
+        WalletUiDialogs.applyFormDialogTheme(
+            activity = host,
+            root = vb.root,
+            inputLayouts = listOf(vb.walletSendDestinationHolder, vb.walletSendAmountHolder),
+            inputFields = listOf(vb.walletSendDestination, vb.walletSendAmount),
+            secondaryTextViews = listOf(vb.walletSendHintText)
+        )
 
         host.getAlertDialogBuilder()
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.wallet_send, null)
             .apply {
                 host.setupDialogStuff(vb.root, this, R.string.wallet_send) { alertDialog ->
+                    WalletUiDialogs.styleDialogActionButtons(host, alertDialog)
                     alertDialog.setOnDismissListener {
                         activeSendDestination = null
                     }
@@ -1106,7 +1157,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
             orientation = LinearLayout.VERTICAL
             setPadding(spacing, spacing / 2, spacing, 0)
         }
-        val amountView = EditText(host).apply {
+        val amountView = MyEditText(host).apply {
             inputType = InputType.TYPE_CLASS_NUMBER
             hint = host.getString(hintRes)
         }
@@ -1117,12 +1168,18 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         )
+        WalletUiDialogs.applyFormDialogTheme(
+            activity = host,
+            root = container,
+            inputFields = listOf(amountView),
+        )
 
         host.getAlertDialogBuilder()
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.ok, null)
             .apply {
                 host.setupDialogStuff(container, this, titleRes) { alertDialog ->
+                    WalletUiDialogs.styleDialogActionButtons(host, alertDialog)
                     alertDialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                         val amountSats = amountView.text?.toString()?.trim()?.toLongOrNull() ?: 0L
                         val txLimitText = NumberFormat.getIntegerInstance(Locale.getDefault())
@@ -1233,14 +1290,14 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
             orientation = LinearLayout.VERTICAL
             setPadding(spacing, spacing / 2, spacing, 0)
         }
-        val messageView = TextView(host).apply {
+        val messageView = MyTextView(host).apply {
             text = host.getString(
                 R.string.wallet_exchange_advanced_confirm_message,
                 formatSats(amountSats.toULong()),
                 formatSats(estimatedFundingSats.toULong())
             )
         }
-        val confirmInput = EditText(host).apply {
+        val confirmInput = MyEditText(host).apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
             hint = host.getString(R.string.wallet_exchange_advanced_confirm_hint)
             setSingleLine()
@@ -1261,12 +1318,18 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                 topMargin = spacing / 2
             }
         )
+        WalletUiDialogs.applyFormDialogTheme(
+            activity = host,
+            root = container,
+            inputFields = listOf(confirmInput),
+        )
 
         host.getAlertDialogBuilder()
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.wallet_exchange_advanced_execute, null)
             .apply {
                 host.setupDialogStuff(container, this, R.string.wallet_exchange_advanced_confirm_title) { alertDialog ->
+                    WalletUiDialogs.styleDialogActionButtons(host, alertDialog)
                     alertDialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                         val typed = confirmInput.text?.toString()?.trim().orEmpty()
                         if (typed.uppercase(Locale.ROOT) != "CONFIRM") {
@@ -1422,8 +1485,9 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
         host.getAlertDialogBuilder()
             .setTitle(R.string.wallet_exchange_advanced_title)
             .setMessage(
-                host.getString(
-                    R.string.wallet_exchange_reverse_warning,
+                host.resources.getQuantityString(
+                    R.plurals.wallet_exchange_reverse_warning,
+                    plan.channelsToClose,
                     formatSats(amountSats.toULong()),
                     plan.channelsToClose,
                     formatSats(plan.estimatedReleaseSats.toULong()),
@@ -1453,15 +1517,16 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
             orientation = LinearLayout.VERTICAL
             setPadding(spacing, spacing / 2, spacing, 0)
         }
-        val messageView = TextView(host).apply {
-            text = host.getString(
-                R.string.wallet_exchange_reverse_confirm_message,
+        val messageView = MyTextView(host).apply {
+            text = host.resources.getQuantityString(
+                R.plurals.wallet_exchange_reverse_confirm_message,
+                plan.channelsToClose,
                 formatSats(amountSats.toULong()),
                 plan.channelsToClose,
                 formatSats(plan.estimatedReleaseSats.toULong()),
             )
         }
-        val confirmInput = EditText(host).apply {
+        val confirmInput = MyEditText(host).apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
             hint = host.getString(R.string.wallet_exchange_advanced_confirm_hint)
             setSingleLine()
@@ -1482,12 +1547,18 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                 topMargin = spacing / 2
             }
         )
+        WalletUiDialogs.applyFormDialogTheme(
+            activity = host,
+            root = container,
+            inputFields = listOf(confirmInput),
+        )
 
         host.getAlertDialogBuilder()
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.wallet_exchange_advanced_execute, null)
             .apply {
                 host.setupDialogStuff(container, this, R.string.wallet_exchange_advanced_confirm_title) { alertDialog ->
+                    WalletUiDialogs.styleDialogActionButtons(host, alertDialog)
                     alertDialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                         val typed = confirmInput.text?.toString()?.trim().orEmpty()
                         if (typed.uppercase(Locale.ROOT) != "CONFIRM") {
@@ -1886,7 +1957,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
     private fun launchWalletContactPicker() {
         val host = activity ?: return
         val intent = Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI)
-        host.startActivityForResult(intent, REQUEST_CODE_PICK_WALLET_CONTACT)
+        (host as? MainActivity)?.launchWalletContactPickerIntent(intent) ?: host.startActivity(intent)
     }
 
     fun handleWalletContactPickerResult(resultCode: Int, resultData: Intent?) {
@@ -1954,6 +2025,13 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
         val existing = WalletContactHelper.getWalletDestinations(host, rawId, 0)
         vb.contactWalletAddress.setText(existing.onchain.orEmpty())
         vb.contactWalletLightning.setText(existing.lightning.orEmpty())
+        WalletUiDialogs.applyFormDialogTheme(
+            activity = host,
+            root = vb.root,
+            inputLayouts = listOf(vb.contactWalletAddressHolder, vb.contactWalletLightningHolder),
+            inputFields = listOf(vb.contactWalletAddress, vb.contactWalletLightning),
+            secondaryTextViews = listOf(vb.contactWalletHintText)
+        )
 
         host.getAlertDialogBuilder()
             .setNeutralButton(R.string.clear) { _, _ ->
@@ -1965,6 +2043,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
             .setPositiveButton(R.string.ok, null)
             .apply {
                 host.setupDialogStuff(vb.root, this, R.string.contact_wallet_address) { alertDialog ->
+                    WalletUiDialogs.styleDialogActionButtons(host, alertDialog)
                     alertDialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                         val onchain = vb.contactWalletAddress.text?.toString()?.trim().orEmpty()
                         val lightning = vb.contactWalletLightning.text?.toString()?.trim().orEmpty()
@@ -2028,6 +2107,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                 var pendingMessage: String? = null
                 var userErrorMessage: String? = null
                 var usedFedimintBackend = isFm
+                var mainnetRecoveryError: String? = null
 
                 val txLimitText = NumberFormat.getIntegerInstance(Locale.getDefault())
                     .format(WalletPolicy.MAX_SINGLE_TX_SATS)
@@ -2107,6 +2187,35 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                                         }
                                     }
                                 }
+                                if (successMessage == null && pendingMessage == null) {
+                                    val requiredSats = WalletFederationTopupManager.parseFixedInvoiceSats(normalizedDestination)
+                                        ?: amountSats?.takeIf { it > 0L }
+                                    val currentError = LdkWalletManager.getLastErrorMessage()
+                                    if (WalletFederationTopupManager.shouldAttemptMainnetLightningRecovery(requiredSats, currentError)) {
+                                        val recovery = WalletFederationTopupManager.recoverMainnetLightningPaymentBlocking(
+                                            context = context,
+                                            sourceFederation = effectiveFederation,
+                                            invoice = normalizedDestination,
+                                            amountSats = amountSats,
+                                        )
+                                        when {
+                                            recovery.success -> {
+                                                successMessage = host.getString(R.string.wallet_send_success)
+                                                allowFedimintFallback = false
+                                            }
+
+                                            recovery.pending -> {
+                                                pendingMessage = recovery.errorMessage
+                                                    ?: host.getString(R.string.wallet_send_pending)
+                                                allowFedimintFallback = false
+                                            }
+
+                                            else -> {
+                                                mainnetRecoveryError = recovery.errorMessage
+                                            }
+                                        }
+                                    }
+                                }
 
                                 if (allowFedimintFallback && tryFedimintFallback) {
                                     usedFedimintBackend = true
@@ -2128,7 +2237,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                 val backendError = if (usedFedimintBackend) {
                     FedimintWalletManager.getLastErrorMessage()
                 } else {
-                    LdkWalletManager.getLastErrorMessage()
+                    mainnetRecoveryError?.takeIf { it.isNotBlank() } ?: LdkWalletManager.getLastErrorMessage()
                 }
                 val error = backendError.orEmpty().ifBlank {
                     host.getString(R.string.wallet_unknown_error)
@@ -2279,7 +2388,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
             type = "application/json"
             putExtra(Intent.EXTRA_TITLE, filename)
         }
-        host.startActivityForResult(intent, REQUEST_CODE_CREATE_WALLET_BACKUP)
+        (host as? MainActivity)?.launchWalletBackupCreateIntent(intent) ?: host.startActivity(intent)
     }
 
     private fun launchWalletBackupRestore() {
@@ -2288,7 +2397,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "application/json"
         }
-        host.startActivityForResult(intent, REQUEST_CODE_OPEN_WALLET_BACKUP)
+        (host as? MainActivity)?.launchWalletBackupRestoreIntent(intent) ?: host.startActivity(intent)
     }
 
     fun handleWalletBackupCreateResult(resultCode: Int, resultData: Intent?) {
@@ -2552,7 +2661,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
             orientation = LinearLayout.VERTICAL
             setPadding(spacing, spacing / 2, spacing, 0)
         }
-        val passphraseView = EditText(host).apply {
+        val passphraseView = MyEditText(host).apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             hint = host.getString(R.string.wallet_backup_passphrase_hint)
         }
@@ -2562,7 +2671,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
         )
 
         val confirmView = if (requireConfirmation) {
-            EditText(host).apply {
+            MyEditText(host).apply {
                 inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
                 hint = host.getString(R.string.wallet_backup_passphrase_confirm_hint)
             }.also {
@@ -2576,6 +2685,11 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
         } else {
             null
         }
+        WalletUiDialogs.applyFormDialogTheme(
+            activity = host,
+            root = container,
+            inputFields = listOfNotNull(passphraseView, confirmView),
+        )
 
         host.getAlertDialogBuilder()
             .setNegativeButton(R.string.cancel, null)
@@ -2587,6 +2701,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                     R.string.wallet_restore_passphrase_title
                 }
                 host.setupDialogStuff(container, this, title) { alertDialog ->
+                    WalletUiDialogs.styleDialogActionButtons(host, alertDialog)
                     alertDialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                         val passphrase = passphraseView.text?.toString().orEmpty()
                         val confirmation = confirmView?.text?.toString().orEmpty()
@@ -2762,12 +2877,20 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
         val vb = DialogWalletCreateInvoiceBinding.inflate(host.layoutInflater)
         vb.walletInvoiceAmount.setText("")
         vb.walletInvoiceMemo.setText(host.getString(R.string.app_launcher_name))
+        WalletUiDialogs.applyFormDialogTheme(
+            activity = host,
+            root = vb.root,
+            inputLayouts = listOf(vb.walletInvoiceAmountHolder, vb.walletInvoiceMemoHolder),
+            inputFields = listOf(vb.walletInvoiceAmount, vb.walletInvoiceMemo),
+            secondaryTextViews = listOf(vb.walletInvoiceHintText)
+        )
 
         host.getAlertDialogBuilder()
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.wallet_create_invoice, null)
             .apply {
                 host.setupDialogStuff(vb.root, this, R.string.wallet_receive_lightning) { alertDialog ->
+                    WalletUiDialogs.styleDialogActionButtons(host, alertDialog)
                     alertDialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                         val amountSats = vb.walletInvoiceAmount.text?.toString()?.trim()?.toLongOrNull()
                         val memo = vb.walletInvoiceMemo.text?.toString()?.trim().orEmpty()
@@ -2795,7 +2918,16 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                                 FedimintWalletManager.createBolt11InvoiceBlocking(context, selected, sats, memo, expirySeconds = expiry)
                             } else {
                                 val started = LdkWalletManager.ensureStartedBlocking(context, selected)
-                                if (started) LdkWalletManager.createBolt11Invoice(amountSats, memo, expirySeconds = expiry) else null
+                                if (started) {
+                                    LdkWalletManager.createBolt11Invoice(
+                                        amountSats = amountSats,
+                                        memo = memo,
+                                        expirySeconds = expiry,
+                                        preferJitChannel = true,
+                                    )
+                                } else {
+                                    null
+                                }
                             }
 
                             val backendError = if (isFm) FedimintWalletManager.getLastErrorMessage() else LdkWalletManager.getLastErrorMessage()
@@ -2820,6 +2952,11 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                                         onSendInMessages = { payload -> sendTextInMessages(payload) }
                                     )
                                 } else {
+                                    if (!isFm && shouldInvalidateCachedReceiveInvoice(error)) {
+                                        context.config.setWalletLastInvoiceForFederation(selected.id, "")
+                                        context.config.setWalletLastInvoiceCreatedMsForFederation(selected.id, 0L)
+                                        renderMyAddresses()
+                                    }
                                     host.toast(host.getString(R.string.wallet_invoice_failed, error))
                                 }
                             }
@@ -3035,6 +3172,24 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
         if (initial != null) return initial
 
         var lastError = LdkWalletManager.getLastErrorMessage()
+        if (isLikelyNodeUnavailableError(lastError)) {
+            if (restartLdkWalletBlocking(selectedFederation)) {
+                try {
+                    Thread.sleep(350L)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return null
+                }
+                val restarted = LdkWalletManager.listBalances()
+                if (restarted != null) {
+                    return restarted
+                }
+                lastError = LdkWalletManager.getLastErrorMessage()
+            } else {
+                return null
+            }
+        }
+
         if (!isLikelyFeerateError(lastError)) {
             return null
         }
@@ -3142,6 +3297,21 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
             (text.contains("fee") && text.contains("estimate")) ||
             ((text.contains("fee") || text.contains("fees")) && (text.contains("rate") || text.contains("rates"))) ||
             (text.contains("fee") && text.contains("invalid"))
+    }
+
+    private fun isLikelyNodeUnavailableError(raw: String?): Boolean {
+        val text = raw?.trim().orEmpty().lowercase(Locale.ROOT)
+        if (text.isBlank()) return false
+        return (text.contains("wallet node unavailable") || text.contains("wallet node is not running")) &&
+            !text.contains("list payments")
+    }
+
+    private fun getRenderableLdkError(raw: String?): String? {
+        val text = raw?.trim().orEmpty()
+        if (text.isBlank()) return null
+        val lower = text.lowercase(Locale.ROOT)
+        if (lower.contains("while trying to list payments")) return null
+        return text
     }
 
     private data class LiquidityPrefsSnapshot(
@@ -3308,9 +3478,5 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
         override val recentsList = null
     }
 
-    companion object {
-        const val REQUEST_CODE_PICK_WALLET_CONTACT = 12021
-        const val REQUEST_CODE_CREATE_WALLET_BACKUP = 12022
-        const val REQUEST_CODE_OPEN_WALLET_BACKUP = 12023
-    }
+    companion object
 }

@@ -21,6 +21,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import androidx.appcompat.content.res.AppCompatResources
+import androidx.core.content.pm.PackageInfoCompat
 import org.fossify.phone.activities.MainActivity
 import org.fossify.commons.dialogs.PermissionRequiredDialog
 import org.fossify.commons.extensions.adjustAlpha
@@ -89,6 +90,7 @@ import org.fossify.messages.models.MessageCategoryCache
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
+import kotlin.concurrent.thread
 
 class MessagesFragment(
     context: Context,
@@ -908,8 +910,16 @@ class MessagesFragment(
     private fun launchNewConversation() {
         val host = activity ?: return
         host.hideKeyboard()
+        reportNewConversationShortcutUsage(host)
         Intent(host, org.fossify.messages.activities.NewConversationActivity::class.java).apply {
             host.startActivity(this)
+        }
+    }
+
+    @SuppressLint("NewApi")
+    private fun reportNewConversationShortcutUsage(host: Activity) {
+        runCatching {
+            host.getSystemService(ShortcutManager::class.java)?.reportShortcutUsed("new_conversation")
         }
     }
 
@@ -919,12 +929,13 @@ class MessagesFragment(
         val appIconColor = host.messagesConfig.appIconColor
         if (host.messagesConfig.lastHandledShortcutColor != appIconColor) {
             val newConversation = getCreateNewContactShortcut(appIconColor)
-
-            val manager = host.getSystemService(ShortcutManager::class.java)
-            try {
-                manager?.dynamicShortcuts = listOf(newConversation)
-                host.messagesConfig.lastHandledShortcutColor = appIconColor
-            } catch (_: Exception) {
+            thread(name = "messages-shortcut-update") {
+                val manager = host.getSystemService(ShortcutManager::class.java)
+                try {
+                    manager?.dynamicShortcuts = listOf(newConversation)
+                    host.messagesConfig.lastHandledShortcutColor = appIconColor
+                } catch (_: Exception) {
+                }
             }
         }
     }
@@ -1092,7 +1103,7 @@ class MessagesFragment(
         val host = activity ?: return
         arrayListOf<Release>().apply {
             val packageInfo = host.packageManager.getPackageInfo(host.packageName, 0)
-            host.checkWhatsNew(this, packageInfo.longVersionCode.toInt())
+            host.checkWhatsNew(this, PackageInfoCompat.getLongVersionCode(packageInfo).toInt())
         }
     }
 }

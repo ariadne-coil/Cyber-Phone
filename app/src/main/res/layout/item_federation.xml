@@ -3,7 +3,8 @@
     android:id="@+id/federation_item_holder"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/ripple_all_corners"
+    android:background="@android:color/transparent"
+    android:foreground="@drawable/ripple_all_corners"
     android:paddingStart="@dimen/activity_margin"
     android:paddingTop="@dimen/normal_margin"
     android:paddingEnd="@dimen/activity_margin"
@@ -26,4 +27,3 @@
         android:textSize="@dimen/smaller_text_size" />
 
 </RelativeLayout>
-

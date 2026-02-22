@@ -1,0 +1,386 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <TextView
+        android:id="@+id/settings_notifications_label"
+        style="@style/SettingsSectionLabelStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/notifications" />
+
+    <RelativeLayout
+        android:id="@+id/settings_customize_notifications_holder"
+        style="@style/SettingsHolderTextViewOneLinerStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyTextView
+            android:id="@+id/settings_customize_notifications_label"
+            style="@style/SettingsTextLabelStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/customize_notifications" />
+
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/settings_show_blocked_call_notifications_holder"
+        style="@style/SettingsHolderSwitchStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyMaterialSwitch
+            android:id="@+id/settings_show_blocked_call_notifications"
+            style="@style/SettingsSwitchStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/show_blocked_call_notifications" />
+
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/settings_show_call_rating_notifications_holder"
+        style="@style/SettingsHolderSwitchStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyMaterialSwitch
+            android:id="@+id/settings_show_call_rating_notifications"
+            style="@style/SettingsSwitchStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/show_call_rating_notifications" />
+
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/settings_lock_screen_visibility_holder"
+        style="@style/SettingsHolderTextViewStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyTextView
+            android:id="@+id/settings_lock_screen_visibility_label"
+            style="@style/SettingsTextLabelStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/lock_screen_visibility" />
+
+        <org.fossify.commons.views.MyTextView
+            android:id="@+id/settings_lock_screen_visibility"
+            style="@style/SettingsTextValueStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/settings_lock_screen_visibility_label"
+            tools:text="@string/sender_and_message" />
+
+    </RelativeLayout>
+
+    <include
+        android:id="@+id/settings_notifications_divider"
+        layout="@layout/divider" />
+
+    <TextView
+        android:id="@+id/settings_outgoing_messages_label"
+        style="@style/SettingsSectionLabelStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/outgoing_messages" />
+
+    <RelativeLayout
+        android:id="@+id/settings_show_character_counter_holder"
+        style="@style/SettingsHolderSwitchStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyMaterialSwitch
+            android:id="@+id/settings_show_character_counter"
+            style="@style/SettingsSwitchStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/show_character_counter" />
+
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/settings_use_simple_characters_holder"
+        style="@style/SettingsHolderSwitchStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyMaterialSwitch
+            android:id="@+id/settings_use_simple_characters"
+            style="@style/SettingsSwitchStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/use_simple_characters" />
+
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/settings_send_on_enter_holder"
+        style="@style/SettingsHolderSwitchStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyMaterialSwitch
+            android:id="@+id/settings_send_on_enter"
+            style="@style/SettingsSwitchStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/send_on_enter" />
+
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/settings_enable_delivery_reports_holder"
+        style="@style/SettingsHolderSwitchStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyMaterialSwitch
+            android:id="@+id/settings_enable_delivery_reports"
+            style="@style/SettingsSwitchStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/enable_delivery_reports" />
+
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/settings_send_long_message_mms_holder"
+        style="@style/SettingsHolderSwitchStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyMaterialSwitch
+            android:id="@+id/settings_send_long_message_mms"
+            style="@style/SettingsSwitchStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/send_long_message_mms" />
+
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/settings_send_group_message_mms_holder"
+        style="@style/SettingsHolderSwitchStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyMaterialSwitch
+            android:id="@+id/settings_send_group_message_mms"
+            style="@style/SettingsSwitchStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/group_message_mms" />
+
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/settings_mms_file_size_limit_holder"
+        style="@style/SettingsHolderTextViewStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyTextView
+            android:id="@+id/settings_mms_file_size_limit_label"
+            style="@style/SettingsTextLabelStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/mms_file_size_limit" />
+
+        <org.fossify.commons.views.MyTextView
+            android:id="@+id/settings_mms_file_size_limit"
+            style="@style/SettingsTextValueStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/settings_mms_file_size_limit_label"
+            tools:text="@string/mms_file_size_limit_none" />
+
+    </RelativeLayout>
+
+    <include
+        android:id="@+id/settings_outgoing_messages_divider"
+        layout="@layout/divider" />
+
+    <TextView
+        android:id="@+id/settings_archived_messages_label"
+        style="@style/SettingsSectionLabelStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/archived_conversations" />
+
+    <RelativeLayout
+        android:id="@+id/settings_keep_conversations_archived_holder"
+        style="@style/SettingsHolderSwitchStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyMaterialSwitch
+            android:id="@+id/settings_keep_conversations_archived"
+            style="@style/SettingsSwitchStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/keep_conversations_archived" />
+
+    </RelativeLayout>
+
+    <include
+        android:id="@+id/settings_archive_divider"
+        layout="@layout/divider" />
+
+    <TextView
+        android:id="@+id/settings_recycle_bin_label"
+        style="@style/SettingsSectionLabelStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/recycle_bin" />
+
+    <RelativeLayout
+        android:id="@+id/settings_use_recycle_bin_holder"
+        style="@style/SettingsHolderSwitchStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyMaterialSwitch
+            android:id="@+id/settings_use_recycle_bin"
+            style="@style/SettingsSwitchStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/move_items_into_recycle_bin" />
+
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/settings_empty_recycle_bin_holder"
+        style="@style/SettingsHolderTextViewStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyTextView
+            android:id="@+id/settings_empty_recycle_bin_label"
+            style="@style/SettingsTextLabelStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/empty_recycle_bin" />
+
+        <org.fossify.commons.views.MyTextView
+            android:id="@+id/settings_empty_recycle_bin_size"
+            style="@style/SettingsTextValueStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/settings_empty_recycle_bin_label"
+            tools:text="0" />
+
+    </RelativeLayout>
+
+    <include
+        android:id="@+id/settings_recycle_bin_divider"
+        layout="@layout/divider" />
+
+    <TextView
+        android:id="@+id/settings_security_label"
+        style="@style/SettingsSectionLabelStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/security" />
+
+    <RelativeLayout
+        android:id="@+id/settings_app_password_protection_holder"
+        style="@style/SettingsHolderSwitchStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyMaterialSwitch
+            android:id="@+id/settings_app_password_protection"
+            style="@style/SettingsSwitchStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/password_protect_whole_app" />
+
+    </RelativeLayout>
+
+    <include
+        android:id="@+id/settings_messages_migration_divider"
+        layout="@layout/divider" />
+
+    <TextView
+        android:id="@+id/settings_messages_migrating_label"
+        style="@style/SettingsSectionLabelStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/messages_tab" />
+
+    <RelativeLayout
+        android:id="@+id/settings_export_messages_holder"
+        style="@style/SettingsHolderTextViewOneLinerStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyTextView
+            android:id="@+id/settings_export_messages"
+            style="@style/SettingsTextLabelStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/export_messages" />
+
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/settings_import_messages_holder"
+        style="@style/SettingsHolderTextViewOneLinerStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyTextView
+            android:id="@+id/settings_import_messages"
+            style="@style/SettingsTextLabelStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/import_messages" />
+
+    </RelativeLayout>
+
+    <include
+        android:id="@+id/settings_calls_migration_divider"
+        layout="@layout/divider" />
+
+    <TextView
+        android:id="@+id/settings_migration_section_label"
+        style="@style/SettingsSectionLabelStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/call_history_tab" />
+
+    <RelativeLayout
+        android:id="@+id/settings_export_calls_holder"
+        style="@style/SettingsHolderTextViewOneLinerStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyTextView
+            android:id="@+id/settings_export_calls"
+            style="@style/SettingsTextLabelStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/export_call_history" />
+
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/settings_import_calls_holder"
+        style="@style/SettingsHolderTextViewOneLinerStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <org.fossify.commons.views.MyTextView
+            android:id="@+id/settings_import_calls"
+            style="@style/SettingsTextLabelStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/import_call_history" />
+
+    </RelativeLayout>
+</merge>

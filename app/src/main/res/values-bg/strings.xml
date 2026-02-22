@@ -65,16 +65,9 @@
     <string name="hide_dialpad_numbers">Скриване на цифрите от бутоните за набиране</string>
     <string name="export_call_history">Изнасяне на дневника на обажданията</string>
     <string name="import_call_history">Внасяне на дневника на обажданията</string>
-    <string name="faq_1_title">Чувам входящи повиквания, но екранът не се включва. Какво да направя?</string>
-    <string name="faq_1_text">Такива проблеми могат да имат много специфични за устройството и системата причини, трудно е да се каже като цяло. Трябва да се огледате в настройките на устройството и да се уверите, че приложението има разрешение да се показва, когато е във фонов режим и може да се показва върху други приложения.</string>
     <string name="app_launcher_name">Телефон</string>
     <string name="audio_route_bluetooth">Bluetooth</string>
     <string name="call_is_being_connected">Свързване…</string>
-    <string name="faq_2_title">Защо спешните обаждания не работят както трябва?</string>
-    <string name="faq_3_text">Cyber Phone показва само контактите с въведен телефонен номер. Тези с липсващ телефон не се показват.</string>
-    <string name="faq_2_text">Поради ограничения на системата спешните обаждания трябва да бъдат извършвани само през стандартното приложение „Телефон“. За да работят спешните обаждания нормално трябва системното приложение да е инсталирано и включено.</string>
-    <string name="faq_3_title">Защо някои от контактите ми липсват в приложението?</string>
     <string name="call_notification_channel">Състояние на обаждането</string>
     <string name="call_notification_channel_high_priority">Състояние на обаждането (приоритетно)</string>
-    <string name="calling_accounts">Профили за обаждания</string>
 </resources>

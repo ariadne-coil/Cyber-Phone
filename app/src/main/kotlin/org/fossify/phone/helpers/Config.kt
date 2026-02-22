@@ -83,7 +83,7 @@ class Config(context: Context) : BaseConfig(context) {
     }
 
     fun removeCustomSIM(number: String) {
-        prefs.edit().remove(getKeyForCustomSIM(number)).apply()
+        prefs.edit { remove(getKeyForCustomSIM(number)) }
     }
 
     private fun getKeyForCustomSIM(number: String): String {
@@ -98,132 +98,132 @@ class Config(context: Context) : BaseConfig(context) {
 
     var showTabs: Int
         get() = prefs.getInt(SHOW_TABS, ALL_TABS_MASK)
-        set(showTabs) = prefs.edit().putInt(SHOW_TABS, showTabs).apply()
+        set(showTabs) = prefs.edit { putInt(SHOW_TABS, showTabs) }
 
     var groupSubsequentCalls: Boolean
         get() = prefs.getBoolean(GROUP_SUBSEQUENT_CALLS, true)
-        set(groupSubsequentCalls) = prefs.edit().putBoolean(GROUP_SUBSEQUENT_CALLS, groupSubsequentCalls).apply()
+        set(groupSubsequentCalls) = prefs.edit { putBoolean(GROUP_SUBSEQUENT_CALLS, groupSubsequentCalls) }
 
     var openDialPadAtLaunch: Boolean
         get() = prefs.getBoolean(OPEN_DIAL_PAD_AT_LAUNCH, false)
-        set(openDialPad) = prefs.edit().putBoolean(OPEN_DIAL_PAD_AT_LAUNCH, openDialPad).apply()
+        set(openDialPad) = prefs.edit { putBoolean(OPEN_DIAL_PAD_AT_LAUNCH, openDialPad) }
 
     var disableProximitySensor: Boolean
         get() = prefs.getBoolean(DISABLE_PROXIMITY_SENSOR, false)
-        set(disableProximitySensor) = prefs.edit().putBoolean(DISABLE_PROXIMITY_SENSOR, disableProximitySensor).apply()
+        set(disableProximitySensor) = prefs.edit { putBoolean(DISABLE_PROXIMITY_SENSOR, disableProximitySensor) }
 
     var disableSwipeToAnswer: Boolean
         get() = prefs.getBoolean(DISABLE_SWIPE_TO_ANSWER, false)
-        set(disableSwipeToAnswer) = prefs.edit().putBoolean(DISABLE_SWIPE_TO_ANSWER, disableSwipeToAnswer).apply()
+        set(disableSwipeToAnswer) = prefs.edit { putBoolean(DISABLE_SWIPE_TO_ANSWER, disableSwipeToAnswer) }
 
     var wasOverlaySnackbarConfirmed: Boolean
         get() = prefs.getBoolean(WAS_OVERLAY_SNACKBAR_CONFIRMED, false)
-        set(wasOverlaySnackbarConfirmed) = prefs.edit().putBoolean(WAS_OVERLAY_SNACKBAR_CONFIRMED, wasOverlaySnackbarConfirmed).apply()
+        set(wasOverlaySnackbarConfirmed) = prefs.edit { putBoolean(WAS_OVERLAY_SNACKBAR_CONFIRMED, wasOverlaySnackbarConfirmed) }
 
     var dialpadVibration: Boolean
         get() = prefs.getBoolean(DIALPAD_VIBRATION, true)
-        set(dialpadVibration) = prefs.edit().putBoolean(DIALPAD_VIBRATION, dialpadVibration).apply()
+        set(dialpadVibration) = prefs.edit { putBoolean(DIALPAD_VIBRATION, dialpadVibration) }
 
     var hideDialpadNumbers: Boolean
         get() = prefs.getBoolean(HIDE_DIALPAD_NUMBERS, false)
-        set(hideDialpadNumbers) = prefs.edit().putBoolean(HIDE_DIALPAD_NUMBERS, hideDialpadNumbers).apply()
+        set(hideDialpadNumbers) = prefs.edit { putBoolean(HIDE_DIALPAD_NUMBERS, hideDialpadNumbers) }
 
     var dialpadBeeps: Boolean
         get() = prefs.getBoolean(DIALPAD_BEEPS, true)
-        set(dialpadBeeps) = prefs.edit().putBoolean(DIALPAD_BEEPS, dialpadBeeps).apply()
+        set(dialpadBeeps) = prefs.edit { putBoolean(DIALPAD_BEEPS, dialpadBeeps) }
 
     var alwaysShowFullscreen: Boolean
         get() = prefs.getBoolean(ALWAYS_SHOW_FULLSCREEN, false)
-        set(alwaysShowFullscreen) = prefs.edit().putBoolean(ALWAYS_SHOW_FULLSCREEN, alwaysShowFullscreen).apply()
+        set(alwaysShowFullscreen) = prefs.edit { putBoolean(ALWAYS_SHOW_FULLSCREEN, alwaysShowFullscreen) }
 
     var blockNegativeRatings: Boolean
         get() = prefs.getBoolean(BLOCK_NEGATIVE_RATINGS, false)
-        set(value) = prefs.edit().putBoolean(BLOCK_NEGATIVE_RATINGS, value).apply()
+        set(value) = prefs.edit { putBoolean(BLOCK_NEGATIVE_RATINGS, value) }
 
     var showBlockedCallNotifications: Boolean
         get() = prefs.getBoolean(SHOW_BLOCKED_CALL_NOTIFICATIONS, false)
-        set(value) = prefs.edit().putBoolean(SHOW_BLOCKED_CALL_NOTIFICATIONS, value).apply()
+        set(value) = prefs.edit { putBoolean(SHOW_BLOCKED_CALL_NOTIFICATIONS, value) }
 
     var showCallRatingNotifications: Boolean
         get() = prefs.getBoolean(SHOW_CALL_RATING_NOTIFICATIONS, false)
-        set(value) = prefs.edit().putBoolean(SHOW_CALL_RATING_NOTIFICATIONS, value).apply()
+        set(value) = prefs.edit { putBoolean(SHOW_CALL_RATING_NOTIFICATIONS, value) }
 
     var walletSelectedFederationId: String
         get() = prefs.getString(WALLET_SELECTED_FEDERATION_ID, "") ?: ""
-        set(value) = prefs.edit().putString(WALLET_SELECTED_FEDERATION_ID, value).apply()
+        set(value) = prefs.edit { putString(WALLET_SELECTED_FEDERATION_ID, value) }
 
     var walletDirectoryJson: String
         get() = prefs.getString(WALLET_DIRECTORY_JSON, "") ?: ""
-        set(value) = prefs.edit().putString(WALLET_DIRECTORY_JSON, value).apply()
+        set(value) = prefs.edit { putString(WALLET_DIRECTORY_JSON, value) }
 
     var walletDirectoryLastSyncMs: Long
         get() = prefs.getLong(WALLET_DIRECTORY_LAST_SYNC_MS, 0L)
-        set(value) = prefs.edit().putLong(WALLET_DIRECTORY_LAST_SYNC_MS, value).apply()
+        set(value) = prefs.edit { putLong(WALLET_DIRECTORY_LAST_SYNC_MS, value) }
 
     var walletDirectoryLastHash: String
         get() = prefs.getString(WALLET_DIRECTORY_LAST_HASH, "") ?: ""
-        set(value) = prefs.edit().putString(WALLET_DIRECTORY_LAST_HASH, value).apply()
+        set(value) = prefs.edit { putString(WALLET_DIRECTORY_LAST_HASH, value) }
 
     var walletDirectoryLastUpdatedAtMs: Long
         get() = prefs.getLong(WALLET_DIRECTORY_LAST_UPDATED_AT_MS, 0L)
-        set(value) = prefs.edit().putLong(WALLET_DIRECTORY_LAST_UPDATED_AT_MS, value).apply()
+        set(value) = prefs.edit { putLong(WALLET_DIRECTORY_LAST_UPDATED_AT_MS, value) }
 
     // Stored as raw IEEE 754 bits so we can keep it in SharedPreferences reliably.
     var walletBtcUsdRate: Double
         get() = java.lang.Double.longBitsToDouble(prefs.getLong(WALLET_BTC_USD_RATE, 0L))
-        set(value) = prefs.edit().putLong(WALLET_BTC_USD_RATE, java.lang.Double.doubleToLongBits(value)).apply()
+        set(value) = prefs.edit { putLong(WALLET_BTC_USD_RATE, java.lang.Double.doubleToLongBits(value)) }
 
     var walletBtcUsdRateLastSyncMs: Long
         get() = prefs.getLong(WALLET_BTC_USD_RATE_LAST_SYNC_MS, 0L)
-        set(value) = prefs.edit().putLong(WALLET_BTC_USD_RATE_LAST_SYNC_MS, value).apply()
+        set(value) = prefs.edit { putLong(WALLET_BTC_USD_RATE_LAST_SYNC_MS, value) }
 
     var walletLastInvoice: String
         get() = prefs.getString(WALLET_LAST_INVOICE, "") ?: ""
-        set(value) = prefs.edit().putString(WALLET_LAST_INVOICE, value).apply()
+        set(value) = prefs.edit { putString(WALLET_LAST_INVOICE, value) }
 
     var walletLastInvoiceCreatedMs: Long
         get() = prefs.getLong(WALLET_LAST_INVOICE_CREATED_MS, 0L)
-        set(value) = prefs.edit().putLong(WALLET_LAST_INVOICE_CREATED_MS, value).apply()
+        set(value) = prefs.edit { putLong(WALLET_LAST_INVOICE_CREATED_MS, value) }
 
     var walletLastOnchainAddress: String
         get() = prefs.getString(WALLET_LAST_ONCHAIN_ADDRESS, "") ?: ""
-        set(value) = prefs.edit().putString(WALLET_LAST_ONCHAIN_ADDRESS, value).apply()
+        set(value) = prefs.edit { putString(WALLET_LAST_ONCHAIN_ADDRESS, value) }
 
     var walletLastOnchainAddressCreatedMs: Long
         get() = prefs.getLong(WALLET_LAST_ONCHAIN_ADDRESS_CREATED_MS, 0L)
-        set(value) = prefs.edit().putLong(WALLET_LAST_ONCHAIN_ADDRESS_CREATED_MS, value).apply()
+        set(value) = prefs.edit { putLong(WALLET_LAST_ONCHAIN_ADDRESS_CREATED_MS, value) }
 
     var walletLiquidityProviderMode: String
         get() = prefs.getString(WALLET_LIQUIDITY_PROVIDER_MODE, "auto") ?: "auto"
-        set(value) = prefs.edit().putString(WALLET_LIQUIDITY_PROVIDER_MODE, value.trim().ifBlank { "auto" }).apply()
+        set(value) = prefs.edit { putString(WALLET_LIQUIDITY_PROVIDER_MODE, value.trim().ifBlank { "auto" }) }
 
     var walletLiquidityProviderId: String
         get() = prefs.getString(WALLET_LIQUIDITY_PROVIDER_ID, "") ?: ""
-        set(value) = prefs.edit().putString(WALLET_LIQUIDITY_PROVIDER_ID, value.trim()).apply()
+        set(value) = prefs.edit { putString(WALLET_LIQUIDITY_PROVIDER_ID, value.trim()) }
 
     var walletLiquidityProviderStatsJson: String
         get() = prefs.getString(WALLET_LIQUIDITY_PROVIDER_STATS_JSON, "") ?: ""
-        set(value) = prefs.edit().putString(WALLET_LIQUIDITY_PROVIDER_STATS_JSON, value).apply()
+        set(value) = prefs.edit { putString(WALLET_LIQUIDITY_PROVIDER_STATS_JSON, value) }
 
     var walletLiquidityCustomName: String
         get() = prefs.getString(WALLET_LIQUIDITY_CUSTOM_NAME, "") ?: ""
-        set(value) = prefs.edit().putString(WALLET_LIQUIDITY_CUSTOM_NAME, value.trim()).apply()
+        set(value) = prefs.edit { putString(WALLET_LIQUIDITY_CUSTOM_NAME, value.trim()) }
 
     var walletLiquidityCustomNetwork: String
         get() = prefs.getString(WALLET_LIQUIDITY_CUSTOM_NETWORK, "") ?: ""
-        set(value) = prefs.edit().putString(WALLET_LIQUIDITY_CUSTOM_NETWORK, value.trim()).apply()
+        set(value) = prefs.edit { putString(WALLET_LIQUIDITY_CUSTOM_NETWORK, value.trim()) }
 
     var walletLiquidityCustomNodeId: String
         get() = prefs.getString(WALLET_LIQUIDITY_CUSTOM_NODE_ID, "") ?: ""
-        set(value) = prefs.edit().putString(WALLET_LIQUIDITY_CUSTOM_NODE_ID, value.trim()).apply()
+        set(value) = prefs.edit { putString(WALLET_LIQUIDITY_CUSTOM_NODE_ID, value.trim()) }
 
     var walletLiquidityCustomAddress: String
         get() = prefs.getString(WALLET_LIQUIDITY_CUSTOM_ADDRESS, "") ?: ""
-        set(value) = prefs.edit().putString(WALLET_LIQUIDITY_CUSTOM_ADDRESS, value.trim()).apply()
+        set(value) = prefs.edit { putString(WALLET_LIQUIDITY_CUSTOM_ADDRESS, value.trim()) }
 
     var walletLiquidityCustomToken: String
         get() = prefs.getString(WALLET_LIQUIDITY_CUSTOM_TOKEN, "") ?: ""
-        set(value) = prefs.edit().putString(WALLET_LIQUIDITY_CUSTOM_TOKEN, value.trim()).apply()
+        set(value) = prefs.edit { putString(WALLET_LIQUIDITY_CUSTOM_TOKEN, value.trim()) }
 
     // Wallet receive cache should be federation-specific, otherwise switching between mainnet/testnet
     // will show invalid addresses/invoices. Keep the legacy global keys for migration/backward compat.
@@ -248,7 +248,7 @@ class Config(context: Context) : BaseConfig(context) {
 
     fun setWalletLastInvoiceForFederation(federationId: String, invoice: String) {
         val key = walletKey(WALLET_LAST_INVOICE, federationId)
-        prefs.edit().putString(key, invoice.trim()).apply()
+        prefs.edit { putString(key, invoice.trim()) }
         // Keep legacy in sync for older code paths.
         walletLastInvoice = invoice.trim()
     }
@@ -268,7 +268,7 @@ class Config(context: Context) : BaseConfig(context) {
 
     fun setWalletLastInvoiceCreatedMsForFederation(federationId: String, createdMs: Long) {
         val key = walletKey(WALLET_LAST_INVOICE_CREATED_MS, federationId)
-        prefs.edit().putLong(key, createdMs).apply()
+        prefs.edit { putLong(key, createdMs) }
         walletLastInvoiceCreatedMs = createdMs
     }
 
@@ -287,7 +287,7 @@ class Config(context: Context) : BaseConfig(context) {
 
     fun setWalletLastOnchainAddressForFederation(federationId: String, address: String) {
         val key = walletKey(WALLET_LAST_ONCHAIN_ADDRESS, federationId)
-        prefs.edit().putString(key, address.trim()).apply()
+        prefs.edit { putString(key, address.trim()) }
         walletLastOnchainAddress = address.trim()
     }
 
@@ -306,7 +306,7 @@ class Config(context: Context) : BaseConfig(context) {
 
     fun setWalletLastOnchainAddressCreatedMsForFederation(federationId: String, createdMs: Long) {
         val key = walletKey(WALLET_LAST_ONCHAIN_ADDRESS_CREATED_MS, federationId)
-        prefs.edit().putLong(key, createdMs).apply()
+        prefs.edit { putLong(key, createdMs) }
         walletLastOnchainAddressCreatedMs = createdMs
     }
 }

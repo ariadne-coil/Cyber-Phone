@@ -1,11 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <string name="app_launcher_name">Cyber Phone</string>
     <string name="messages_tab">Messages</string>
     <string name="wallet_tab">Wallet</string>
-    <string name="open_messages">Open Messages</string>
-    <string name="messages_placeholder">Your messages live here</string>
-    <string name="messages">Messages</string>
     <string name="default_phone_app_prompt">Please make this app the default Phone app</string>
     <string name="allow_displaying_over_other_apps">Please allow displaying over other apps for reliable behaviour</string>
     <string name="clear">Clear</string>
@@ -23,7 +20,6 @@
     <string name="wallet_send">Send</string>
     <string name="wallet_receive">Receive</string>
     <string name="wallet_sync">Sync</string>
-    <string name="wallet_exchange">Exchange</string>
     <string name="wallet_mint">Mint</string>
     <string name="wallet_withdraw">Withdraw</string>
     <string name="wallet_unknown">Unknown</string>
@@ -53,22 +49,24 @@
     <string name="wallet_exchange_amount_hint">Amount to exchange (sats)</string>
     <string name="wallet_exchange_amount_required">Enter a valid amount in sats</string>
     <string name="wallet_exchange_submitted">Exchange submitted</string>
-    <string name="wallet_exchange_already_has_liquidity">Lightning already has at least %1$s sats available.</string>
-    <string name="wallet_exchange_already_has_onchain">On-chain already has at least %1$s sats available.</string>
-    <string name="wallet_exchange_bootstrap_blocked">Requested %1$s sats for Lightning, but this requires funding about %2$s sats on-chain to bootstrap a channel. Automatic bootstrap is blocked here to prevent accidental large sends.</string>
     <string name="wallet_exchange_bootstrap_warning">Converting %1$s sats to Lightning right now requires opening/funding a Lightning channel with about %2$s sats on-chain. This can move much more than the amount you entered.</string>
-    <string name="wallet_exchange_reverse_warning">Converting %1$s sats to on-chain requires closing %2$d Lightning channel(s), with an estimated %3$s sats released on-chain after confirmations. This can move more than your requested amount.</string>
+    <plurals name="wallet_exchange_reverse_warning">
+        <item quantity="one">Converting %1$s sats to on-chain requires closing %2$d Lightning channel, with an estimated %3$s sats released on-chain after confirmations. This can move more than your requested amount.</item>
+        <item quantity="other">Converting %1$s sats to on-chain requires closing %2$d Lightning channels, with an estimated %3$s sats released on-chain after confirmations. This can move more than your requested amount.</item>
+    </plurals>
     <string name="wallet_exchange_advanced_title">Advanced convert</string>
     <string name="wallet_exchange_advanced_button">Advanced convert</string>
     <string name="wallet_exchange_advanced_confirm_title">Confirm advanced convert</string>
     <string name="wallet_exchange_advanced_confirm_message">You requested %1$s sats, but channel bootstrap may lock about %2$s sats on-chain.\n\nType CONFIRM to continue.</string>
-    <string name="wallet_exchange_reverse_confirm_message">You requested %1$s sats to on-chain, but this will close %2$d channel(s) and is estimated to release %3$s sats.\n\nType CONFIRM to continue.</string>
+    <plurals name="wallet_exchange_reverse_confirm_message">
+        <item quantity="one">You requested %1$s sats to on-chain, but this will close %2$d channel and is estimated to release %3$s sats.\n\nType CONFIRM to continue.</item>
+        <item quantity="other">You requested %1$s sats to on-chain, but this will close %2$d channels and is estimated to release %3$s sats.\n\nType CONFIRM to continue.</item>
+    </plurals>
     <string name="wallet_exchange_advanced_confirm_hint">Type CONFIRM</string>
     <string name="wallet_exchange_advanced_confirm_required">Type CONFIRM to proceed.</string>
     <string name="wallet_exchange_advanced_execute">Convert anyway</string>
     <string name="wallet_exchange_advanced_pending">Liquidity bootstrap started. Wait for confirmations and retry.</string>
     <string name="wallet_exchange_reverse_pending">Channel close submitted. Wait for confirmations and sync again.</string>
-    <string name="wallet_exchange_reverse_not_supported">Lightning to on-chain exchange is not available in this embedded wallet yet.</string>
     <string name="wallet_exchange_failed">Couldn\'t exchange sats: %1$s</string>
     <string name="wallet_mint_title">Mint to federation</string>
     <string name="wallet_mint_amount_hint">Amount to mint (sats)</string>
@@ -103,7 +101,6 @@
     <string name="wallet_invoice_amount_variable">Variable amount</string>
     <string name="wallet_invoice_show_full">Show full invoice</string>
     <string name="wallet_invoice_hide_full">Hide full invoice</string>
-    <string name="wallet_selected_federation">Selected federation: %1$s</string>
     <string name="wallet_directory_last_sync">Directory updated: %1$s</string>
     <string name="wallet_directory_never_synced">Directory not yet updated</string>
     <string name="wallet_directory_loading_failed">Could not load federation directory</string>
@@ -142,10 +139,8 @@
     <string name="wallet_backup_invalid_format">Invalid wallet backup format</string>
     <string name="wallet_backup_too_large">Backup exceeds the supported size limit</string>
     <string name="wallet_fedimint_no_onchain">Fedimint mode does not support on-chain addresses yet.</string>
-    <string name="wallet_fedimint_backup_not_supported">Backup &amp; restore is not supported for Fedimint yet.</string>
     <string name="wallet_fedimint_invoice_only">Fedimint mode currently supports Lightning invoices only.</string>
     <string name="wallet_fedimint_fixed_amount_required">Fedimint invoices require an amount.</string>
-    <string name="wallet_fedimint_variable_invoice_unsupported">Variable-amount invoices are not supported by Fedimint mode yet.</string>
     <string name="wallet_fedimint_variable_invoice_requires_mainnet">Variable-amount invoices require a Bitcoin Mainnet source wallet.</string>
 
     <!-- Fedimint out-of-band (OOB) ecash transfers over chat -->
@@ -159,7 +154,6 @@
     <string name="wallet_redeem_token_button">Redeem</string>
     <string name="wallet_redeem_token_success">Redeemed</string>
     <string name="wallet_redeem_token_invalid">Invalid token</string>
-    <string name="wallet_redeem_token_unknown_federation">Unknown federation. Update the directory in Wallet settings.</string>
     <string name="wallet_redeem_token_select_federation">Select a federation before redeeming this token.</string>
     <string name="wallet_redeem_token_federation_hint">Token federation hint: %1$s (unverified)</string>
     <string name="wallet_redeem_token_amount_unverified">Token amount (unverified): %1$s sats</string>
@@ -175,15 +169,9 @@
     <string name="wallet_review_request_unknown_federation">Requested federation is not available on this device.</string>
     <string name="wallet_review_request_invoice_failed">Couldn\'t create invoice for this request: %1$s</string>
     <string name="wallet_federation_topup_confirm_title">Insufficient federation balance</string>
-    <string name="wallet_federation_topup_confirm_message">This invoice needs %2$s sats in %1$s.
-Current federation balance: %3$s sats.
-Mint %4$s sats from %5$s now?
-Estimated Lightning routing fee: up to %6$s sats.</string>
     <string name="wallet_federation_topup_confirm_action">Mint and pay</string>
     <string name="wallet_federation_topup_unavailable">Insufficient federation balance, and automatic top-up from Bitcoin mainnet is not available.</string>
-    <string name="wallet_federation_topup_provider_missing">Automatic top-up in %1$s is not set up yet for instant payments.</string>
     <string name="wallet_federation_topup_source_start_failed">Could not start source wallet %1$s for automatic top-up.</string>
-    <string name="wallet_federation_topup_lightning_required">Automatic top-up requires Lightning liquidity in %1$s. Lightning balance: %2$s sats. On-chain balance: %3$s sats.</string>
     <string name="wallet_federation_topup_lightning_insufficient">Not enough Lightning balance in %1$s for automatic top-up. Needed about %2$s sats, available %3$s sats. On-chain balance: %4$s sats.</string>
     <string name="wallet_federation_topup_liquidity_bootstrap_failed">Automatic top-up in %1$s needs Lightning liquidity. Tried bootstrapping it from on-chain funds, but failed: %2$s</string>
     <string name="wallet_federation_topup_liquidity_pending">Liquidity bootstrap started in %1$s. Wait for confirmations and try again.</string>
@@ -229,7 +217,7 @@ Estimated Lightning routing fee: up to %6$s sats.</string>
     <!-- Contacts -->
     <string name="could_not_access_contacts">Could not access your contacts</string>
     <string name="mesh_address">Mesh address</string>
-    <string name="mesh_address_hint">Mesh address (mesh:...)</string>
+    <string name="mesh_address_hint">Mesh address (mesh:…)</string>
     <string name="mesh_address_copy">Copy</string>
     <string name="mesh_address_share">Share</string>
     <string name="mesh_address_paste">Paste</string>
@@ -244,7 +232,7 @@ Estimated Lightning routing fee: up to %6$s sats.</string>
     <string name="contact_action_set_wallet_address">Set wallet details</string>
     <string name="contact_action_edit_wallet_address">Edit wallet details</string>
     <string name="contact_wallet_address">Wallet details</string>
-    <string name="contact_wallet_onchain_hint">Bitcoin on-chain address (bc1...)</string>
+    <string name="contact_wallet_onchain_hint">Bitcoin on-chain address (starts with bc1q…)</string>
     <string name="contact_wallet_lightning_hint">Lightning destination (invoice / LNURL / address)</string>
     <string name="contact_wallet_destination_required">Enter a Bitcoin or Lightning destination.</string>
     <string name="wallet_contact_no_address">%1$s has no wallet destination saved.</string>
@@ -318,7 +306,6 @@ Estimated Lightning routing fee: up to %6$s sats.</string>
     <string name="show_call_rating_notifications">Show call rating notifications</string>
     <string name="spam_reputation_threshold">Spam reputation threshold</string>
     <string name="spam_reputation_community">Community spam reputation (YACB)</string>
-    <string name="spam_reputation_community_summary">Enable community reputation lookups and rating submissions</string>
     <string name="spam_reputation_last_updated">Last updated: %1$s</string>
     <string name="spam_reputation_never_updated">Never updated</string>
     <string name="spam_reputation_downloading">Downloading…</string>
@@ -352,21 +339,7 @@ Estimated Lightning routing fee: up to %6$s sats.</string>
     <string name="hide_dialpad_numbers">Hide dialpad numbers</string>
     <string name="export_call_history">Export call history</string>
     <string name="import_call_history">Import call history</string>
-    <string name="calling_accounts">Calling accounts</string>
-    <string name="mesh_networking">Mesh networking</string>
-    <string name="mesh_mode">Mesh mode</string>
-    <string name="mesh_mode_standard">Standard (cellular and Wi-Fi)</string>
-    <string name="mesh_mode_fallback">Mesh with fallback</string>
-    <string name="mesh_mode_mesh_only">Mesh only</string>
-    <string name="mesh_routing_enabled">Allow routing for other devices (act as node)</string>
-    <string name="mesh_call_quality">Mesh call quality</string>
-    <string name="mesh_call_quality_low">Low (16 kHz)</string>
-    <string name="mesh_call_quality_high">High (48 kHz)</string>
     <string name="mesh_call_account_label">Mesh calls</string>
-    <string name="mesh_call_account_disabled">Enable "Mesh calls" in system Phone Accounts to place mesh calls.</string>
-    <string name="mesh_call_account_open_settings">Open phone accounts settings?</string>
-    <string name="mesh_call_account_settings_unavailable">Couldn\'t open phone accounts settings.</string>
-    <string name="mesh_call_failed">Could not start mesh call.</string>
     <string name="mesh_call_declined">Call declined.</string>
 
     <!-- Contact action menu -->
@@ -381,15 +354,8 @@ Estimated Lightning routing fee: up to %6$s sats.</string>
     <string name="manage_e2e_keys">Cyber Features</string>
 
     <!-- FAQ -->
-    <string name="faq_1_title">I hear incoming calls, but the screen doesn\'t turn on. What can I do?</string>
-    <string name="faq_1_text">Such issues can have many device and system specific reasons, hard to say in general. You should look around in your device settings and make sure that the app is allowed to pop up when in background and allow displaying over other apps.</string>
-    <string name="faq_2_title">Why emergency calls don\'t work properly?</string>
-    <string name="faq_2_text">Due to system restrictions, emergency calls can only be made through your system\'s default dialer or phone app. To ensure emergency calls work properly, you need to keep the system app installed and enabled.</string>
-    <string name="faq_3_title">Why are some of my contacts missing from the app?</string>
-    <string name="faq_3_text">Cyber Phone only displays contacts that have a phone number associated with them. Contacts without a phone number are not shown in the app.</string>
 
     <!-- About -->
-    <string name="about_author_title">Author</string>
     <string name="about_author_text">https://ariadnecyber.substack.com/</string>
     <string name="about_ack_title">Acknowledgements</string>
     <string name="about_ack_text">Cyber Phone\nFossify Messages\nFossify Commons\nYet Another Call Blocker</string>

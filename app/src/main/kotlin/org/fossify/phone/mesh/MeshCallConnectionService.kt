@@ -7,6 +7,7 @@ import android.telecom.Connection
 import android.telecom.ConnectionRequest
 import android.telecom.ConnectionService
 import android.telecom.PhoneAccountHandle
+import androidx.core.net.toUri
 import org.fossify.mesh.lxmf.LxmfAddress
 
 class MeshCallConnectionService : ConnectionService() {
@@ -47,7 +48,7 @@ class MeshCallConnectionService : ConnectionService() {
         val connection = MeshCallConnection(sessionId, outgoing)
         connection.connectionCapabilities = Connection.CAPABILITY_MUTE or Connection.CAPABILITY_SUPPORT_HOLD
         val address = if (remoteDeliveryHash.isNotEmpty()) {
-            Uri.parse(LxmfAddress.encode(remoteDeliveryHash))
+            LxmfAddress.encode(remoteDeliveryHash).toUri()
         } else {
             Uri.fromParts("mesh", "", null)
         }

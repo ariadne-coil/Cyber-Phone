@@ -3,6 +3,7 @@ package org.fossify.phone.wallet
 import android.content.Context
 import org.fossify.phone.R
 import org.lightningdevkit.ldknode.Bolt11Invoice
+import org.lightningdevkit.ldknode.PaymentStatus
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -31,6 +32,13 @@ object WalletFederationTopupManager {
     )
 
     data class TopupResult(
+        val success: Boolean,
+        val pending: Boolean = false,
+        val errorMessage: String? = null,
+        val reference: String? = null,
+    )
+
+    data class MainnetLightningRecoveryResult(
         val success: Boolean,
         val pending: Boolean = false,
         val errorMessage: String? = null,
@@ -85,6 +93,338 @@ object WalletFederationTopupManager {
         val msat = runCatching { invoice.amountMilliSatoshis() }.getOrNull() ?: return null
         val sats = runCatching { (msat / 1000UL).toLong() }.getOrNull() ?: return null
         return sats.takeIf { it > 0L }
+    }
+
+    fun shouldAttemptMainnetLightningRecovery(
+        requiredSats: Long?,
+        errorMessage: String?,
+    ): Boolean {
+        val required = requiredSats?.takeIf { it > 0L }
+
+        val text = errorMessage?.trim().orEmpty().lowercase(Locale.ROOT)
+        val likelyRouteOrLiquidityFailure = text.contains("could not be routed") ||
+            text.contains("failed to send the given payment") ||
+            text.contains("paymentsendingfailed") ||
+            text.contains("lightning payment failed before settlement") ||
+            text.contains("liquidity source") ||
+            text.contains("liquidity") ||
+            isLikelyInsufficientBalance(text)
+        if (likelyRouteOrLiquidityFailure) {
+            return true
+        }
+        if (required == null) return false
+
+        val outboundLiquidity = LdkWalletManager.getUsableOutboundLiquiditySats(setError = false)
+        return outboundLiquidity != null && outboundLiquidity < required
+    }
+
+    fun recoverMainnetLightningPaymentBlocking(
+        context: Context,
+        sourceFederation: FederationEntry,
+        invoice: String,
+        amountSats: Long?,
+    ): MainnetLightningRecoveryResult {
+        val requiredSats = parseFixedInvoiceSats(invoice) ?: amountSats?.takeIf { it > 0L }
+        if (requiredSats != null && !WalletPolicy.isAmountWithinSingleTxLimit(requiredSats)) {
+            val limit = NumberFormat.getIntegerInstance(Locale.getDefault())
+                .format(WalletPolicy.MAX_SINGLE_TX_SATS)
+            return MainnetLightningRecoveryResult(
+                success = false,
+                errorMessage = context.getString(R.string.wallet_amount_over_limit, limit),
+            )
+        }
+
+        if (!LdkWalletManager.ensureStartedBlocking(context, sourceFederation)) {
+            val startError = LdkWalletManager.getLastErrorMessage()
+                ?: context.getString(R.string.wallet_unknown_error)
+            return MainnetLightningRecoveryResult(success = false, errorMessage = startError)
+        }
+
+        // First, retry with fresh sync/state before opening new channels. Many route failures are
+        // transient graph/peer-state issues and can clear without liquidity bootstrap.
+        val preBootstrapRetry = retryMainnetLightningPayment(
+            context = context,
+            invoice = invoice,
+            amountSats = amountSats,
+            attempts = 2,
+            syncBeforeAttempt = true,
+        )
+        if (preBootstrapRetry.success || preBootstrapRetry.pending) {
+            return preBootstrapRetry
+        }
+        if (requiredSats == null) {
+            val restarted = restartLdkNodeWithSync(
+                context = context,
+                sourceFederation = sourceFederation,
+            )
+            if (restarted) {
+                val postRestartRetry = retryMainnetLightningPayment(
+                    context = context,
+                    invoice = invoice,
+                    amountSats = amountSats,
+                    attempts = 3,
+                    syncBeforeAttempt = true,
+                )
+                if (postRestartRetry.success || postRestartRetry.pending) {
+                    return postRestartRetry
+                }
+                if (isLikelyRouteOrLiquidityFailure(postRestartRetry.errorMessage)) {
+                    val p2pRestarted = restartLdkNodeWithSync(
+                        context = context,
+                        sourceFederation = sourceFederation,
+                        forceP2pGossip = true,
+                    )
+                    if (p2pRestarted) {
+                        val p2pRetry = retryMainnetLightningPayment(
+                            context = context,
+                            invoice = invoice,
+                            amountSats = amountSats,
+                            attempts = 3,
+                            syncBeforeAttempt = true,
+                        )
+                        if (p2pRetry.success || p2pRetry.pending) {
+                            return p2pRetry
+                        }
+                        return MainnetLightningRecoveryResult(
+                            success = false,
+                            errorMessage = p2pRetry.errorMessage ?: context.getString(R.string.wallet_unknown_error),
+                        )
+                    }
+                }
+                return MainnetLightningRecoveryResult(
+                    success = false,
+                    errorMessage = postRestartRetry.errorMessage ?: context.getString(R.string.wallet_unknown_error),
+                )
+            }
+            return MainnetLightningRecoveryResult(
+                success = false,
+                errorMessage = preBootstrapRetry.errorMessage ?: context.getString(R.string.wallet_unknown_error),
+            )
+        }
+
+        val requiredWithFee = saturatingAdd(requiredSats, estimateRoutingFeeSats(requiredSats))
+        val outboundLiquidity = LdkWalletManager.getUsableOutboundLiquiditySats(setError = false)
+            ?.coerceAtLeast(0L)
+            ?: 0L
+        val hasLiquidityProvider = FederationDirectoryManager
+            .resolveLiquidityProvider(context, sourceFederation) != null
+
+        if (outboundLiquidity < requiredWithFee && hasLiquidityProvider) {
+            val directBootstrap = LdkWalletManager.bootstrapOutboundLiquidityBlocking(
+                context = context,
+                requiredSats = requiredWithFee,
+            )
+
+            if (directBootstrap.success) {
+                return retryMainnetLightningPayment(
+                    context = context,
+                    invoice = invoice,
+                    amountSats = amountSats,
+                    attempts = 3,
+                    syncBeforeAttempt = true,
+                )
+            }
+            if (directBootstrap.pending) {
+                return MainnetLightningRecoveryResult(
+                    success = false,
+                    pending = true,
+                    errorMessage = directBootstrap.errorMessage
+                        ?: context.getString(R.string.wallet_exchange_advanced_pending),
+                    reference = directBootstrap.fundingReference,
+                )
+            }
+        }
+
+        // Even with "enough" outbound sats, routing can still fail if the channel graph/peer set
+        // is poor. Try opening to gateway hints to improve route diversity.
+        val gatewayNodeHints = (sourceFederation.vettedGateways + extractInvoiceRouteHintNodeIds(invoice))
+            .asSequence()
+            .map { it.trim() }
+            .filter { it.matches(Regex("^(02|03)[0-9a-fA-F]{64}$")) }
+            .distinct()
+            .toList()
+        val gatewayBootstrap = LdkWalletManager.bootstrapOutboundLiquidityViaGatewayHintsBlocking(
+            context = context,
+            gatewayNodeIds = gatewayNodeHints,
+            requiredSats = requiredWithFee,
+            network = sourceFederation.network,
+            forceOpenOnRouteFailure = true,
+        )
+
+        if (gatewayBootstrap.success) {
+            return retryMainnetLightningPayment(
+                context = context,
+                invoice = invoice,
+                amountSats = amountSats,
+                attempts = 3,
+                syncBeforeAttempt = true,
+            )
+        }
+        if (gatewayBootstrap.pending) {
+            return MainnetLightningRecoveryResult(
+                success = false,
+                pending = true,
+                errorMessage = gatewayBootstrap.errorMessage
+                    ?: context.getString(R.string.wallet_exchange_advanced_pending),
+                reference = gatewayBootstrap.fundingReference,
+            )
+        }
+
+        if (outboundLiquidity < requiredWithFee && !hasLiquidityProvider) {
+            val missingProvider = context.getString(R.string.wallet_instant_setup_message)
+            return MainnetLightningRecoveryResult(
+                success = false,
+                errorMessage = missingProvider,
+            )
+        }
+
+        val finalRetry = retryMainnetLightningPayment(
+            context = context,
+            invoice = invoice,
+            amountSats = amountSats,
+            attempts = 2,
+            syncBeforeAttempt = true,
+        )
+        if (finalRetry.success || finalRetry.pending) {
+            return finalRetry
+        }
+        var postRecoveryError = finalRetry.errorMessage
+        if (isLikelyRouteOrLiquidityFailure(postRecoveryError)) {
+            val restarted = restartLdkNodeWithSync(
+                context = context,
+                sourceFederation = sourceFederation,
+            )
+            if (restarted) {
+                val postRestartRetry = retryMainnetLightningPayment(
+                    context = context,
+                    invoice = invoice,
+                    amountSats = amountSats,
+                    attempts = 2,
+                    syncBeforeAttempt = true,
+                )
+                if (postRestartRetry.success || postRestartRetry.pending) {
+                    return postRestartRetry
+                }
+                postRecoveryError = postRestartRetry.errorMessage
+            }
+            if (isLikelyRouteOrLiquidityFailure(postRecoveryError)) {
+                val p2pRestarted = restartLdkNodeWithSync(
+                    context = context,
+                    sourceFederation = sourceFederation,
+                    forceP2pGossip = true,
+                )
+                if (p2pRestarted) {
+                    val p2pRetry = retryMainnetLightningPayment(
+                        context = context,
+                        invoice = invoice,
+                        amountSats = amountSats,
+                        attempts = 2,
+                        syncBeforeAttempt = true,
+                    )
+                    if (p2pRetry.success || p2pRetry.pending) {
+                        return p2pRetry
+                    }
+                    postRecoveryError = p2pRetry.errorMessage
+                }
+            }
+        }
+
+        val recoveryError = postRecoveryError
+            ?: gatewayBootstrap.errorMessage
+            ?: LdkWalletManager.getLastErrorMessage()
+            ?: context.getString(R.string.wallet_unknown_error)
+        return MainnetLightningRecoveryResult(success = false, errorMessage = recoveryError)
+    }
+
+    private fun restartLdkNodeWithSync(
+        context: Context,
+        sourceFederation: FederationEntry,
+        forceP2pGossip: Boolean = false,
+    ): Boolean {
+        val restarted = LdkWalletManager.restartForRouteRecoveryBlocking(
+            context = context,
+            federation = sourceFederation,
+            forceP2pGossip = forceP2pGossip,
+        )
+        if (!restarted) return false
+        return true
+    }
+
+    private fun isLikelyRouteOrLiquidityFailure(errorMessage: String?): Boolean {
+        val text = errorMessage?.trim().orEmpty().lowercase(Locale.ROOT)
+        if (text.isBlank()) return false
+        return text.contains("could not be routed") ||
+            text.contains("payment could not be routed") ||
+            text.contains("failed to send the given payment") ||
+            text.contains("paymentsendingfailed") ||
+            text.contains("liquidity") ||
+            text.contains("route") ||
+            text.contains("channel")
+    }
+
+    private fun retryMainnetLightningPayment(
+        context: Context,
+        invoice: String,
+        amountSats: Long?,
+        attempts: Int,
+        syncBeforeAttempt: Boolean,
+    ): MainnetLightningRecoveryResult {
+        val maxAttempts = attempts.coerceAtLeast(1)
+        var latestError: String? = null
+        var lastPaymentId: String? = null
+
+        for (attempt in 1..maxAttempts) {
+            if (syncBeforeAttempt || attempt > 1) {
+                runCatching { LdkWalletManager.syncWalletsBlocking() }
+            }
+
+            val paymentId = LdkWalletManager.payBolt11Invoice(invoice, amountSats)
+            if (!paymentId.isNullOrBlank()) {
+                lastPaymentId = paymentId
+                when (LdkWalletManager.awaitOutgoingLightningPaymentStatusBlocking(paymentId)) {
+                    PaymentStatus.SUCCEEDED -> {
+                        return MainnetLightningRecoveryResult(
+                            success = true,
+                            reference = paymentId,
+                        )
+                    }
+
+                    PaymentStatus.PENDING -> {
+                        return MainnetLightningRecoveryResult(
+                            success = false,
+                            pending = true,
+                            errorMessage = context.getString(R.string.wallet_send_pending),
+                            reference = paymentId,
+                        )
+                    }
+
+                    PaymentStatus.FAILED,
+                    null,
+                    -> {
+                        latestError = LdkWalletManager.getLastErrorMessage()
+                    }
+                }
+            } else {
+                latestError = LdkWalletManager.getLastErrorMessage()
+            }
+
+            if (attempt < maxAttempts && isLikelyRouteOrLiquidityFailure(latestError)) {
+                try {
+                    Thread.sleep((300L * attempt).coerceAtMost(1_200L))
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    break
+                }
+                continue
+            }
+            break
+        }
+
+        return MainnetLightningRecoveryResult(
+            success = false,
+            errorMessage = latestError ?: context.getString(R.string.wallet_unknown_error),
+            reference = lastPaymentId,
+        )
     }
 
     fun buildTopupQuote(
@@ -614,6 +954,11 @@ object WalletFederationTopupManager {
         if (amountSats <= 0L) return 0L
         val proportional = amountSats / 200L // ~0.5%
         return proportional.coerceAtLeast(10L).coerceAtMost(5_000L)
+    }
+
+    private fun saturatingAdd(left: Long, right: Long): Long {
+        if (right <= 0L) return left
+        return if (left > Long.MAX_VALUE - right) Long.MAX_VALUE else left + right
     }
 
     private fun isMainnetLikeNetwork(network: String?): Boolean {

@@ -7,6 +7,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.textfield.TextInputLayout
 import org.fossify.commons.extensions.adjustAlpha
 import org.fossify.commons.extensions.copyToClipboard
 import org.fossify.commons.extensions.getAlertDialogBuilder
@@ -26,6 +27,38 @@ import java.text.NumberFormat
 import java.util.Locale
 
 object WalletUiDialogs {
+    fun applyFormDialogTheme(
+        activity: SimpleActivity,
+        root: View,
+        inputLayouts: List<TextInputLayout> = emptyList(),
+        inputFields: List<TextView> = emptyList(),
+        secondaryTextViews: List<TextView> = emptyList(),
+    ) {
+        val textColor = activity.getProperTextColor()
+        val secondary = textColor.adjustAlpha(0.72f)
+        val primaryColor = activity.getProperPrimaryColor()
+
+        root.setBackgroundColor(activity.getProperBackgroundColor())
+        applyTextColorRecursively(root, textColor)
+        inputLayouts.forEach {
+            tintInputLayout(it, textColor, primaryColor)
+            it.setEndIconTintList(ColorStateList.valueOf(primaryColor.adjustAlpha(0.85f)))
+        }
+        inputFields.forEach {
+            it.setTextColor(textColor)
+            it.setHintTextColor(secondary)
+        }
+        secondaryTextViews.forEach { it.setTextColor(secondary) }
+    }
+
+    fun styleDialogActionButtons(activity: SimpleActivity, dialog: AlertDialog) {
+        val primary = activity.getProperPrimaryColor()
+        val secondary = activity.getProperTextColor().adjustAlpha(0.8f)
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(primary)
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(secondary)
+        dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(secondary)
+    }
+
     fun showInvoicePreviewDialog(
         activity: SimpleActivity,
         federation: FederationEntry,
@@ -185,5 +218,31 @@ object WalletUiDialogs {
         button.strokeColor = ColorStateList.valueOf(primaryColor.adjustAlpha(0.55f))
         button.setTextColor(primaryColor)
         button.rippleColor = ColorStateList.valueOf(primaryColor.adjustAlpha(0.2f))
+    }
+
+    private fun tintInputLayout(layout: TextInputLayout, textColor: Int, primaryColor: Int) {
+        val strokeDefault = textColor.adjustAlpha(0.28f)
+        layout.setBoxStrokeColorStateList(
+            ColorStateList(
+                arrayOf(
+                    intArrayOf(android.R.attr.state_focused),
+                    intArrayOf()
+                ),
+                intArrayOf(
+                    primaryColor,
+                    strokeDefault
+                )
+            )
+        )
+        layout.defaultHintTextColor = ColorStateList(
+            arrayOf(
+                intArrayOf(android.R.attr.state_focused),
+                intArrayOf()
+            ),
+            intArrayOf(
+                primaryColor,
+                textColor.adjustAlpha(0.62f)
+            )
+        )
     }
 }

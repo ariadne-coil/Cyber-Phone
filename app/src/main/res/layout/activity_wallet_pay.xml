@@ -84,7 +84,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/normal_margin">
 
-                <com.google.android.material.textfield.TextInputEditText
+                <org.fossify.commons.views.MyEditText
                     android:id="@+id/wallet_pay_destination"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -98,7 +98,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/normal_margin">
 
-                <com.google.android.material.textfield.TextInputEditText
+                <org.fossify.commons.views.MyEditText
                     android:id="@+id/wallet_pay_amount"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

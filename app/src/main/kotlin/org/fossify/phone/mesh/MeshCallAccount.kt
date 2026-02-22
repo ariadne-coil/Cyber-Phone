@@ -1,5 +1,6 @@
 package org.fossify.phone.mesh
 
+import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Context
 import android.telecom.PhoneAccount
@@ -13,6 +14,7 @@ object MeshCallAccount {
         return PhoneAccountHandle(component, MeshCallConstants.PHONE_ACCOUNT_ID)
     }
 
+    @SuppressLint("MissingPermission")
     fun isEnabled(context: Context): Boolean {
         val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as TelecomManager
         val handle = getHandle(context)

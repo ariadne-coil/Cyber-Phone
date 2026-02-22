@@ -12,6 +12,7 @@ import android.provider.Telephony
 import android.text.TextUtils
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.content.res.AppCompatResources
+import androidx.core.content.pm.PackageInfoCompat
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import org.fossify.commons.dialogs.PermissionRequiredDialog
 import org.fossify.commons.extensions.adjustAlpha
@@ -754,7 +755,7 @@ class MainActivity : SimpleActivity() {
     private fun checkWhatsNewDialog() {
         arrayListOf<Release>().apply {
             val packageInfo = packageManager.getPackageInfo(packageName, 0)
-            checkWhatsNew(this, packageInfo.longVersionCode.toInt())
+            checkWhatsNew(this, PackageInfoCompat.getLongVersionCode(packageInfo).toInt())
         }
     }
 }

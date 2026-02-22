@@ -17,7 +17,6 @@ import org.lightningdevkit.ldknode.NodeException
 import org.lightningdevkit.ldknode.PaymentDetails
 import org.lightningdevkit.ldknode.PaymentDirection
 import org.lightningdevkit.ldknode.PaymentKind
-import org.lightningdevkit.ldknode.PaymentState
 import org.lightningdevkit.ldknode.PaymentStatus
 import org.json.JSONArray
 import org.json.JSONObject
@@ -29,6 +28,8 @@ object LdkWalletManager {
     private const val LIQUIDITY_BOOTSTRAP_TIMEOUT_MS = 45_000L
     private const val LIQUIDITY_BOOTSTRAP_POLL_MS = 2_500L
     private const val LIQUIDITY_BOOTSTRAP_MIN_CHANNEL_SATS = 50_000L
+    private const val LIQUIDITY_BOOTSTRAP_MIN_AFFORDABLE_CHANNEL_SATS = 10_000L
+    private const val LIQUIDITY_BOOTSTRAP_ONCHAIN_RESERVE_SATS = 3_000L
     private const val LIQUIDITY_BOOTSTRAP_CHANNEL_EXPIRY_BLOCKS = 2_016U
     private const val GATEWAY_BOOTSTRAP_MAX_CANDIDATES = 6
     private const val GATEWAY_BOOTSTRAP_MAX_ADDRS_PER_NODE = 3
@@ -45,15 +46,18 @@ object LdkWalletManager {
     private const val LIGHTNING_RECEIVE_AWAIT_TIMEOUT_MS = 45_000L
     private const val LIGHTNING_RECEIVE_AWAIT_POLL_MS = 1_000L
     private const val BALANCE_SNAPSHOT_MAX_AGE_MS = 10L * 60L * 1000L
+    private const val BALANCE_SNAPSHOT_STALE_MAX_AGE_MS = 72L * 60L * 60L * 1000L
+    private const val WALLET_SYNC_STALE_WINDOW_MS = 90_000L
     private const val FEERATE_RECOVERY_FAILURE_WINDOW_MS = 2L * 60L * 1000L
-    private const val FEERATE_RECOVERY_ATTEMPT_COOLDOWN_MS = 15_000L
-    private const val FEERATE_RECOVERY_MIN_FAILURES = 1
+    private const val FEERATE_RECOVERY_ATTEMPT_COOLDOWN_MS = 45_000L
+    private const val FEERATE_RECOVERY_MIN_FAILURES = 2
     private const val MEMPOOL_MAINNET_NODE_API = "https://mempool.space/api/v1/lightning/nodes/"
     private const val MEMPOOL_TESTNET_NODE_API = "https://mempool.space/testnet/api/v1/lightning/nodes/"
     private const val MEMPOOL_SIGNET_NODE_API = "https://mempool.space/signet/api/v1/lightning/nodes/"
     private const val MEMPOOL_MAINNET_CONNECTIVITY_RANKING = "https://mempool.space/api/v1/lightning/nodes/rankings/connectivity"
     private const val MEMPOOL_TESTNET_CONNECTIVITY_RANKING = "https://mempool.space/testnet/api/v1/lightning/nodes/rankings/connectivity"
     private const val MEMPOOL_SIGNET_CONNECTIVITY_RANKING = "https://mempool.space/signet/api/v1/lightning/nodes/rankings/connectivity"
+    private const val GOSSIP_MODE_P2P = "p2p"
 
     private val lock = Any()
     private val bootstrapHttpClient by lazy {
@@ -98,6 +102,7 @@ object LdkWalletManager {
     private val knownGoodEsploraByFederationId = HashMap<String, String>()
     private val esploraHealthStatsByUrl = HashMap<String, EsploraHealthStats>()
     private val cachedBalanceSnapshotByFederationId = HashMap<String, Pair<BalanceDetails, Long>>()
+    private val lastWalletFreshAtByFederationId = HashMap<String, Long>()
 
     @Volatile
     private var consecutiveFeerateFailures: Int = 0
@@ -213,6 +218,38 @@ object LdkWalletManager {
         if (requiredSats <= 0L) return 0L
         return (requiredSats + maxOf(10_000L, requiredSats / 10L))
             .coerceAtLeast(LIQUIDITY_BOOTSTRAP_MIN_CHANNEL_SATS)
+    }
+
+    private fun resolveBootstrapChannelFundingSats(n: Node, requiredSats: Long): Long? {
+        val required = requiredSats.coerceAtLeast(1L)
+        val desired = estimateLiquidityBootstrapFundingSats(required)
+
+        val spendableOnchain = runCatching {
+            n.listBalances().spendableOnchainBalanceSats.toLongSaturated()
+        }.getOrElse {
+            lastError = it
+            return null
+        }.coerceAtLeast(0L)
+
+        val affordable = (spendableOnchain - LIQUIDITY_BOOTSTRAP_ONCHAIN_RESERVE_SATS).coerceAtLeast(0L)
+        if (affordable < required) {
+            val msg = "Not enough on-chain balance to bootstrap Lightning liquidity. Need at least ${required} sats, available ${affordable} sats."
+            lastError = IllegalStateException(msg)
+            return null
+        }
+        if (affordable < LIQUIDITY_BOOTSTRAP_MIN_AFFORDABLE_CHANNEL_SATS) {
+            val msg = "On-chain balance is too low to bootstrap a Lightning channel. Need at least ${LIQUIDITY_BOOTSTRAP_MIN_AFFORDABLE_CHANNEL_SATS} sats available for channel funding."
+            lastError = IllegalStateException(msg)
+            return null
+        }
+
+        val chosen = desired.coerceAtMost(affordable).coerceAtLeast(required)
+        if (!WalletPolicy.isAmountWithinSingleTxLimit(chosen)) {
+            val msg = "Requested liquidity amount exceeds the configured transfer limit."
+            lastError = IllegalArgumentException(msg)
+            return null
+        }
+        return chosen
     }
 
     fun estimateLightningToOnchainChannelCloseSats(requiredOnchainSats: Long): LightningToOnchainPlan? {
@@ -361,9 +398,26 @@ object LdkWalletManager {
 
     private fun listBalancesInternal(allowFeerateRecovery: Boolean): BalanceDetails? {
         return try {
-            val n = runningNodeOrNull(operation = "list balances") ?: return getFreshBalanceSnapshotOrNull()
+            val n = runningNodeOrNull(operation = "list balances", setError = false) ?: run {
+                val snapshot = getBalanceSnapshotOrNull(maxAgeMs = BALANCE_SNAPSHOT_STALE_MAX_AGE_MS)
+                if (snapshot != null) {
+                    lastError = null
+                    return snapshot
+                }
+                if (allowFeerateRecovery &&
+                    recoverFromFeerateFailureBlocking(
+                        operation = "list balances",
+                        allowRunningNodeRebuild = true,
+                    )
+                ) {
+                    return listBalancesInternal(allowFeerateRecovery = false)
+                }
+                lastError = IllegalStateException("Wallet node unavailable while trying to list balances")
+                return null
+            }
             val balances = n.listBalances()
             cacheBalanceSnapshot(balances)
+            markWalletFreshNow()
             rememberActiveEsploraAsHealthy()
             resetFeerateFailureTracking()
             lastError = null
@@ -371,40 +425,59 @@ object LdkWalletManager {
         } catch (t: Throwable) {
             if (allowFeerateRecovery && t.isLikelyFeerateFailure()) {
                 noteActiveEsploraFailure()
-                noteFeerateFailureAndShouldRecover()
+                val thresholdRecoveryAllowed = noteFeerateFailureAndShouldRecover()
 
                 // Return a fresh cached snapshot if available — keep the wallet
                 // usable during transient esplora outages without tearing down
                 // the running node.
                 getFreshBalanceSnapshotOrNull()?.let { snapshot ->
-                    lastError = t
+                    lastError = null
                     return snapshot
                 }
 
-                // No cached snapshot available. Escalate to full recovery.
-                if (recoverFromFeerateFailureBlocking(
+                // If there is no local snapshot at all (fresh installs / second device),
+                // recover immediately instead of waiting for repeated failures.
+                val hasAnySnapshot = hasStaleBalanceSnapshotForCurrentFederation()
+                if ((thresholdRecoveryAllowed || !hasAnySnapshot) &&
+                    recoverFromFeerateFailureBlocking(
                         operation = "list balances",
                         allowRunningNodeRebuild = true,
                     )
                 ) {
                     return listBalancesInternal(allowFeerateRecovery = false)
                 }
+
+                // Recovery failed; keep rendering last known snapshot if available.
+                getBalanceSnapshotOrNull(maxAgeMs = BALANCE_SNAPSHOT_STALE_MAX_AGE_MS)?.let { snapshot ->
+                    lastError = null
+                    return snapshot
+                }
+            }
+
+            // Non-feerate failures can also be transient; prefer the latest cached snapshot.
+            getBalanceSnapshotOrNull(maxAgeMs = BALANCE_SNAPSHOT_STALE_MAX_AGE_MS)?.let { snapshot ->
+                lastError = null
+                return snapshot
             }
             lastError = t
             null
         }
     }
 
-    fun listPayments(limit: Int = 50): List<PaymentDetails> {
+    fun listPayments(limit: Int = 50, setError: Boolean = true): List<PaymentDetails> {
         return try {
-            val n = runningNodeOrNull(operation = "list payments") ?: return emptyList()
+            val n = runningNodeOrNull(operation = "list payments", setError = setError) ?: return emptyList()
             val items = n.listPayments().orEmpty()
                 .sortedByDescending { it.latestUpdateTimestamp }
                 .take(limit)
-            lastError = null
+            if (setError) {
+                lastError = null
+            }
             items
         } catch (t: Throwable) {
-            lastError = t
+            if (setError) {
+                lastError = t
+            }
             emptyList()
         }
     }
@@ -528,13 +601,53 @@ object LdkWalletManager {
                 n.bolt11Payment().receive(amountMsat, desc, expiry)
             } else {
                 if (preferJitChannel) {
-                    runCatching {
+                    val jitAttempt = runCatching {
                         n.bolt11Payment().receiveVariableAmountViaJitChannel(
                             desc,
                             expiry,
                             null,
                         )
-                    }.getOrNull() ?: n.bolt11Payment().receiveVariableAmount(desc, expiry)
+                    }
+                    val jitInvoice = jitAttempt.getOrNull()
+                    if (jitInvoice != null) {
+                        lastError = null
+                        return jitInvoice.toString()
+                    }
+
+                    val jitErr = jitAttempt.exceptionOrNull()
+                    if (allowFeerateRecovery &&
+                        jitErr != null &&
+                        jitErr.isLikelyFeerateFailure() &&
+                        recoverFromFeerateFailureBlocking("create invoice")
+                    ) {
+                        return createBolt11InvoiceInternal(
+                            amountSats = amountSats,
+                            memo = memo,
+                            expirySeconds = expirySeconds,
+                            preferJitChannel = preferJitChannel,
+                            allowFeerateRecovery = false,
+                        )
+                    }
+
+                    val inboundSats = runCatching { totalUsableInboundLiquiditySats(n.listChannels().orEmpty()) }
+                        .getOrDefault(0L)
+                    if (inboundSats <= 0L) {
+                        val reason = jitErr?.toOneLineSummary()
+                        val message = buildString {
+                            append("Incoming Lightning liquidity is unavailable for a variable invoice.")
+                            append(" Available inbound: ")
+                            append(inboundSats)
+                            append(" sats.")
+                            if (!reason.isNullOrBlank()) {
+                                append(" ")
+                                append(reason)
+                            }
+                        }
+                        lastError = RuntimeException(message)
+                        return null
+                    }
+
+                    n.bolt11Payment().receiveVariableAmount(desc, expiry)
                 } else {
                     n.bolt11Payment().receiveVariableAmount(desc, expiry)
                 }
@@ -811,6 +924,23 @@ object LdkWalletManager {
         }
     }
 
+    fun getUsableOutboundLiquiditySats(setError: Boolean = true): Long? {
+        return try {
+            val n = runningNodeOrNull(operation = "check outbound liquidity") ?: return null
+            val channels = n.listChannels().orEmpty()
+            val total = totalUsableOutboundLiquiditySats(channels)
+            if (setError) {
+                lastError = null
+            }
+            total
+        } catch (t: Throwable) {
+            if (setError) {
+                lastError = t
+            }
+            null
+        }
+    }
+
     fun discoverLspsCandidatesFromGatewayHints(
         network: String?,
         gatewayNodeIds: List<String>,
@@ -871,18 +1001,15 @@ object LdkWalletManager {
         }
         val providerId = activeLiquidityProviderId?.trim()
 
-        val desiredChannelSats = (requiredSats + maxOf(10_000L, requiredSats / 10L))
-            .coerceAtLeast(LIQUIDITY_BOOTSTRAP_MIN_CHANNEL_SATS)
-        if (!WalletPolicy.isAmountWithinSingleTxLimit(desiredChannelSats)) {
-            val msg = "Requested liquidity amount exceeds the configured transfer limit."
-            lastError = IllegalArgumentException(msg)
+        val channelFundingSats = resolveBootstrapChannelFundingSats(n, requiredSats) ?: run {
+            val msg = lastError?.toOneLineSummary() ?: "Could not determine channel funding amount for liquidity bootstrap."
             return LiquidityBootstrapResult(success = false, errorMessage = msg)
         }
 
         val order = try {
             n.lsps1Liquidity().requestChannel(
                 0UL,
-                desiredChannelSats.toULong(),
+                channelFundingSats.toULong(),
                 LIQUIDITY_BOOTSTRAP_CHANNEL_EXPIRY_BLOCKS,
                 false,
             )
@@ -946,8 +1073,8 @@ object LdkWalletManager {
                 }
 
                 val refunded = (
-                    status.paymentOptions.bolt11?.state == PaymentState.REFUNDED ||
-                        status.paymentOptions.onchain?.state == PaymentState.REFUNDED
+                    LdkLspsStateCompat.isRefunded(status.paymentOptions.bolt11?.state) ||
+                        LdkLspsStateCompat.isRefunded(status.paymentOptions.onchain?.state)
                     )
                 if (refunded) {
                     val msg = "Liquidity order was refunded by the provider."
@@ -1010,6 +1137,7 @@ object LdkWalletManager {
         gatewayNodeIds: List<String>,
         requiredSats: Long,
         network: String? = null,
+        forceOpenOnRouteFailure: Boolean = false,
         timeoutMs: Long = LIQUIDITY_BOOTSTRAP_TIMEOUT_MS,
     ): LiquidityBootstrapResult {
         if (requiredSats <= 0L) {
@@ -1030,7 +1158,7 @@ object LdkWalletManager {
                 reference = pendingRef,
                 requiredSats = requiredSats,
             )
-            if (pendingStatus.readyForSpend || hasEnoughSpendableLiquidity(n, requiredSats)) {
+            if (pendingStatus.readyForSpend || (!forceOpenOnRouteFailure && hasEnoughSpendableLiquidity(n, requiredSats))) {
                 gatewayBootstrapPendingReference = null
                 gatewayBootstrapPendingUntilMs = 0L
                 lastError = null
@@ -1067,11 +1195,8 @@ object LdkWalletManager {
             .distinct()
             .toList()
 
-        val desiredChannelSats = (requiredSats + maxOf(10_000L, requiredSats / 10L))
-            .coerceAtLeast(LIQUIDITY_BOOTSTRAP_MIN_CHANNEL_SATS)
-        if (!WalletPolicy.isAmountWithinSingleTxLimit(desiredChannelSats)) {
-            val msg = "Requested liquidity amount exceeds the configured transfer limit."
-            lastError = IllegalArgumentException(msg)
+        val channelFundingSats = resolveBootstrapChannelFundingSats(n, requiredSats) ?: run {
+            val msg = lastError?.toOneLineSummary() ?: "Could not determine channel funding amount for liquidity bootstrap."
             return LiquidityBootstrapResult(success = false, errorMessage = msg)
         }
 
@@ -1121,7 +1246,7 @@ object LdkWalletManager {
             return LiquidityBootstrapResult(success = false, errorMessage = msg)
         }
 
-        if (hasEnoughSpendableLiquidity(n, requiredSats)) {
+        if (!forceOpenOnRouteFailure && hasEnoughSpendableLiquidity(n, requiredSats)) {
             gatewayBootstrapPendingReference = null
             gatewayBootstrapPendingUntilMs = 0L
             lastError = null
@@ -1136,7 +1261,7 @@ object LdkWalletManager {
             val channelRefLegacy = "$nodeId@$address"
 
             val openResult = runCatching {
-                n.openChannel(nodeId, address, desiredChannelSats.toULong(), null, null)
+                n.openChannel(nodeId, address, channelFundingSats.toULong(), null, null)
             }
             if (!openResult.isSuccess) {
                 val msg = openResult.exceptionOrNull()?.toOneLineSummary()
@@ -1821,6 +1946,7 @@ object LdkWalletManager {
     ) {
         val appContext = context.applicationContext
         appContextForRecovery = appContext
+        federationSnapshotForRecovery = federation
         ensureBackgroundThread {
             val success = try {
                 startInternal(appContext, federation)
@@ -1846,6 +1972,7 @@ object LdkWalletManager {
     fun ensureStartedBlocking(context: Context, federation: FederationEntry): Boolean {
         val appContext = context.applicationContext
         appContextForRecovery = appContext
+        federationSnapshotForRecovery = federation
         return try {
             startInternal(appContext, federation)
             if (!waitForStartupToFinish(START_WAIT_TIMEOUT_MS)) {
@@ -1856,6 +1983,48 @@ object LdkWalletManager {
             }
         } catch (t: Throwable) {
             Log.w(TAG, "Failed to start wallet", t)
+            lastError = t
+            false
+        }
+    }
+
+    /**
+     * Force-restarts the wallet for Lightning route recovery.
+     *
+     * If [forceP2pGossip] is true, RGS is bypassed and P2P gossip is used for this restart.
+     */
+    fun restartForRouteRecoveryBlocking(
+        context: Context,
+        federation: FederationEntry,
+        forceP2pGossip: Boolean = false,
+    ): Boolean {
+        val appContext = context.applicationContext
+        appContextForRecovery = appContext
+        federationSnapshotForRecovery = federation
+        val restartFederation = if (forceP2pGossip) {
+            federation.copy(rgsUrl = GOSSIP_MODE_P2P)
+        } else {
+            federation
+        }
+
+        return try {
+            startInternal(
+                context = appContext,
+                federation = restartFederation,
+                forceRebuild = true,
+            )
+            if (!waitForStartupToFinish(START_WAIT_TIMEOUT_MS)) {
+                lastError = RuntimeException("Wallet restart timed out")
+                false
+            } else {
+                val running = isRunningForFederation(federation.id)
+                if (running) {
+                    runCatching { syncWalletsBlocking() }
+                }
+                running
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed to restart wallet for route recovery", t)
             lastError = t
             false
         }
@@ -1882,11 +2051,24 @@ object LdkWalletManager {
             try {
                 val n = runningNodeOrNull(operation = "sync wallet", setError = false) ?: return@ensureBackgroundThread
                 n.syncWallets()
+                markWalletFreshNow()
                 rememberActiveEsploraAsHealthy()
                 lastError = null
             } catch (t: Throwable) {
                 if (t.isLikelyFeerateFailure()) {
                     noteActiveEsploraFailure()
+                    val thresholdRecoveryAllowed = noteFeerateFailureAndShouldRecover()
+                    val hasAnySnapshot = hasStaleBalanceSnapshotForCurrentFederation()
+                    if ((thresholdRecoveryAllowed || !hasAnySnapshot) &&
+                        recoverFromFeerateFailureBlocking(
+                            operation = "sync wallet",
+                            allowRunningNodeRebuild = true,
+                        )
+                    ) {
+                        // Best-effort post-recovery sync without recursive recovery loops.
+                        syncWalletsBlockingInternal(allowFeerateRecovery = false)
+                        return@ensureBackgroundThread
+                    }
                 }
                 Log.w(TAG, "syncWallets() failed", t)
                 lastError = t
@@ -1899,6 +2081,17 @@ object LdkWalletManager {
      */
     fun syncWalletsBlocking(): Boolean {
         return syncWalletsBlockingInternal(allowFeerateRecovery = true)
+    }
+
+    fun syncWalletsBlockingIfStale(
+        maxAgeMs: Long = WALLET_SYNC_STALE_WINDOW_MS,
+        force: Boolean = false,
+    ): Boolean {
+        val effectiveMaxAge = maxAgeMs.coerceAtLeast(0L)
+        if (!force && isWalletFreshWithin(effectiveMaxAge)) {
+            return true
+        }
+        return syncWalletsBlocking()
     }
 
     /**
@@ -1916,6 +2109,7 @@ object LdkWalletManager {
         return try {
             val n = runningNodeOrNull(operation = "sync wallet") ?: return false
             n.syncWallets()
+            markWalletFreshNow()
             rememberActiveEsploraAsHealthy()
             resetFeerateFailureTracking()
             lastError = null
@@ -1923,7 +2117,9 @@ object LdkWalletManager {
         } catch (t: Throwable) {
             if (allowFeerateRecovery && t.isLikelyFeerateFailure()) {
                 noteActiveEsploraFailure()
-                if (noteFeerateFailureAndShouldRecover() &&
+                val thresholdRecoveryAllowed = noteFeerateFailureAndShouldRecover()
+                val hasAnySnapshot = hasStaleBalanceSnapshotForCurrentFederation()
+                if ((thresholdRecoveryAllowed || !hasAnySnapshot) &&
                     recoverFromFeerateFailureBlocking(
                         operation = "sync wallet",
                         allowRunningNodeRebuild = true,
@@ -2123,7 +2319,13 @@ object LdkWalletManager {
         val esploraUrl = esploraUrlOverride?.trim().orEmpty()
             .ifBlank { federation.esploraUrl?.trim().orEmpty() }
             .ifBlank { defaultEsploraUrl(network) }
-        val rgsUrl = federation.rgsUrl?.trim().orEmpty().ifBlank { defaultRgsUrl(network) }
+        val rawRgs = federation.rgsUrl?.trim().orEmpty()
+        val forceP2pGossip = rawRgs.equals(GOSSIP_MODE_P2P, ignoreCase = true)
+        val rgsUrl = when {
+            forceP2pGossip -> ""
+            rawRgs.isNotBlank() -> rawRgs
+            else -> defaultRgsUrl(network)
+        }
 
         val storageDir = WalletStoragePaths.ldkFederationDir(context, federation.id)
         if (!storageDir.exists()) {
@@ -2274,7 +2476,7 @@ object LdkWalletManager {
     }
 
     private fun cacheBalanceSnapshot(balances: BalanceDetails) {
-        val runningFederationId = synchronized(lock) { federationId?.trim().orEmpty() }
+        val runningFederationId = resolveBalanceSnapshotFederationId()
         if (runningFederationId.isBlank()) return
         synchronized(lock) {
             cachedBalanceSnapshotByFederationId[runningFederationId] = balances to System.currentTimeMillis()
@@ -2282,13 +2484,45 @@ object LdkWalletManager {
     }
 
     private fun getFreshBalanceSnapshotOrNull(): BalanceDetails? {
-        val runningFederationId = synchronized(lock) { federationId?.trim().orEmpty() }
+        return getBalanceSnapshotOrNull(maxAgeMs = BALANCE_SNAPSHOT_MAX_AGE_MS)
+    }
+
+    private fun getBalanceSnapshotOrNull(maxAgeMs: Long): BalanceDetails? {
+        val runningFederationId = resolveBalanceSnapshotFederationId()
         if (runningFederationId.isBlank()) return null
         val snapshot = synchronized(lock) {
             cachedBalanceSnapshotByFederationId[runningFederationId]
         } ?: return null
         val ageMs = System.currentTimeMillis() - snapshot.second
-        return if (ageMs in 0..BALANCE_SNAPSHOT_MAX_AGE_MS) snapshot.first else null
+        return if (ageMs in 0..maxAgeMs.coerceAtLeast(0L)) snapshot.first else null
+    }
+
+    private fun hasStaleBalanceSnapshotForCurrentFederation(): Boolean {
+        return getBalanceSnapshotOrNull(maxAgeMs = BALANCE_SNAPSHOT_STALE_MAX_AGE_MS) != null
+    }
+
+    private fun resolveBalanceSnapshotFederationId(): String {
+        return synchronized(lock) {
+            federationId?.trim().orEmpty().ifBlank {
+                federationSnapshotForRecovery?.id?.trim().orEmpty()
+            }
+        }
+    }
+
+    private fun markWalletFreshNow() {
+        val fedId = resolveBalanceSnapshotFederationId()
+        if (fedId.isBlank()) return
+        synchronized(lock) {
+            lastWalletFreshAtByFederationId[fedId] = System.currentTimeMillis()
+        }
+    }
+
+    private fun isWalletFreshWithin(maxAgeMs: Long): Boolean {
+        val fedId = resolveBalanceSnapshotFederationId()
+        if (fedId.isBlank()) return false
+        val last = synchronized(lock) { lastWalletFreshAtByFederationId[fedId] ?: return false }
+        val age = System.currentTimeMillis() - last
+        return age in 0..maxAgeMs
     }
 
     private fun rememberActiveEsploraAsHealthy() {
@@ -2361,20 +2595,28 @@ object LdkWalletManager {
         preferred: String,
         secondaryPreferred: String = "",
     ): List<String> {
+        // Ranked by observed availability + latency from in-app probes (2026-02-22).
         val defaults = when (network) {
             Network.BITCOIN -> listOf(
-                "https://blockstream.info/api",
+                "https://mempool.ninja/api",
                 "https://mempool.space/api",
+                "https://btcscan.org/api",
+                "https://blockstream.info/api",
+                "https://mempool.bitaroo.net/api",
+                "https://mempool.emzy.de/api",
             )
 
             Network.TESTNET -> listOf(
-                "https://blockstream.info/testnet/api",
+                "https://mempool.ninja/testnet/api",
                 "https://mempool.space/testnet/api",
+                "https://blockstream.info/testnet/api",
             )
 
             Network.SIGNET -> listOf(
-                "https://blockstream.info/signet/api",
+                "https://mempool.ninja/signet/api",
                 "https://mempool.space/signet/api",
+                "https://blockstream.info/signet/api",
+                "https://mempool.emzy.de/signet/api",
             )
 
             Network.REGTEST -> listOf(
@@ -2382,7 +2624,22 @@ object LdkWalletManager {
             )
         }
 
-        return (listOf(preferred.trim(), secondaryPreferred.trim()) + defaults)
+        val rankedDefaults = defaults
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+        val defaultSet = rankedDefaults
+            .map { canonicalizeEsploraUrl(it) }
+            .toSet()
+
+        // Preserve ranked defaults for known endpoints. Only prepend explicit custom
+        // URLs that are not part of the ranked pool.
+        val customPreferred = listOf(preferred.trim(), secondaryPreferred.trim())
+            .map { it.trim() }
+            .filter { it.isNotBlank() && !defaultSet.contains(canonicalizeEsploraUrl(it)) }
+            .distinct()
+
+        return (customPreferred + rankedDefaults)
             .map { it.trim() }
             .filter { it.isNotBlank() }
             .distinct()
@@ -2585,7 +2842,7 @@ object LdkWalletManager {
 
     private fun payExpectedLiquidityOrderPayment(node: Node, order: Lsps1OrderStatus): String? {
         val onchain = order.paymentOptions.onchain
-        if (onchain != null && onchain.state == PaymentState.EXPECT_PAYMENT) {
+        if (onchain != null && LdkLspsStateCompat.isExpectPayment(onchain.state)) {
             val amountSats = onchain.orderTotalSat.toLongSaturated()
             if (amountSats <= 0L) {
                 throw IllegalStateException("Liquidity order returned an invalid on-chain amount.")
@@ -2601,7 +2858,7 @@ object LdkWalletManager {
         }
 
         val bolt11 = order.paymentOptions.bolt11
-        if (bolt11 != null && bolt11.state == PaymentState.EXPECT_PAYMENT) {
+        if (bolt11 != null && LdkLspsStateCompat.isExpectPayment(bolt11.state)) {
             return node.bolt11Payment().send(bolt11.invoice, null)
         }
 

@@ -126,6 +126,13 @@ private fun SimpleActivity.handleWalletSetAddress(
         val vb = DialogContactWalletAddressBinding.inflate(this@handleWalletSetAddress.layoutInflater)
         vb.contactWalletAddress.setText(existingOnchain.orEmpty())
         vb.contactWalletLightning.setText(existingLightning.orEmpty())
+        WalletUiDialogs.applyFormDialogTheme(
+            activity = this@handleWalletSetAddress,
+            root = vb.root,
+            inputLayouts = listOf(vb.contactWalletAddressHolder, vb.contactWalletLightningHolder),
+            inputFields = listOf(vb.contactWalletAddress, vb.contactWalletLightning),
+            secondaryTextViews = listOf(vb.contactWalletHintText)
+        )
 
         getAlertDialogBuilder()
             .setNegativeButton(R.string.cancel, null)
@@ -138,6 +145,7 @@ private fun SimpleActivity.handleWalletSetAddress(
             .setPositiveButton(R.string.ok, null)
             .apply {
                 setupDialogStuff(vb.root, this, R.string.contact_wallet_address) { alertDialog ->
+                    WalletUiDialogs.styleDialogActionButtons(this@handleWalletSetAddress, alertDialog)
                     alertDialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                         val onchain = vb.contactWalletAddress.text?.toString()?.trim().orEmpty()
                         val lightning = vb.contactWalletLightning.text?.toString()?.trim().orEmpty()
@@ -215,12 +223,20 @@ private fun SimpleActivity.showInvoiceAndPrefillThread(
     val vb = DialogWalletCreateInvoiceBinding.inflate(this@showInvoiceAndPrefillThread.layoutInflater)
     vb.walletInvoiceAmount.setText("")
     vb.walletInvoiceMemo.setText(getString(R.string.app_launcher_name))
+    WalletUiDialogs.applyFormDialogTheme(
+        activity = this@showInvoiceAndPrefillThread,
+        root = vb.root,
+        inputLayouts = listOf(vb.walletInvoiceAmountHolder, vb.walletInvoiceMemoHolder),
+        inputFields = listOf(vb.walletInvoiceAmount, vb.walletInvoiceMemo),
+        secondaryTextViews = listOf(vb.walletInvoiceHintText)
+    )
 
     getAlertDialogBuilder()
         .setNegativeButton(R.string.cancel, null)
         .setPositiveButton(R.string.wallet_create_invoice, null)
         .apply {
             setupDialogStuff(vb.root, this, R.string.wallet_receive_lightning) { alertDialog ->
+                WalletUiDialogs.styleDialogActionButtons(this@showInvoiceAndPrefillThread, alertDialog)
                 alertDialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                     val amountSats = vb.walletInvoiceAmount.text?.toString()?.trim()?.toLongOrNull()
                     val memo = vb.walletInvoiceMemo.text?.toString()?.trim().orEmpty()
@@ -256,7 +272,12 @@ private fun SimpleActivity.showInvoiceAndPrefillThread(
                                 expirySeconds = expiry
                             )
                         } else {
-                            LdkWalletManager.createBolt11Invoice(amountSats, memo, expirySeconds = expiry)
+                            LdkWalletManager.createBolt11Invoice(
+                                amountSats = amountSats,
+                                memo = memo,
+                                expirySeconds = expiry,
+                                preferJitChannel = true,
+                            )
                         }
                         if (invoice != null) {
                             config.setWalletLastInvoiceForFederation(federation.id, invoice)

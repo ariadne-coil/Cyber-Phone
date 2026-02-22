@@ -94,7 +94,7 @@ class WalletPayActivity : SimpleActivity() {
         if (prefill.isNotBlank()) {
             binding.walletPayDestination.setText(prefill)
             parseFixedInvoiceSats(prefill)?.let { sats ->
-                binding.walletPayAmount.setText(sats.toString())
+                binding.walletPayAmount.setText(String.format(Locale.US, "%d", sats))
                 // Fixed-amount invoice, don't let the user accidentally enter a conflicting amount.
                 binding.walletPayAmount.isEnabled = false
             }
@@ -110,7 +110,7 @@ class WalletPayActivity : SimpleActivity() {
                 val fixed = parseFixedInvoiceSats(text)
                 if (fixed != null) {
                     val current = binding.walletPayAmount.text?.toString()?.trim()
-                    val desired = fixed.toString()
+                    val desired = String.format(Locale.US, "%d", fixed)
                     if (current != desired) {
                         binding.walletPayAmount.setText(desired)
                     }
@@ -123,7 +123,7 @@ class WalletPayActivity : SimpleActivity() {
         if (!requestIdHint.isNullOrBlank()) {
             binding.walletPayDestination.isEnabled = false
             requestAmountSatsHint?.let { amount ->
-                binding.walletPayAmount.setText(amount.toString())
+                binding.walletPayAmount.setText(String.format(Locale.US, "%d", amount))
                 binding.walletPayAmount.isEnabled = false
             }
         }
@@ -391,6 +391,7 @@ class WalletPayActivity : SimpleActivity() {
                 var ok = false
                 var usedFedimintBackend = isFm
                 var pendingMessage: String? = null
+                var mainnetRecoveryError: String? = null
                 if (started) {
                     val isBolt11 = LdkWalletManager.isBolt11Invoice(destination)
                     if (isFm && allowTopupPrompt && isBolt11) {
@@ -436,6 +437,35 @@ class WalletPayActivity : SimpleActivity() {
                                     }
                                 }
                             }
+                            if (!ok && pendingMessage == null) {
+                                val requiredSats = WalletFederationTopupManager.parseFixedInvoiceSats(destination)
+                                    ?: amountSats?.takeIf { it > 0L }
+                                val currentError = LdkWalletManager.getLastErrorMessage()
+                                if (WalletFederationTopupManager.shouldAttemptMainnetLightningRecovery(requiredSats, currentError)) {
+                                    val recovery = WalletFederationTopupManager.recoverMainnetLightningPaymentBlocking(
+                                        context = this,
+                                        sourceFederation = selected,
+                                        invoice = destination,
+                                        amountSats = amountSats,
+                                    )
+                                    when {
+                                        recovery.success -> {
+                                            ok = true
+                                            allowFedimintFallback = false
+                                        }
+
+                                        recovery.pending -> {
+                                            pendingMessage = recovery.errorMessage
+                                                ?: getString(R.string.wallet_send_pending)
+                                            allowFedimintFallback = false
+                                        }
+
+                                        else -> {
+                                            mainnetRecoveryError = recovery.errorMessage
+                                        }
+                                    }
+                                }
+                            }
                             if (!ok && pendingMessage == null && allowFedimintFallback && tryFedimintFallback) {
                                 usedFedimintBackend = true
                                 val fmStarted = FedimintWalletManager.ensureStartedBlocking(this, selected)
@@ -454,7 +484,7 @@ class WalletPayActivity : SimpleActivity() {
                 val backendError = if (usedFedimintBackend) {
                     FedimintWalletManager.getLastErrorMessage()
                 } else {
-                    LdkWalletManager.getLastErrorMessage()
+                    mainnetRecoveryError?.takeIf { it.isNotBlank() } ?: LdkWalletManager.getLastErrorMessage()
                 }
                 val error = backendError.orEmpty().ifBlank {
                     getString(R.string.wallet_unknown_error)

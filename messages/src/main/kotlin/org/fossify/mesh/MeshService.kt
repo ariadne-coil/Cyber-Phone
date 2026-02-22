@@ -1,5 +1,6 @@
 package org.fossify.mesh
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -128,6 +129,7 @@ class MeshService : Service() {
             .build()
     }
 
+    @SuppressLint("ForegroundServiceType")
     private fun ensureForeground(): Boolean {
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

@@ -218,16 +218,16 @@ class Config(context: Context) : BaseConfig(context) {
     }
 
     var e2ePublicKey: String
-        get() = prefs.getString(E2E_PUBLIC_KEY, "") ?: ""
-        set(value) = prefs.edit().putString(E2E_PUBLIC_KEY, value).apply()
+        get() = SensitivePrefs.getString(prefs, E2E_PUBLIC_KEY)
+        set(value) = SensitivePrefs.putString(prefs, E2E_PUBLIC_KEY, value)
 
     var e2ePrivateKey: String
-        get() = prefs.getString(E2E_PRIVATE_KEY, "") ?: ""
-        set(value) = prefs.edit().putString(E2E_PRIVATE_KEY, value).apply()
+        get() = SensitivePrefs.getString(prefs, E2E_PRIVATE_KEY)
+        set(value) = SensitivePrefs.putString(prefs, E2E_PRIVATE_KEY, value)
 
     var e2eSharedSecrets: String
-        get() = prefs.getString(E2E_SHARED_SECRETS, "") ?: ""
-        set(value) = prefs.edit().putString(E2E_SHARED_SECRETS, value).apply()
+        get() = SensitivePrefs.getString(prefs, E2E_SHARED_SECRETS)
+        set(value) = SensitivePrefs.putString(prefs, E2E_SHARED_SECRETS, value)
 
     var e2eEncryptedThreads: Set<String>
         get() = prefs.getStringSet(E2E_ENCRYPTED_THREADS, HashSet()) ?: HashSet()

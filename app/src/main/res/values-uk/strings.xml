@@ -64,17 +64,10 @@
     <string name="hide_dialpad_numbers">Приховати номери цифрової клавіатури</string>
     <string name="export_call_history">Експорт журналу дзвінків</string>
     <string name="import_call_history">Імпорт історії дзвінків</string>
-    <string name="faq_1_title">Я чую вхідні дзвінки, але екран не вмикається. Що я можу зробити\?</string>
-    <string name="faq_1_text">Такі проблеми можуть мати багато специфічних для пристрою та системи причин, важко сказати в цілому. Вам слід подивитися в налаштуваннях свого пристрою та переконатися, що застосунку дозволено відображати у фоновому режимі та дозволяти відображення над іншими застосунками.</string>
     <string name="app_launcher_name">Телефон</string>
     <string name="asterisk">Зірочка</string>
     <string name="audio_route_bluetooth">Bluetooth</string>
     <string name="call_is_being_connected">Триває з\'єднання…</string>
-    <string name="faq_2_title">Чому екстрені виклики не працюють належним чином?</string>
-    <string name="faq_2_text">Через системні обмеження екстрені виклики можна здійснювати лише через стандартний набір номера або телефонний застосунок вашої системи. Щоби екстрені виклики працювали належним чином, вам потрібно тримати системний застосунок встановленим та увімкненим.</string>
-    <string name="faq_3_title">Чому деякі з моїх контактів відсутні в застосунку?</string>
-    <string name="faq_3_text">Cyber Phone показує лише ті контакти, з якими пов\'язаний номер телефону. Контакти без номера телефону не показується в застосунку.</string>
     <string name="call_notification_channel">Стан дзвінка</string>
     <string name="call_notification_channel_high_priority">Стан виклику (високий пріоритет)</string>
-    <string name="calling_accounts">Облікові записи для дзвінків</string>
 </resources>

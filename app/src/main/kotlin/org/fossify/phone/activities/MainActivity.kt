@@ -73,6 +73,18 @@ class MainActivity : SimpleActivity() {
                 result.resultCode
             )
         }
+    private val walletContactPickerLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            getWalletFragment()?.handleWalletContactPickerResult(result.resultCode, result.data)
+        }
+    private val walletBackupCreateLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            getWalletFragment()?.handleWalletBackupCreateResult(result.resultCode, result.data)
+        }
+    private val walletBackupRestoreLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            getWalletFragment()?.handleWalletBackupRestoreResult(result.resultCode, result.data)
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -183,18 +195,6 @@ class MainActivity : SimpleActivity() {
         super.onActivityResult(requestCode, resultCode, resultData)
         if (requestCode == MessagesFragment.REQUEST_CODE_SET_DEFAULT_SMS) {
             getMessagesFragment()?.handleActivityResult(requestCode, resultCode)
-            return
-        }
-        if (requestCode == org.fossify.phone.fragments.WalletFragment.REQUEST_CODE_PICK_WALLET_CONTACT) {
-            getWalletFragment()?.handleWalletContactPickerResult(resultCode, resultData)
-            return
-        }
-        if (requestCode == org.fossify.phone.fragments.WalletFragment.REQUEST_CODE_CREATE_WALLET_BACKUP) {
-            getWalletFragment()?.handleWalletBackupCreateResult(resultCode, resultData)
-            return
-        }
-        if (requestCode == org.fossify.phone.fragments.WalletFragment.REQUEST_CODE_OPEN_WALLET_BACKUP) {
-            getWalletFragment()?.handleWalletBackupRestoreResult(resultCode, resultData)
             return
         }
         // we don't really care about the result, the app can work without being the default Dialer too
@@ -479,6 +479,18 @@ class MainActivity : SimpleActivity() {
 
     fun launchDefaultSmsRoleIntent(intent: Intent) {
         setDefaultSmsLauncher.launch(intent)
+    }
+
+    fun launchWalletContactPickerIntent(intent: Intent) {
+        walletContactPickerLauncher.launch(intent)
+    }
+
+    fun launchWalletBackupCreateIntent(intent: Intent) {
+        walletBackupCreateLauncher.launch(intent)
+    }
+
+    fun launchWalletBackupRestoreIntent(intent: Intent) {
+        walletBackupRestoreLauncher.launch(intent)
     }
 
     private fun getTabIcon(position: Int): Drawable {

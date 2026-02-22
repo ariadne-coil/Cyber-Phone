@@ -44,6 +44,11 @@ object LxmfRouter {
     private const val PROPAGATION_OFFER_INTERVAL_MS = 60_000L
     private const val PROPAGATION_OFFER_JITTER_MS = 15_000L
     private const val PROPAGATION_OFFER_MAX_IDS = 512
+    private const val BURST_SYNC_WINDOW_MS = 30_000L
+    private const val BURST_SYNC_COOLDOWN_MS = 45_000L
+    private const val BURST_SYNC_MIN_INTERVAL_MS = 2_500L
+    private const val BURST_SYNC_MAX_INTERVAL_MS = 12_000L
+    private const val BURST_SYNC_MAX_PULL_MESSAGES = 48
     private const val PROCESSED_TRANSIENT_TTL_MS = 6L * 60L * 60L * 1000L
     private const val PROCESSED_TRANSIENT_LIMIT = 8192
     private const val PROCESSED_TRANSIENT_TRIM_INTERVAL_MS = 60_000L
@@ -88,6 +93,12 @@ object LxmfRouter {
     }
     @Volatile
     private var lastProcessedTransientsTrimAt = 0L
+    @Volatile
+    private var burstSyncUntilMs = 0L
+    @Volatile
+    private var burstSyncRetryDelayMs = BURST_SYNC_MIN_INTERVAL_MS
+    @Volatile
+    private var lastBurstSyncStartedAt = 0L
 
     private data class PropagationPeer(
         val destinationHash: ByteArray,
@@ -185,6 +196,7 @@ object LxmfRouter {
             }, propagationAnnounceProvider)
             RnsNode.announce(propagation, propagationAnnounceProvider().appData, null)
             startOfferSync()
+            triggerBurstSync(force = true)
         }
         RnsNode.addResourceListener(resourceListener)
         RnsNode.addResourceAdvertisementListener(resourceAdvertisementListener)
@@ -202,6 +214,9 @@ object LxmfRouter {
         stopOfferSync()
         appContext = null
         pendingPropagationSync = false
+        burstSyncUntilMs = 0L
+        burstSyncRetryDelayMs = BURST_SYNC_MIN_INTERVAL_MS
+        lastBurstSyncStartedAt = 0L
         RnsNode.removeResourceListener(resourceListener)
         RnsNode.removeResourceAdvertisementListener(resourceAdvertisementListener)
         RnsNode.removeAnnounceListener(announceListener)
@@ -337,9 +352,15 @@ object LxmfRouter {
         fields: Map<Int, Any?> = emptyMap(),
         onDelivered: (() -> Unit)? = null
     ): Boolean {
+        if (propagationEnabled) {
+            triggerBurstSync()
+        }
         val local = deliveryDestination ?: return false
         val remoteIdentity = RnsNode.recallIdentity(destinationHash) ?: run {
             RnsNode.requestPath(destinationHash)
+            if (propagationEnabled) {
+                triggerBurstSync(force = true)
+            }
             return false
         }
         val stampCost = outboundStampCosts[RnsHex.encode(destinationHash)]
@@ -557,8 +578,10 @@ object LxmfRouter {
                 metadata = announceData.metadata
             )
             propagationPeers[RnsHex.encode(announce.destinationHash)] = peer
+            triggerBurstSync()
             if (pendingPropagationSync) {
                 pendingPropagationSync = false
+                triggerBurstSync(force = true)
                 requestMessagesFromPropagationNode()
             }
         } else if (announce.nameHash.contentEquals(DELIVERY_NAME_HASH)) {
@@ -567,6 +590,7 @@ object LxmfRouter {
                 updateOutboundStampCost(announce.destinationHash, parsed?.stampCost)
             }
             forwardBufferedMessages(announce)
+            triggerBurstSync()
         }
     }
 
@@ -755,12 +779,39 @@ object LxmfRouter {
         if (!offerSyncActive.compareAndSet(false, true)) return
         offerSyncThread = thread(start = true, name = "lxmf-offer-sync") {
             while (offerSyncActive.get()) {
+                val now = System.currentTimeMillis()
+                val burstActive = propagationEnabled && now < burstSyncUntilMs
+                var didWork = false
                 try {
-                    performOfferSync()
+                    didWork = performOfferSync()
+                    if (burstActive) {
+                        val requested = requestMessagesFromPropagationNode(
+                            maxMessages = BURST_SYNC_MAX_PULL_MESSAGES,
+                            retryOnFailure = false
+                        )
+                        didWork = didWork || requested
+                    }
                 } catch (_: Exception) {
                 }
-                val delay = PROPAGATION_OFFER_INTERVAL_MS +
-                    ThreadLocalRandom.current().nextLong(0, PROPAGATION_OFFER_JITTER_MS + 1)
+                val delay = if (burstActive) {
+                    if (didWork) {
+                        burstSyncRetryDelayMs = BURST_SYNC_MIN_INTERVAL_MS
+                    } else {
+                        burstSyncRetryDelayMs = (burstSyncRetryDelayMs * 2).coerceAtMost(BURST_SYNC_MAX_INTERVAL_MS)
+                    }
+                    val remaining = (burstSyncUntilMs - System.currentTimeMillis()).coerceAtLeast(0L)
+                    if (remaining <= 0L) {
+                        burstSyncRetryDelayMs = BURST_SYNC_MIN_INTERVAL_MS
+                        PROPAGATION_OFFER_INTERVAL_MS +
+                            ThreadLocalRandom.current().nextLong(0, PROPAGATION_OFFER_JITTER_MS + 1)
+                    } else {
+                        burstSyncRetryDelayMs.coerceAtMost(remaining)
+                    }
+                } else {
+                    burstSyncRetryDelayMs = BURST_SYNC_MIN_INTERVAL_MS
+                    PROPAGATION_OFFER_INTERVAL_MS +
+                        ThreadLocalRandom.current().nextLong(0, PROPAGATION_OFFER_JITTER_MS + 1)
+                }
                 try {
                     Thread.sleep(delay)
                 } catch (_: InterruptedException) {
@@ -775,19 +826,22 @@ object LxmfRouter {
         offerSyncThread = null
     }
 
-    private fun performOfferSync() {
-        if (!propagationEnabled) return
-        val store = propagationStore ?: return
-        if (store.listEntries().isEmpty()) return
+    private fun performOfferSync(): Boolean {
+        if (!propagationEnabled) return false
+        val store = propagationStore ?: return false
+        if (store.listEntries().isEmpty()) return false
         val peers = propagationPeers.values.toList()
-        if (peers.isEmpty()) return
+        if (peers.isEmpty()) return false
         val now = System.currentTimeMillis()
+        var offered = false
         peers.forEach { peer ->
             if (!peer.nodeEnabled) return@forEach
             if (now - peer.lastOfferAt < PROPAGATION_OFFER_INTERVAL_MS / 2) return@forEach
             offerToPeer(peer)
             peer.lastOfferAt = now
+            offered = true
         }
+        return offered
     }
 
     private fun offerToPeer(peer: PropagationPeer) {
@@ -831,7 +885,7 @@ object LxmfRouter {
         if (entries.isEmpty()) return emptyList()
         val maxIds = when {
             peer.syncLimitKb > 0 -> {
-                val approx = (peer.syncLimitKb * 1000 / 24).toInt()
+                val approx = peer.syncLimitKb * 1000 / 24
                 approx.coerceIn(1, PROPAGATION_OFFER_MAX_IDS)
             }
             else -> PROPAGATION_OFFER_MAX_IDS
@@ -884,21 +938,29 @@ object LxmfRouter {
         }
     }
 
-    fun requestMessagesFromPropagationNode(maxMessages: Int = 0) {
-        val peer = selectPropagationPeer() ?: return
-        val owner = deliveryDestination ?: return
-        val identity = localIdentity ?: return
+    fun requestMessagesFromPropagationNode(
+        maxMessages: Int = 0,
+        retryOnFailure: Boolean = true
+    ): Boolean {
+        if (retryOnFailure) {
+            triggerBurstSync(force = true)
+        }
+        val peer = selectPropagationPeer() ?: return false
+        val owner = deliveryDestination ?: return false
+        val identity = localIdentity ?: return false
 
         if (!RnsNode.identifyLink(owner, peer.destination, identity)) {
-            thread {
-                try {
-                    Thread.sleep(1500)
-                } catch (_: InterruptedException) {
-                    return@thread
+            if (retryOnFailure) {
+                thread {
+                    try {
+                        Thread.sleep(1500)
+                    } catch (_: InterruptedException) {
+                        return@thread
+                    }
+                    requestMessagesFromPropagationNode(maxMessages, retryOnFailure = true)
                 }
-                requestMessagesFromPropagationNode(maxMessages)
             }
-            return
+            return false
         }
 
         val receipt = RnsNode.requestOverLink(
@@ -913,15 +975,19 @@ object LxmfRouter {
         )
 
         if (receipt == null) {
-            thread {
-                try {
-                    Thread.sleep(1500)
-                } catch (_: InterruptedException) {
-                    return@thread
+            if (retryOnFailure) {
+                thread {
+                    try {
+                        Thread.sleep(1500)
+                    } catch (_: InterruptedException) {
+                        return@thread
+                    }
+                    requestMessagesFromPropagationNode(maxMessages, retryOnFailure = true)
                 }
-                requestMessagesFromPropagationNode(maxMessages)
             }
+            return false
         }
+        return true
     }
 
     private fun handleMessageListResponse(
@@ -1062,6 +1128,21 @@ object LxmfRouter {
                 keyIterator.remove()
             }
         }
+    }
+
+    private fun triggerBurstSync(force: Boolean = false) {
+        if (!propagationEnabled) return
+        val now = System.currentTimeMillis()
+        val active = now < burstSyncUntilMs
+        val canStart = force || active || now - lastBurstSyncStartedAt >= BURST_SYNC_COOLDOWN_MS
+        if (!canStart) return
+
+        if (!active) {
+            lastBurstSyncStartedAt = now
+            burstSyncRetryDelayMs = BURST_SYNC_MIN_INTERVAL_MS
+        }
+        burstSyncUntilMs = maxOf(burstSyncUntilMs, now + BURST_SYNC_WINDOW_MS)
+        offerSyncThread?.interrupt()
     }
 
     private fun sendPackedMessage(

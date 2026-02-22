@@ -1,14 +1,14 @@
 [versions]
 #jetbrains
 geocoderVersion = "3.24"
-carrierVersion = "2.22"
-kotlin = "2.3.0"
+carrierVersion = "2.24"
+kotlin = "2.3.10"
 kotlinxSerializationJson = "1.10.0"
 #KSP
 ksp = "2.3.4"
 #Detekt
 detekt = "1.23.8"
-detektCompose = "0.5.5"
+detektCompose = "0.5.6"
 #AndroidX
 androidx-constraintlayout = "2.2.1"
 androidx-swiperefreshlayout = "1.2.0"
@@ -35,14 +35,14 @@ libphonenumberinfo = "c77bdd2b69"
 tfLiteTaskTextVersion = "0.4.4"
 okhttp = "5.3.2"
 slf4j = "1.7.36"
-work = "2.11.0"
-bouncycastle = "1.78.1"
+work = "2.11.1"
+bouncycastle = "1.83"
 msgpack = "0.9.11"
-zxingCore = "3.5.3"
+zxingCore = "3.5.4"
 zxingEmbedded = "4.3.0"
 concentus = "6c2328dc19"
 junit = "4.13.2"
-ldkNode = "0.6.1"
+ldkNode = "0.7.0"
 #build
 app-build-compileSDKVersion = "36"
 app-build-targetSDK = "36"

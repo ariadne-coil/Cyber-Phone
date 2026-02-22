@@ -70,11 +70,4 @@
     <string name="hide_dialpad_numbers">Sakrij brojeve brojčanika</string>
     <string name="export_call_history">Izvezi historiju poziva</string>
     <string name="import_call_history">Uvezi historiju poziva</string>
-    <string name="calling_accounts">Računi pozivanja</string>
-    <string name="faq_1_title">Čujem dolazne pozive, ali se ekran ne uključuje. Šta mogu da uradim?</string>
-    <string name="faq_1_text">Takvi problemi mogu imati mnogo razloga specifičnih za uređaj i sustav i teško je reći općenito. Trebali biste pogledati u postavkama svog uređaja i provjeriti je li aplikaciji dopušteno iskakanje kada radi u pozadini i dopuštenje prikazivanja preko drugih aplikacija.</string>
-    <string name="faq_2_title">Zašto pozivi za hitne slučajeve ne rade ispravno?</string>
-    <string name="faq_2_text">Zbog ograničenja sustava, pozivi za hitne slučajeve se mogu uputiti samo putem zadanog brojčanika ili telefonske aplikacije tvog sistema. Za pravilan rad poziva za hitne slučajeve, aplikacija sistema mora biti instalirana i aktivirana.</string>
-    <string name="faq_3_title">Zašto neki moji kontakti nedostaju u aplikaciji?</string>
-    <string name="faq_3_text">Cyber Phone prikazuje samo kontakte koji sadrže telefonski broj. Kontakti bez telefonskog broja ne prikazuju se u aplikaciji.</string>
 </resources>

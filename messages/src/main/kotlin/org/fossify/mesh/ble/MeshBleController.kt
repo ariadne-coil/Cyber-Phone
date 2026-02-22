@@ -1,5 +1,7 @@
 package org.fossify.mesh.ble
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
@@ -20,10 +22,13 @@ import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.ParcelUuid
 import android.util.Log
+import androidx.core.content.ContextCompat
 import java.nio.ByteBuffer
 import java.util.ArrayDeque
 import java.util.UUID
@@ -31,6 +36,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import org.fossify.mesh.ble.MeshBleState
 
+@SuppressLint("MissingPermission")
 class MeshBleController(
     private val context: Context,
     private val onPayload: (ByteArray) -> Unit,
@@ -59,6 +65,22 @@ class MeshBleController(
     private val thread = HandlerThread("mesh-ble").apply { start() }
     private val handler = Handler(thread.looper)
 
+    private fun hasPermission(permission: String): Boolean {
+        return ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun canScan(): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S || hasPermission(Manifest.permission.BLUETOOTH_SCAN)
+    }
+
+    private fun canAdvertise(): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S || hasPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
+    }
+
+    private fun canConnect(): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S || hasPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    }
+
     fun start() {
         MeshBleState.setBluetoothEnabled(adapter?.isEnabled == true)
         if (adapter == null || !adapter.isEnabled) {
@@ -66,32 +88,50 @@ class MeshBleController(
             MeshBleState.setConnections(0)
             return
         }
-        advertiser = adapter.bluetoothLeAdvertiser
-        scanner = adapter.bluetoothLeScanner
-        startServer()
-        startAdvertise()
-        startScan()
-        MeshBleState.setActive(true)
+
+        advertiser = if (canAdvertise()) adapter.bluetoothLeAdvertiser else null
+        scanner = if (canScan()) adapter.bluetoothLeScanner else null
+
+        if (canConnect()) {
+            startServer()
+        }
+        if (advertiser != null) {
+            startAdvertise()
+        }
+        if (scanner != null) {
+            startScan()
+        }
+
+        val active = canConnect() && (advertiser != null || scanner != null)
+        MeshBleState.setActive(active)
     }
 
     fun stop() {
         MeshBleState.setActive(false)
         MeshBleState.setConnections(0)
         try {
-            scanner?.stopScan(scanCallback)
+            if (canScan()) {
+                scanner?.stopScan(scanCallback)
+            }
         } catch (_: Exception) {
         }
         try {
-            advertiser?.stopAdvertising(advertiseCallback)
+            if (canAdvertise()) {
+                advertiser?.stopAdvertising(advertiseCallback)
+            }
         } catch (_: Exception) {
         }
         try {
-            gattServer?.close()
+            if (canConnect()) {
+                gattServer?.close()
+            }
         } catch (_: Exception) {
         }
         connections.values.forEach {
             try {
-                it.close()
+                if (canConnect()) {
+                    it.close()
+                }
             } catch (_: Exception) {
             }
         }
@@ -210,6 +250,7 @@ class MeshBleController(
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
             val device = result?.device ?: return
             if (connections.containsKey(device.address)) return
+            if (!canConnect()) return
             handler.post {
                 try {
                     @Suppress("DEPRECATION")
@@ -241,6 +282,7 @@ class MeshBleController(
                     onPeerConnected?.invoke()
                 } catch (_: Exception) {
                 }
+                if (!canConnect()) return
                 gatt.discoverServices()
                 try {
                     gatt.requestMtu(517)
@@ -254,7 +296,9 @@ class MeshBleController(
                 mtus.remove(gatt.device.address)
                 sendQueues.remove(gatt.device.address)
                 sending.remove(gatt.device.address)
-                gatt.close()
+                if (canConnect()) {
+                    gatt.close()
+                }
             }
         }
 
@@ -294,6 +338,7 @@ class MeshBleController(
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 // Some devices only show up as "incoming" connections. Connect back so we can also send.
                 if (!connections.containsKey(device.address)) {
+                    if (!canConnect()) return
                     handler.post {
                         try {
                             @Suppress("DEPRECATION")

@@ -42,24 +42,23 @@ class DirectReplyReceiver : BroadcastReceiver() {
 
                     if (sent) {
                         LxmfStore.storeOutgoing(context, address, body)
-                    }
+                        val photoUri = MeshContactHelper.getContactNameAndPhotoForMeshAddress(context, address).second
+                        val bitmap = context.getNotificationBitmap(photoUri.orEmpty())
+                        Handler(Looper.getMainLooper()).post {
+                            context.notificationHelper.showMessageNotification(
+                                messageId = 0L,
+                                address = address,
+                                body = body,
+                                threadId = threadId,
+                                bitmap = bitmap,
+                                sender = null,
+                                alertOnlyOnce = true
+                            )
+                        }
 
-                    val photoUri = MeshContactHelper.getContactNameAndPhotoForMeshAddress(context, address).second
-                    val bitmap = context.getNotificationBitmap(photoUri.orEmpty())
-                    Handler(Looper.getMainLooper()).post {
-                        context.notificationHelper.showMessageNotification(
-                            messageId = 0L,
-                            address = address,
-                            body = body,
-                            threadId = threadId,
-                            bitmap = bitmap,
-                            sender = null,
-                            alertOnlyOnce = true
-                        )
+                        context.markThreadMessagesRead(threadId)
+                        context.conversationsDB.markRead(threadId)
                     }
-
-                    context.markThreadMessagesRead(threadId)
-                    context.conversationsDB.markRead(threadId)
                 }
                 return
             }
@@ -76,8 +75,10 @@ class DirectReplyReceiver : BroadcastReceiver() {
 
             ensureBackgroundThread {
                 var messageId = 0L
+                var sentSuccessfully = false
                 try {
                     context.sendMessageCompat(body, listOf(address), subscriptionId, emptyList())
+                    sentSuccessfully = true
                     val message = context.getMessages(
                         threadId = threadId, includeScheduledMessages = false, limit = 1
                     ).lastOrNull()
@@ -91,22 +92,24 @@ class DirectReplyReceiver : BroadcastReceiver() {
                     context.showErrorToast(e)
                 }
 
-                val photoUri = SimpleContactsHelper(context).getPhotoUriFromPhoneNumber(address)
-                val bitmap = context.getNotificationBitmap(photoUri)
-                Handler(Looper.getMainLooper()).post {
-                    context.notificationHelper.showMessageNotification(
-                        messageId = messageId,
-                        address = address,
-                        body = body,
-                        threadId = threadId,
-                        bitmap = bitmap,
-                        sender = null,
-                        alertOnlyOnce = true
-                    )
-                }
+                if (sentSuccessfully) {
+                    val photoUri = SimpleContactsHelper(context).getPhotoUriFromPhoneNumber(address)
+                    val bitmap = context.getNotificationBitmap(photoUri)
+                    Handler(Looper.getMainLooper()).post {
+                        context.notificationHelper.showMessageNotification(
+                            messageId = messageId,
+                            address = address,
+                            body = body,
+                            threadId = threadId,
+                            bitmap = bitmap,
+                            sender = null,
+                            alertOnlyOnce = true
+                        )
+                    }
 
-                context.markThreadMessagesRead(threadId)
-                context.conversationsDB.markRead(threadId)
+                    context.markThreadMessagesRead(threadId)
+                    context.conversationsDB.markRead(threadId)
+                }
             }
         }
     }

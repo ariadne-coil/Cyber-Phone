@@ -18,6 +18,7 @@ import java.security.KeyPairGenerator
 import java.security.PrivateKey
 import java.security.PublicKey
 import java.security.SecureRandom
+import java.security.Signature
 import java.security.spec.ECGenParameterSpec
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
@@ -90,6 +91,9 @@ object E2eManager {
         val publicKey = map["public"].orEmpty()
         val privateKey = map["private"].orEmpty()
         if (publicKey.isBlank() || privateKey.isBlank()) {
+            return false
+        }
+        if (!isValidKeyPair(publicKey, privateKey)) {
             return false
         }
 
@@ -592,6 +596,24 @@ object E2eManager {
         val generator = KeyPairGenerator.getInstance(KEY_ALGORITHM)
         generator.initialize(ECGenParameterSpec(CURVE_NAME), SecureRandom())
         return generator.generateKeyPair()
+    }
+
+    private fun isValidKeyPair(publicKeyEncoded: String, privateKeyEncoded: String): Boolean {
+        val privateKey = decodePrivateKey(privateKeyEncoded) ?: return false
+        val publicKey = decodePublicKey(publicKeyEncoded) ?: return false
+
+        return runCatching {
+            val challenge = ByteArray(32).also { SecureRandom().nextBytes(it) }
+            val signer = Signature.getInstance("SHA256withECDSA")
+            signer.initSign(privateKey)
+            signer.update(challenge)
+            val signature = signer.sign()
+
+            val verifier = Signature.getInstance("SHA256withECDSA")
+            verifier.initVerify(publicKey)
+            verifier.update(challenge)
+            verifier.verify(signature)
+        }.getOrDefault(false)
     }
 
     private fun decodePrivateKey(encoded: String): PrivateKey? {

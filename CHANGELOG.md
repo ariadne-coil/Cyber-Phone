@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.4.4 (2026-02-22)
+- Mesh reliability: added event-driven burst propagation sync (startup/announce/send/manual-trigger windows) with strict caps and exponential backoff to reduce delivery latency without sustained battery drain.
+- Mesh transport/runtime: improved service/interface startup behavior and transport coordination across UDP multicast, BLE, Wi-Fi Direct, and Wi-Fi Aware paths.
+- Wallet core: migrated and hardened Lightning runtime integration around `ldk-node` 0.7.x with compatibility wrappers and restart/recovery improvements.
+- Wallet reliability: expanded Bitcoin Mainnet node/feerate/esplora failover handling and recovery paths to reduce balance/sync/payment outages across federation switches and retries.
+- Wallet flows: rebuilt top-up and liquidity orchestration plumbing (`WalletFederationTopupManager`) and strengthened automatic route/bootstrap handling for pay/send operations.
+- Wallet UI/UX: significant wallet surface polish (cards, send/pay dialogs, payment list rendering, federation selector behavior, and theme-accent consistency).
+- Wallet + messaging integration: improved wallet protocol token handling in threads/direct reply and compacted mesh wallet payloads for more reliable mesh transport.
+- Security hardening: introduced sensitive preference handling paths for private wallet/message data and tightened related persistence/restore handling.
+- Settings/UI structure: refactored settings layout composition (modular sections) and aligned call/wallet/message surfaces with consistent app theming and typography behavior.
+- Localization/resources: added wallet-core localized string sets across Fossify locales and performed a broad resource cleanup/reorganization (including launcher/art asset placement).
+- Dev/testing/docs: added wallet compatibility tests/helpers and checked-in wallet federation/migration reference docs/data used during stabilization.
+- Known issue: Fedimint withdrawals can still be unreliable on some federation/runtime combinations and may require retries.
+
 ## v0.4.3 (2026-02-21)
 - Branding: normalized product naming to **Cyber Phone** across repo metadata/templates and app-facing assets.
 - Wallet/Mesh: fixed Bitcoin over mesh delivery by switching wallet invoice messages to a compact payload format suitable for mesh transport.

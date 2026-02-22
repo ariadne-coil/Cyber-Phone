@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "updated_at": "2026-02-09",
+  "federations": [
+    {
+      "id": "btc-mainnet",
+      "name": "Bitcoin Mainnet",
+      "network": "bitcoin",
+      "website": "https://blockstream.info",
+      "description": "Self-custodial on-chain + Lightning wallet (LDK Node). Chain data via Blockstream Esplora. Gossip via LDK Rapid Gossip Sync.",
+      "esplora_url": "https://blockstream.info/api",
+      "rgs_url": "https://rapidsync.lightningdevkit.org/snapshot"
+    },
+    {
+      "id": "btc-testnet",
+      "name": "Bitcoin Testnet",
+      "network": "testnet",
+      "website": "https://blockstream.info/testnet",
+      "description": "Testnet wallet for development/testing (LDK Node). Chain data via Blockstream Esplora testnet. Gossip via LDK Rapid Gossip Sync testnet.",
+      "esplora_url": "https://blockstream.info/testnet/api",
+      "rgs_url": "https://rapidsync.lightningdevkit.org/testnet/snapshot"
+    },
+    {
+      "id": "fedimint-mutinynet",
+      "name": "Fedimint Testnet (Mutinynet)",
+      "kind": "fedimint",
+      "network": "testnet",
+      "website": "https://sdk.fedimint.org/",
+      "description": "Fedimint federation on testnet for experimentation. Uses the official Fedimint SDK (WASM).",
+      "invite": "fed11qgqzc2nhwden5te0vejkg6tdd9h8gepwvejkg6tdd9h8garhduhx6at5d9h8jmn9wshxxmmd9uqqzgxg6s3evnr6m9zdxr6hxkdkukexpcs3mn7mj3g5pc5dfh63l4tj6g9zk4er"
+    }
+  ]
+}

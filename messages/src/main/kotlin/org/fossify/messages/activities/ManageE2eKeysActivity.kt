@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
+import java.io.ByteArrayOutputStream
 import org.json.JSONObject
 import org.fossify.commons.dialogs.ConfirmationDialog
 import org.fossify.commons.dialogs.RadioGroupDialog
@@ -53,6 +54,7 @@ class ManageE2eKeysActivity : SimpleActivity() {
     private var pendingIdentity: CyberIdentityPayload? = null
 
     private companion object {
+        const val MAX_E2E_BACKUP_IMPORT_BYTES = 256 * 1024
         const val PREFS_NAME = "Prefs"
         const val WALLET_LIQUIDITY_PROVIDER_MODE = "wallet_liquidity_provider_mode"
         const val WALLET_LIQUIDITY_PROVIDER_ID = "wallet_liquidity_provider_id"
@@ -85,7 +87,7 @@ class ManageE2eKeysActivity : SimpleActivity() {
                 return@registerForActivityResult
             }
             try {
-                val content = contentResolver.openInputStream(uri)?.bufferedReader()?.readText().orEmpty()
+                val content = readTextFromUriLimited(uri, MAX_E2E_BACKUP_IMPORT_BYTES).orEmpty()
                 if (E2eManager.importBackupData(this, content)) {
                     refreshProfile()
                     toast(R.string.e2e_import_successful)
@@ -282,6 +284,26 @@ class ManageE2eKeysActivity : SimpleActivity() {
                 toast(R.string.e2e_keys_regenerated)
             }
         }
+    }
+
+    private fun readTextFromUriLimited(uri: android.net.Uri, maxBytes: Int): String? {
+        return runCatching {
+            contentResolver.openInputStream(uri)?.use { input ->
+                val output = ByteArrayOutputStream()
+                val buffer = ByteArray(8 * 1024)
+                var total = 0
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read <= 0) break
+                    total += read
+                    if (total > maxBytes) {
+                        return null
+                    }
+                    output.write(buffer, 0, read)
+                }
+                output.toString(Charsets.UTF_8.name())
+            }
+        }.getOrNull()
     }
 
     private fun setupMeshSettings() = binding.apply {

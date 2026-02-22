@@ -18,16 +18,22 @@ import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.WindowManager
 import android.widget.ImageView
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.os.postDelayed
+import org.fossify.commons.extensions.adjustAlpha
 import org.fossify.commons.extensions.applyColorFilter
 import org.fossify.commons.extensions.beGone
 import org.fossify.commons.extensions.beVisible
 import org.fossify.commons.extensions.getFormattedDuration
+import org.fossify.commons.extensions.getContrastColor
+import org.fossify.commons.extensions.getProperBackgroundColor
+import org.fossify.commons.extensions.getProperPrimaryColor
 import org.fossify.commons.extensions.getProperTextColor
 import org.fossify.commons.extensions.isRTLLayout
 import org.fossify.commons.extensions.onGlobalLayout
 import org.fossify.commons.extensions.performHapticFeedback
 import org.fossify.commons.extensions.toast
+import org.fossify.commons.extensions.updateTextColors
 import org.fossify.commons.extensions.viewBinding
 import org.fossify.commons.helpers.MINUTE_SECONDS
 import org.fossify.mesh.MeshConfig
@@ -69,6 +75,7 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
     private var ringtone: Ringtone? = null
     private var stopSwipeAnimation = false
     private var dragDownX = 0f
+    private var isMicrophoneOff = false
     private var proximityWakeLock: PowerManager.WakeLock? = null
     private var lastRemotePacketMs: Long = 0L
     private var lastRemoteAudioSeq: Int = -1
@@ -136,6 +143,11 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
         MeshCallRouter.addListener(this)
     }
 
+    override fun onResume() {
+        super.onResume()
+        syncAudioButtonStateFromSystem()
+    }
+
     override fun onStop() {
         MeshCallRouter.removeListener(this)
         super.onStop()
@@ -152,6 +164,8 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
     }
 
     private fun setupUiSkeleton() = binding.apply {
+        updateTextColors(callHolder)
+
         // Mesh calls do not support SIM selection / conferencing / PSTN dialpad.
         callSimId.beGone()
         callSimImage.beGone()
@@ -168,6 +182,12 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
         // Basic ongoing controls only.
         callToggleMicrophone.beVisible()
         callToggleSpeaker.beVisible()
+        val bgColor = getProperBackgroundColor()
+        val inactiveColor = getInactiveButtonColor()
+        arrayOf(callToggleMicrophone, callToggleSpeaker).forEach {
+            it.applyColorFilter(bgColor.getContrastColor())
+            it.background.applyColorFilter(inactiveColor)
+        }
 
         // Incoming swipe UI.
         handleSwipe()
@@ -204,6 +224,14 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
         incomingCallHolder.beGone()
         ongoingCallHolder.beGone()
         callEnd.beGone()
+
+        isMicrophoneOff = try {
+            (getSystemService(Context.AUDIO_SERVICE) as AudioManager).isMicrophoneMute
+        } catch (_: Exception) {
+            false
+        }
+        updateMicrophoneButton()
+        updateAudioRouteUi()
     }
 
     private fun showIncomingUi() = binding.apply {
@@ -231,12 +259,15 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
         callerReputation.beGone()
 
         // We intentionally keep caller avatar styling consistent with PSTN calls.
-        callerAvatar.apply {
-            setImageResource(R.drawable.ic_person_vector)
-            background = getDrawable(R.drawable.circle_background)
-            val tint = getProperTextColor()
-            drawable?.mutate()?.setTint(tint)
-        }
+            callerAvatar.apply {
+                setImageResource(R.drawable.ic_person_vector)
+                background = AppCompatResources.getDrawable(
+                    this@MeshVoipCallActivity,
+                    R.drawable.circle_background
+                )
+                val tint = getProperTextColor()
+                drawable?.mutate()?.setTint(tint)
+            }
     }
 
     private fun startOutgoingCall() {
@@ -368,9 +399,9 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
     private fun toggleMute() = binding.apply {
         try {
             val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            val newMuted = !audioManager.isMicrophoneMute
-            audioManager.isMicrophoneMute = newMuted
-            callToggleMicrophone.alpha = if (newMuted) 0.5f else 1f
+            isMicrophoneOff = !audioManager.isMicrophoneMute
+            audioManager.isMicrophoneMute = isMicrophoneOff
+            updateMicrophoneButton()
         } catch (_: Exception) {
         }
     }
@@ -409,11 +440,10 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
         // Auto-prefer bluetooth headsets for VoIP calls when available.
         if (audioRoute == MeshAudioRoute.EARPIECE && isBluetoothRouteAvailable(audioManager)) {
             setRouteBluetooth(audioManager)
-        } else {
-            updateAudioRouteUi()
         }
+        updateAudioRouteUi()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && audioDeviceCallback == null) {
+        if (audioDeviceCallback == null) {
             audioDeviceCallback = object : AudioDeviceCallback() {
                 override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
                     // A headset might have connected mid-call.
@@ -445,11 +475,9 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
             return
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            try {
-                audioDeviceCallback?.let { audioManager.unregisterAudioDeviceCallback(it) }
-            } catch (_: Exception) {
-            }
+        try {
+            audioDeviceCallback?.let { audioManager.unregisterAudioDeviceCallback(it) }
+        } catch (_: Exception) {
         }
         audioDeviceCallback = null
 
@@ -473,10 +501,8 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 audioManager.availableCommunicationDevices.any { isBluetoothCommDeviceType(it.type) }
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any { isBluetoothCommDeviceType(it.type) }
             } else {
-                false
+                audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any { isBluetoothCommDeviceType(it.type) }
             }
         } catch (_: Exception) {
             false
@@ -564,19 +590,16 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
     }
 
     private fun updateAudioRouteUi() = binding.apply {
-        // Keep the UI simple but informative.
         val iconRes = when (audioRoute) {
             MeshAudioRoute.SPEAKER -> R.drawable.ic_volume_up_vector
             MeshAudioRoute.BLUETOOTH -> R.drawable.ic_bluetooth_audio_vector
             MeshAudioRoute.EARPIECE -> R.drawable.ic_volume_down_vector
         }
         callToggleSpeaker.setImageResource(iconRes)
-        // Subtle hint that routing is "external" vs on-device.
-        callToggleSpeaker.alpha = when (audioRoute) {
-            MeshAudioRoute.SPEAKER -> 1f
-            MeshAudioRoute.BLUETOOTH -> 0.95f
-            MeshAudioRoute.EARPIECE -> 0.7f
-        }
+        toggleButtonColor(callToggleSpeaker, enabled = audioRoute != MeshAudioRoute.EARPIECE)
+        callToggleSpeaker.contentDescription = getString(
+            if (audioRoute == MeshAudioRoute.SPEAKER) R.string.turn_speaker_off else R.string.turn_speaker_on
+        )
     }
 
     private fun startRingtone() {
@@ -795,6 +818,13 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
                     callDraggable.animate().x(initialDraggableX).withEndAction {
                         callDraggableBackground.animate().alpha(0.2f)
                     }
+                    callDraggable.setImageDrawable(
+                        AppCompatResources.getDrawable(
+                            this@MeshVoipCallActivity,
+                            R.drawable.ic_phone_down_vector
+                        )
+                    )
+                    callDraggable.drawable?.mutate()?.setTint(getProperTextColor())
                     callLeftArrow.animate().alpha(1f)
                     callRightArrow.animate().alpha(1f)
                     stopSwipeAnimation = false
@@ -829,8 +859,34 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
                             }
                         }
 
+                        callDraggable.x > initialDraggableX -> {
+                            lock = false
+                            val drawableRes = if (isRtl) {
+                                R.drawable.ic_phone_down_red_vector
+                            } else {
+                                R.drawable.ic_phone_green_vector
+                            }
+                            callDraggable.setImageDrawable(
+                                AppCompatResources.getDrawable(
+                                    this@MeshVoipCallActivity,
+                                    drawableRes
+                                )
+                            )
+                        }
+
                         else -> {
                             lock = false
+                            val drawableRes = if (isRtl) {
+                                R.drawable.ic_phone_green_vector
+                            } else {
+                                R.drawable.ic_phone_down_red_vector
+                            }
+                            callDraggable.setImageDrawable(
+                                AppCompatResources.getDrawable(
+                                    this@MeshVoipCallActivity,
+                                    drawableRes
+                                )
+                            )
                         }
                     }
                 }
@@ -878,11 +934,7 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
             )
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            (getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager).requestDismissKeyguard(this, null)
-        } else {
-            window.addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD)
-        }
+        (getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager).requestDismissKeyguard(this, null)
 
         try {
             val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -910,6 +962,38 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
                 proximityWakeLock?.release()
             }
         } catch (_: Exception) {
+        }
+    }
+
+    private fun syncAudioButtonStateFromSystem() {
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            isMicrophoneOff = audioManager.isMicrophoneMute
+        } catch (_: Exception) {
+            // Keep previous state if AudioManager is unavailable.
+        }
+        updateMicrophoneButton()
+    }
+
+    private fun updateMicrophoneButton() = binding.apply {
+        toggleButtonColor(callToggleMicrophone, enabled = isMicrophoneOff)
+        callToggleMicrophone.contentDescription = getString(
+            if (isMicrophoneOff) R.string.turn_microphone_on else R.string.turn_microphone_off
+        )
+    }
+
+    private fun getActiveButtonColor() = getProperPrimaryColor()
+
+    private fun getInactiveButtonColor() = getProperTextColor().adjustAlpha(0.10f)
+
+    private fun toggleButtonColor(view: ImageView, enabled: Boolean) {
+        if (enabled) {
+            val color = getActiveButtonColor()
+            view.background.applyColorFilter(color)
+            view.applyColorFilter(color.getContrastColor())
+        } else {
+            view.background.applyColorFilter(getInactiveButtonColor())
+            view.applyColorFilter(getProperBackgroundColor().getContrastColor())
         }
     }
 

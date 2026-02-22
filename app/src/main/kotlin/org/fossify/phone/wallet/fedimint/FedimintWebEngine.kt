@@ -1,5 +1,6 @@
 package org.fossify.phone.wallet.fedimint
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
@@ -25,6 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * The wallet UI remains native; the WebView is used as an execution engine only.
  */
+@SuppressLint("StaticFieldLeak")
 object FedimintWebEngine {
     private const val TAG = "FedimintWebEngine"
     // Versioned query forces WebView to load the latest bundled engine script after updates.
@@ -55,6 +57,7 @@ object FedimintWebEngine {
             .build()
     }
 
+    @SuppressLint("SetJavaScriptEnabled")
     private fun ensureWebView(context: Context) {
         val existing = webView
         if (existing != null) {
@@ -69,6 +72,7 @@ object FedimintWebEngine {
 
         val wv = WebView(appContext)
         wv.settings.apply {
+            // Fedimint Web SDK requires JavaScript; keep the rest of the surface tightly locked down.
             javaScriptEnabled = true
             domStorageEnabled = true
             databaseEnabled = true
@@ -83,6 +87,7 @@ object FedimintWebEngine {
             allowFileAccessFromFileURLs = false
             allowUniversalAccessFromFileURLs = false
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            safeBrowsingEnabled = true
         }
         wv.webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {

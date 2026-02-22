@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="wallet_tab">Wallet</string>
+    <string name="wallet_select_federation">Föderation auswählen</string>
+    <string name="wallet_change_federation">Föderation ändern</string>
+    <string name="wallet_federation">Föderation</string>
+    <string name="wallet_balance">Guthaben</string>
+    <string name="wallet_onchain">On-Chain</string>
+    <string name="wallet_lightning">Lightning</string>
+    <string name="wallet_recent_activity">Letzte Aktivitäten</string>
+    <string name="wallet_send">Senden</string>
+    <string name="wallet_receive">Empfangen</string>
+    <string name="wallet_sync">Synchronisieren</string>
+    <string name="wallet_mint">Prägen</string>
+    <string name="wallet_withdraw">Abheben</string>
+    <string name="wallet_unknown">Unbekannt</string>
+    <string name="wallet_balance_unknown">Guthaben nicht verfügbar</string>
+    <string name="wallet_send_success">Zahlung gesendet</string>
+    <string name="wallet_send_failed">Zahlung konnte nicht gesendet werden: %1$s</string>
+    <string name="wallet_mint_success">Prägung übermittelt</string>
+    <string name="wallet_mint_failed">Sats konnten nicht geprägt werden: %1$s</string>
+    <string name="wallet_withdraw_success">Auszahlung übermittelt</string>
+    <string name="wallet_withdraw_failed">Sats konnten nicht ausgezahlt werden: %1$s</string>
+    <string name="wallet_create_invoice">Rechnung erstellen</string>
+    <string name="wallet_invoice">Rechnung</string>
+    <string name="wallet_onchain_address">On-Chain-Adresse</string>
+    <string name="wallet_tap_to_copy">Zum Kopieren tippen</string>
+    <string name="wallet_generate_new">Neu generieren</string>
+    <string name="wallet_backup">Sichern</string>
+    <string name="wallet_restore">Wiederherstellen</string>
+    <string name="wallet_unknown_error">Unbekannter Fehler</string>
+    <string name="mesh_address">Mesh-Adresse</string>
+    <string name="mesh_address_saved">Mesh-Adresse gespeichert</string>
+    <string name="mesh_address_invalid">Ungültige Mesh-Adresse</string>
+    <string name="contact_action_pay">Bezahlen</string>
+    <string name="contact_action_request_payment">Zahlung anfordern</string>
+    <string name="contact_action_set_wallet_address">Wallet-Adresse festlegen</string>
+    <string name="contact_action_call">Anrufen</string>
+    <string name="contact_action_message">Nachricht</string>
+    <string name="contact_action_edit">Bearbeiten</string>
+    <string name="add_to_favorites">Zu Favoriten hinzufügen</string>
+    <string name="remove_from_favorites">Aus Favoriten entfernen</string>
+    <string name="delete_contact">Kontakt löschen</string>
+    <string name="contact_action_cancel">Abbrechen</string>
+    <string name="no_phone_numbers_found">Keine Telefonnummern gefunden</string>
+</resources>

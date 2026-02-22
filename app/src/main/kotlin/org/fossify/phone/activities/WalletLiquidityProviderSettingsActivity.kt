@@ -151,30 +151,10 @@ class WalletLiquidityProviderSettingsActivity : SimpleActivity() {
             config.walletLiquidityCustomToken
         )
 
-        getAlertDialogBuilder()
+        val dialog = getAlertDialogBuilder()
             .setTitle(R.string.wallet_liquidity_custom_title)
             .setView(content)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                val name = nameField.text?.toString()?.trim().orEmpty()
-                val network = networkField.text?.toString()?.trim().orEmpty()
-                val nodeId = nodeIdField.text?.toString()?.trim().orEmpty()
-                val address = addressField.text?.toString()?.trim().orEmpty()
-                val token = tokenField.text?.toString()?.trim().orEmpty()
-
-                if (nodeId.isBlank() || address.isBlank()) {
-                    toast(R.string.wallet_liquidity_custom_required)
-                    return@setPositiveButton
-                }
-
-                config.walletLiquidityCustomName = name
-                config.walletLiquidityCustomNetwork = network
-                config.walletLiquidityCustomNodeId = nodeId
-                config.walletLiquidityCustomAddress = address
-                config.walletLiquidityCustomToken = token
-                config.walletLiquidityProviderMode = MODE_MANUAL
-                config.walletLiquidityProviderId = CUSTOM_PROVIDER_ID
-                loadProviders()
-            }
+            .setPositiveButton(android.R.string.ok, null)
             .setNeutralButton(R.string.clear) { _, _ ->
                 config.walletLiquidityCustomName = ""
                 config.walletLiquidityCustomNetwork = ""
@@ -189,6 +169,29 @@ class WalletLiquidityProviderSettingsActivity : SimpleActivity() {
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
+
+        dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val name = nameField.text?.toString()?.trim().orEmpty()
+                val network = networkField.text?.toString()?.trim().orEmpty()
+                val nodeId = nodeIdField.text?.toString()?.trim().orEmpty()
+                val address = addressField.text?.toString()?.trim().orEmpty()
+                val token = tokenField.text?.toString()?.trim().orEmpty()
+
+                if (nodeId.isBlank() || address.isBlank()) {
+                    toast(R.string.wallet_liquidity_custom_required)
+                    return@setOnClickListener
+                }
+
+                config.walletLiquidityCustomName = name
+                config.walletLiquidityCustomNetwork = network
+                config.walletLiquidityCustomNodeId = nodeId
+                config.walletLiquidityCustomAddress = address
+                config.walletLiquidityCustomToken = token
+                config.walletLiquidityProviderMode = MODE_MANUAL
+                config.walletLiquidityProviderId = CUSTOM_PROVIDER_ID
+                loadProviders()
+                dialog.dismiss()
+            }
     }
 
     private fun renderState() = binding.apply {

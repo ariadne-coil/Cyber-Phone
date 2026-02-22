@@ -4,12 +4,19 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.net.Uri
+import androidx.core.net.toUri
+import java.io.ByteArrayOutputStream
 import org.fossify.messages.activities.ManageE2eKeysActivity
 
 /**
  * Receives external intents (QR scanners, browsers, shares) and forwards them to Cyber Features.
  */
 class MeshLinkActivity : Activity() {
+    private companion object {
+        // vCards/QR payloads should stay small; hard cap avoids OOM from oversized external URIs.
+        const val MAX_IMPORTED_TEXT_BYTES = 512 * 1024
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -20,20 +27,18 @@ class MeshLinkActivity : Activity() {
         // which ManageE2eKeysActivity likely uses for auto-importing.
         val forward = Intent(this, ManageE2eKeysActivity::class.java).apply {
             action = if (!extracted.isNullOrBlank()) Intent.ACTION_VIEW else src?.action
-            data = src?.data
-            type = src?.type
+            setDataAndType(src?.data, src?.type)
             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+            src?.extras?.let { putExtras(it) }
 
             if (!extracted.isNullOrBlank()) {
                 putExtra(Intent.EXTRA_TEXT, extracted)
                 // Also set the data to the extracted URI if it's a mesh address
                 if (extracted.startsWith("mesh", ignoreCase = true) ||
                     extracted.startsWith("lxm", ignoreCase = true)) {
-                    data = Uri.parse(extracted)
+                    data = extracted.toUri()
                 }
             }
-
-            src?.extras?.let { putExtras(it) }
         }
 
         startActivity(forward)
@@ -81,7 +86,21 @@ class MeshLinkActivity : Activity() {
 
     private fun readTextFromUri(uri: Uri): String? {
         return try {
-            contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() }
+            contentResolver.openInputStream(uri)?.use { input ->
+                val output = ByteArrayOutputStream()
+                val buffer = ByteArray(8 * 1024)
+                var total = 0
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read <= 0) break
+                    total += read
+                    if (total > MAX_IMPORTED_TEXT_BYTES) {
+                        return null
+                    }
+                    output.write(buffer, 0, read)
+                }
+                output.toString(Charsets.UTF_8.name())
+            }
         } catch (_: Exception) {
             null
         }

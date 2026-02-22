@@ -9,7 +9,7 @@ import org.fossify.commons.helpers.isQPlus
 private val OUTGOING_CALL_STATES = arrayOf(STATE_CONNECTING, STATE_DIALING, STATE_SELECT_PHONE_ACCOUNT)
 
 fun Call?.getStateCompat(): Int {
-    return this?.details?.state ?: Call.STATE_DISCONNECTED
+    return this?.state ?: Call.STATE_DISCONNECTED
 }
 
 fun Call?.getCallDuration(): Int {

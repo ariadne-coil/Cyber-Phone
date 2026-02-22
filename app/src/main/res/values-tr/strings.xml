@@ -65,16 +65,9 @@
     <string name="hide_dialpad_numbers">Tuş takımı numaralarını gizle</string>
     <string name="export_call_history">Arama geçmişini dışa aktar</string>
     <string name="import_call_history">Arama geçmişini içe aktar</string>
-    <string name="faq_1_title">Gelen aramaları duyuyorum ama ekran açılmıyor. Ne yapabilirim\?</string>
-    <string name="faq_1_text">Bu tür sorunların cihaza ve sisteme göre birçok nedeni olabilir. Cihaz ayarlarında uygulamanın arka plandayken açılmasına ve diğer uygulamaların üzerinde görüntülenmesine izin verildiğinden emin olmalısınız.</string>
     <string name="audio_route_bluetooth">Bluetooth</string>
     <string name="app_launcher_name">Telefon</string>
     <string name="call_is_being_connected">Aramanız bağlanıyor…</string>
-    <string name="faq_2_text">Sistem kısıtlamaları nedeniyle, acil durum çağrıları yalnızca sisteminizin varsayılan çeviricisi veya telefon uygulaması aracılığıyla yapılabilir. Acil durum çağrılarının düzgün çalışmasını sağlamak için sistem uygulamasını yüklemeli ve etkin tutmanız gerekir.</string>
-    <string name="faq_2_title">Acil durum çağrıları neden düzgün çalışmıyor?</string>
-    <string name="faq_3_title">Neden uygulamada bazı kişiler eksik?</string>
-    <string name="faq_3_text">Cyber Phone yalnızca kendileriyle ilişkili bir telefon numarası olan kişileri görüntüler. Telefon numarası olmayan kişiler uygulamada gösterilmemiştir.</string>
     <string name="call_notification_channel">Arama durumu</string>
     <string name="call_notification_channel_high_priority">Arama durumu (yüksek öncelik)</string>
-    <string name="calling_accounts">Arama hesapları</string>
 </resources>

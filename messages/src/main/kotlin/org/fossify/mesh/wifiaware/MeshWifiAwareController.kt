@@ -1,6 +1,9 @@
 package org.fossify.mesh.wifiaware
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.wifi.aware.AttachCallback
 import android.net.wifi.aware.DiscoverySessionCallback
 import android.net.wifi.aware.PeerHandle
@@ -9,11 +12,14 @@ import android.net.wifi.aware.PublishDiscoverySession
 import android.net.wifi.aware.SubscribeConfig
 import android.net.wifi.aware.SubscribeDiscoverySession
 import android.net.wifi.aware.WifiAwareManager
+import android.os.Build
 import android.util.Log
+import androidx.core.content.ContextCompat
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.ConcurrentHashMap
 
+@SuppressLint("MissingPermission")
 class MeshWifiAwareController(
     private val context: Context,
     private val onPayload: (ByteArray) -> Unit,
@@ -33,8 +39,28 @@ class MeshWifiAwareController(
     private val buffers = ConcurrentHashMap<String, ByteBuffer>()
     private val messageCounter = AtomicInteger(1)
 
+    private fun hasPermission(permission: String): Boolean {
+        return ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun canUseWifiAware(): Boolean {
+        if (!hasPermission(Manifest.permission.ACCESS_WIFI_STATE) || !hasPermission(Manifest.permission.CHANGE_WIFI_STATE)) {
+            return false
+        }
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            hasPermission(Manifest.permission.NEARBY_WIFI_DEVICES)
+        } else {
+            hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
     fun start() {
         val aware = manager ?: return
+        if (!canUseWifiAware()) {
+            MeshWifiAwareState.setActive(false)
+            MeshWifiAwareState.setPeers(0)
+            return
+        }
         aware.attach(object : AttachCallback() {
             override fun onAttached(session: android.net.wifi.aware.WifiAwareSession) {
                 MeshWifiAwareState.setActive(true)
@@ -57,6 +83,7 @@ class MeshWifiAwareController(
     }
 
     fun send(raw: ByteArray) {
+        if (!canUseWifiAware()) return
         MeshWifiAwareState.markTx()
         val framed = ByteBuffer.allocate(2 + raw.size)
         framed.putShort(raw.size.toShort())
@@ -80,6 +107,7 @@ class MeshWifiAwareController(
     }
 
     private fun startPublish(session: android.net.wifi.aware.WifiAwareSession) {
+        if (!canUseWifiAware()) return
         val config = PublishConfig.Builder()
             .setServiceName(SERVICE_NAME)
             .build()
@@ -107,6 +135,7 @@ class MeshWifiAwareController(
     }
 
     private fun startSubscribe(session: android.net.wifi.aware.WifiAwareSession) {
+        if (!canUseWifiAware()) return
         val config = SubscribeConfig.Builder()
             .setServiceName(SERVICE_NAME)
             .build()

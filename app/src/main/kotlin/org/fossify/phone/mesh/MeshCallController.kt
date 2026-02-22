@@ -1,5 +1,6 @@
 package org.fossify.phone.mesh
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
@@ -37,6 +38,7 @@ object MeshCallController : MeshCallRouter.Listener {
         appContext = null
     }
 
+    @SuppressLint("MissingPermission")
     fun placeMeshCall(
         context: Context,
         remoteDeliveryHash: ByteArray,

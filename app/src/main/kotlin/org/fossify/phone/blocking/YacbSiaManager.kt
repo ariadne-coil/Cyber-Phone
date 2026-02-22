@@ -3,6 +3,7 @@ package org.fossify.phone.blocking
 import android.content.Context
 import android.util.Log
 import androidx.annotation.Keep
+import androidx.core.content.edit
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
@@ -342,7 +343,7 @@ object YacbSiaManager {
         }
 
         override fun setInt(key: String, value: Int) {
-            prefs.edit().putInt(key, value).apply()
+            prefs.edit { putInt(key, value) }
         }
     }
 

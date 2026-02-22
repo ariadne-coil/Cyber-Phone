@@ -1,11 +1,11 @@
 package org.fossify.phone.mesh
 
+import android.annotation.SuppressLint
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
-import android.os.Build
 import android.os.Process
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
@@ -14,6 +14,7 @@ import org.concentus.OpusDecoder
 import org.concentus.OpusEncoder
 import org.fossify.mesh.call.MeshCallQuality
 
+@SuppressLint("MissingPermission")
 class MeshAudioEngine(
     private val quality: MeshCallQuality,
     private val onEncodedFrame: (ByteArray) -> Unit
@@ -112,11 +113,7 @@ class MeshAudioEngine(
             )
             .setTransferMode(AudioTrack.MODE_STREAM)
             .setBufferSizeInBytes(minOut * 2)
-            .apply {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
-                }
-            }
+            .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
             .build()
     }
 

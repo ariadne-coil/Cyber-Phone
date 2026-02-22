@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="wallet_tab">Кошелёк</string>
+    <string name="wallet_select_federation">Выбрать федерацию</string>
+    <string name="wallet_change_federation">Сменить федерацию</string>
+    <string name="wallet_federation">Федерация</string>
+    <string name="wallet_balance">Баланс</string>
+    <string name="wallet_onchain">Ончейн</string>
+    <string name="wallet_lightning">Lightning</string>
+    <string name="wallet_recent_activity">Последние операции</string>
+    <string name="wallet_send">Отправить</string>
+    <string name="wallet_receive">Получить</string>
+    <string name="wallet_sync">Синхронизировать</string>
+    <string name="wallet_mint">Пополнить</string>
+    <string name="wallet_withdraw">Вывести</string>
+    <string name="wallet_unknown">Неизвестно</string>
+    <string name="wallet_balance_unknown">Баланс недоступен</string>
+    <string name="wallet_send_success">Платёж отправлен</string>
+    <string name="wallet_send_failed">Не удалось отправить платёж: %1$s</string>
+    <string name="wallet_mint_success">Пополнение отправлено</string>
+    <string name="wallet_mint_failed">Не удалось пополнить sats: %1$s</string>
+    <string name="wallet_withdraw_success">Вывод отправлен</string>
+    <string name="wallet_withdraw_failed">Не удалось вывести sats: %1$s</string>
+    <string name="wallet_create_invoice">Создать инвойс</string>
+    <string name="wallet_invoice">Инвойс</string>
+    <string name="wallet_onchain_address">Ончейн-адрес</string>
+    <string name="wallet_tap_to_copy">Нажмите, чтобы скопировать</string>
+    <string name="wallet_generate_new">Сгенерировать новый</string>
+    <string name="wallet_backup">Резервная копия</string>
+    <string name="wallet_restore">Восстановить</string>
+    <string name="wallet_unknown_error">Неизвестная ошибка</string>
+    <string name="mesh_address">Mesh-адрес</string>
+    <string name="mesh_address_saved">Mesh-адрес сохранён</string>
+    <string name="mesh_address_invalid">Недопустимый Mesh-адрес</string>
+    <string name="contact_action_pay">Оплатить</string>
+    <string name="contact_action_request_payment">Запросить платёж</string>
+    <string name="contact_action_set_wallet_address">Указать адрес кошелька</string>
+    <string name="contact_action_call">Позвонить</string>
+    <string name="contact_action_message">Сообщение</string>
+    <string name="contact_action_edit">Изменить</string>
+    <string name="add_to_favorites">Добавить в избранное</string>
+    <string name="remove_from_favorites">Удалить из избранного</string>
+    <string name="delete_contact">Удалить контакт</string>
+    <string name="contact_action_cancel">Отмена</string>
+    <string name="no_phone_numbers_found">Номера телефонов не найдены</string>
+</resources>

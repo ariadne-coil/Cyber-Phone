@@ -1,17 +1,23 @@
 package org.fossify.mesh.wifidirect
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.net.NetworkInfo
 import android.net.wifi.p2p.WifiP2pGroup
 import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pManager
 import android.net.wifi.WpsInfo
+import android.os.Build
 import android.util.Log
+import androidx.core.content.ContextCompat
 
+@SuppressLint("MissingPermission")
 class MeshWifiDirectController(
     private val context: Context,
     private val listener: (WifiP2pGroup) -> Unit
@@ -32,8 +38,27 @@ class MeshWifiDirectController(
     @Volatile
     private var lastConnectAttemptMs = 0L
 
+    private fun hasPermission(permission: String): Boolean {
+        return ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun canUseWifiDirect(): Boolean {
+        val hasNearby = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            hasPermission(Manifest.permission.NEARBY_WIFI_DEVICES)
+        } else {
+            hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        return hasNearby &&
+            hasPermission(Manifest.permission.ACCESS_WIFI_STATE) &&
+            hasPermission(Manifest.permission.CHANGE_WIFI_STATE)
+    }
+
     fun start() {
         if (manager == null || channel == null) return
+        if (!canUseWifiDirect()) {
+            MeshWifiDirectState.clear()
+            return
+        }
         registerReceiver()
         discoverPeers()
         requestGroupInfo()
@@ -42,6 +67,7 @@ class MeshWifiDirectController(
     fun stop() {
         if (manager == null || channel == null) return
         unregisterReceiver()
+        if (!canUseWifiDirect()) return
         // Be conservative on teardown. Some OEM stacks show disruptive user dialogs when we try to
         // forcibly remove the current P2P group ("Turn off Wi‑Fi Direct?" / "Turn off Sharing?").
         // Stopping discovery and canceling connect is sufficient to quiesce the controller.
@@ -107,6 +133,7 @@ class MeshWifiDirectController(
     }
 
     private fun discoverPeers() {
+        if (!canUseWifiDirect()) return
         try {
             manager?.discoverPeers(channel, null)
         } catch (e: Exception) {
@@ -116,6 +143,7 @@ class MeshWifiDirectController(
 
     private fun requestPeersAndMaybeConnect() {
         if (manager == null || channel == null) return
+        if (!canUseWifiDirect()) return
         if (isConnected) return
         val now = System.currentTimeMillis()
         if (now - lastConnectAttemptMs < CONNECT_COOLDOWN_MS) return
@@ -138,6 +166,7 @@ class MeshWifiDirectController(
 
     private fun connectTo(device: WifiP2pDevice) {
         if (manager == null || channel == null) return
+        if (!canUseWifiDirect()) return
         val address = device.deviceAddress ?: return
         lastConnectAttemptMs = System.currentTimeMillis()
 
@@ -166,6 +195,7 @@ class MeshWifiDirectController(
     }
 
     private fun requestGroupInfo() {
+        if (!canUseWifiDirect()) return
         try {
             manager?.requestGroupInfo(channel) { group ->
                 if (group != null && group.isGroupOwner != null) {

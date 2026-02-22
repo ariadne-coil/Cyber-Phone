@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="wallet_tab">Wallet</string>
+    <string name="wallet_select_federation">Select federation</string>
+    <string name="wallet_change_federation">Change federation</string>
+    <string name="wallet_federation">Federation</string>
+    <string name="wallet_balance">Balance</string>
+    <string name="wallet_onchain">On-chain</string>
+    <string name="wallet_lightning">Lightning</string>
+    <string name="wallet_recent_activity">Recent activity</string>
+    <string name="wallet_send">Send</string>
+    <string name="wallet_receive">Receive</string>
+    <string name="wallet_sync">Sync</string>
+    <string name="wallet_mint">Mint</string>
+    <string name="wallet_withdraw">Withdraw</string>
+    <string name="wallet_unknown">Unknown</string>
+    <string name="wallet_balance_unknown">Balance unavailable</string>
+    <string name="wallet_send_success">Payment sent</string>
+    <string name="wallet_send_failed">Couldn\'t send payment: %1$s</string>
+    <string name="wallet_mint_success">Mint submitted</string>
+    <string name="wallet_mint_failed">Couldn\'t mint sats: %1$s</string>
+    <string name="wallet_withdraw_success">Withdraw submitted</string>
+    <string name="wallet_withdraw_failed">Couldn\'t withdraw sats: %1$s</string>
+    <string name="wallet_create_invoice">Create invoice</string>
+    <string name="wallet_invoice">Invoice</string>
+    <string name="wallet_onchain_address">On-chain address</string>
+    <string name="wallet_tap_to_copy">Tap to copy</string>
+    <string name="wallet_generate_new">Generate new</string>
+    <string name="wallet_backup">Backup</string>
+    <string name="wallet_restore">Restore</string>
+    <string name="wallet_unknown_error">Unknown error</string>
+    <string name="mesh_address">Mesh address</string>
+    <string name="mesh_address_saved">Mesh address saved</string>
+    <string name="mesh_address_invalid">Mesh address must be 32 hex characters</string>
+    <string name="contact_action_pay">Pay</string>
+    <string name="contact_action_request_payment">Request payment</string>
+    <string name="contact_action_set_wallet_address">Set wallet details</string>
+    <string name="contact_action_call">Call</string>
+    <string name="contact_action_message">Message</string>
+    <string name="contact_action_edit">Edit</string>
+    <string name="add_to_favorites">Add to Favorites</string>
+    <string name="remove_from_favorites">Remove from Favorites</string>
+    <string name="delete_contact">Delete Contact</string>
+    <string name="contact_action_cancel">Cancel</string>
+    <string name="no_phone_numbers_found">No phone numbers found</string>
+</resources>
