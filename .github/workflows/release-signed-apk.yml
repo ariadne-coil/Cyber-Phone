@@ -1,0 +1,109 @@
+name: Release Signed APK
+
+on:
+  release:
+    types: [published, prereleased]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to upload assets to (for manual runs)"
+        required: true
+        type: string
+
+jobs:
+  build-and-upload-signed-apk:
+    name: Build and upload signed APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    env:
+      APK_PATH: app/build/outputs/apk/release/app-release.apk
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Validate signing secrets
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for var in SIGNING_KEYSTORE_BASE64 SIGNING_KEY_ALIAS SIGNING_KEY_PASSWORD SIGNING_STORE_PASSWORD; do
+            if [ -z "${!var:-}" ]; then
+              echo "::error::Missing required secret: $var"
+              exit 1
+            fi
+          done
+
+      - name: Materialize release keystore
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYSTORE_PATH="$RUNNER_TEMP/release.keystore"
+          printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          if [ ! -s "$KEYSTORE_PATH" ]; then
+            echo "::error::Decoded keystore is empty"
+            exit 1
+          fi
+          {
+            echo "SIGNING_STORE_FILE=$KEYSTORE_PATH"
+            echo "SIGNING_KEY_ALIAS=$SIGNING_KEY_ALIAS"
+            echo "SIGNING_KEY_PASSWORD=$SIGNING_KEY_PASSWORD"
+            echo "SIGNING_STORE_PASSWORD=$SIGNING_STORE_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Build signed release APK
+        run: ./gradlew --no-daemon :app:assembleRelease
+
+      - name: Validate release APK output
+        run: |
+          set -euo pipefail
+          if [ ! -f "$APK_PATH" ]; then
+            echo "::error::Signed APK not found at $APK_PATH"
+            exit 1
+          fi
+          sha256sum "$APK_PATH" | tee "$APK_PATH.sha256"
+
+      - name: Resolve release tag
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            TAG="${{ inputs.tag }}"
+          fi
+          if [ -z "$TAG" ]; then
+            echo "::error::Unable to determine release tag"
+            exit 1
+          fi
+          echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
+
+      - name: Upload signed APK to GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" "$APK_PATH" "$APK_PATH.sha256" --clobber
+
+      - name: Upload workflow artifacts (backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-apk-${{ env.RELEASE_TAG }}
+          path: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/apk/release/app-release.apk.sha256
+          if-no-files-found: error

@@ -100,7 +100,7 @@ class RecentsFragment(
     @Suppress("UNCHECKED_CAST")
     private fun updateSearchResult() {
         ensureBackgroundThread {
-            val fixedText = searchQuery!!.trim().replace("\\s+".toRegex(), " ")
+            val fixedText = searchQuery?.trim()?.replace("\\s+".toRegex(), " ") ?: return@ensureBackgroundThread
             val recentCalls = allRecentCalls
                 .filterIsInstance<RecentCall>()
                 .filter {
@@ -114,6 +114,8 @@ class RecentsFragment(
 
             prepareCallLog(recentCalls) {
                 activity?.runOnUiThread {
+                    val currentQuery = searchQuery?.trim()?.replace("\\s+".toRegex(), " ") ?: return@runOnUiThread
+                    if (currentQuery != fixedText) return@runOnUiThread
                     showOrHidePlaceholder(recentCalls.isEmpty())
                     recentsAdapter?.updateItems(it, fixedText)
                 }

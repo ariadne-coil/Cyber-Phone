@@ -1,0 +1,8 @@
+Changed:
+
+• Mesh transport retry behavior for better delayed-delivery reliability
+• Wallet send/receive and contact payment flow polish
+
+Fixed:
+
+• Bitcoin-over-mesh interoperability edge cases

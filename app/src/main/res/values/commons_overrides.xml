@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Force-disable Commons ecosystem-specific flows in the app build itself. -->
+    <bool name="hide_google_relations">true</bool>
+    <bool name="pretend_thank_you_installed">true</bool>
+    <bool name="show_donate_in_about">false</bool>
+
+    <!-- Neutralize upstream ecosystem branding/URLs where Commons text can still surface. -->
+    <string name="all_fossify_apps">All compatible apps</string>
+    <string name="apply_to_all_apps">Apply theme to all apps</string>
+    <string name="more_fossify_apps">More apps</string>
+    <string name="donate_to_fossify">Support Cyber Phone</string>
+    <string name="my_website">https://github.com/ariadne-coil/Cyber-Phone</string>
+    <string name="donate_url">https://github.com/ariadne-coil/Cyber-Phone</string>
+    <string name="thank_you_url">https://github.com/ariadne-coil/Cyber-Phone</string>
+
+    <!-- Keep sideload warning text neutral if a defensive dialog is ever shown. -->
+    <string name="sideloaded_app">App integrity check failed for this build.</string>
+</resources>

@@ -10,6 +10,7 @@ import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.messages.extensions.conversationsDB
 import org.fossify.messages.extensions.getNotificationBitmap
 import org.fossify.messages.extensions.messagesDB
+import org.fossify.messages.extensions.shouldUnarchive
 import org.fossify.messages.extensions.showReceivedMessageNotification
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
@@ -177,6 +178,70 @@ object LxmfStore {
         }
     }
 
+    fun backfillMissingConversations(context: Context) {
+        val latestByThread = try {
+            context.messagesDB.getLatestMeshMessages()
+                .sortedByDescending { it.date }
+                .distinctBy { it.threadId }
+        } catch (_: Exception) {
+            emptyList()
+        }
+        if (latestByThread.isEmpty()) return
+
+        latestByThread.forEach { message ->
+            val threadId = message.threadId
+            if (!LxmfAddress.isMeshThreadId(threadId)) {
+                return@forEach
+            }
+
+            val meshAddress = resolveMeshAddressFromMessage(message) ?: return@forEach
+            val existing = context.conversationsDB.getConversationWithThreadId(threadId)
+            if (existing != null) {
+                val shouldUnarchiveConversation = context.shouldUnarchive()
+                val normalizedAddress = LxmfAddress.normalize(meshAddress)
+                val updated = existing.copy(
+                    snippet = if (message.date >= existing.date) message.body else existing.snippet,
+                    date = maxOf(existing.date, message.date),
+                    read = existing.read && message.read,
+                    phoneNumber = if (LxmfAddress.isMeshLike(existing.phoneNumber)) {
+                        existing.phoneNumber
+                    } else {
+                        normalizedAddress
+                    },
+                    isArchived = if (shouldUnarchiveConversation) false else existing.isArchived,
+                    unreadCount = when {
+                        message.read -> existing.unreadCount
+                        existing.unreadCount > 0 -> existing.unreadCount
+                        else -> 1
+                    }
+                )
+                if (updated != existing) {
+                    context.conversationsDB.insertOrUpdate(updated)
+                }
+                return@forEach
+            }
+
+            val participant = MeshContactHelper.getSimpleContactForMeshAddress(context, meshAddress)
+                ?: buildMeshParticipant(meshAddress)
+
+            val conversation = Conversation(
+                threadId = threadId,
+                snippet = message.body,
+                date = message.date,
+                read = message.read,
+                title = participant.name,
+                photoUri = participant.photoUri,
+                isGroupConversation = false,
+                phoneNumber = meshAddress,
+                isScheduled = false,
+                usesCustomTitle = false,
+                isArchived = false,
+                unreadCount = if (message.read) 0 else 1,
+            )
+            context.conversationsDB.insertOrUpdate(conversation)
+        }
+    }
+
     private fun upsertConversation(
         context: Context,
         threadId: Long,
@@ -187,6 +252,7 @@ object LxmfStore {
     ) {
         val existing = context.conversationsDB.getConversationWithThreadId(threadId)
         val unreadCount = if (!read) (existing?.unreadCount ?: 0) + 1 else (existing?.unreadCount ?: 0)
+        val shouldUnarchiveConversation = context.shouldUnarchive()
         val conversation = Conversation(
             threadId = threadId,
             snippet = snippet,
@@ -198,10 +264,33 @@ object LxmfStore {
             phoneNumber = existing?.phoneNumber ?: participant.phoneNumbers.first().value,
             isScheduled = false,
             usesCustomTitle = existing?.usesCustomTitle ?: false,
-            isArchived = existing?.isArchived ?: false,
+            isArchived = if (shouldUnarchiveConversation) false else (existing?.isArchived ?: false),
             unreadCount = if (read) 0 else unreadCount
         )
         context.conversationsDB.insertOrUpdate(conversation)
+    }
+
+    private fun resolveMeshAddressFromMessage(message: Message): String? {
+        val sender = message.senderPhoneNumber
+            .takeIf { LxmfAddress.isMeshLike(it) }
+            ?.let { LxmfAddress.normalize(it) }
+            ?.takeIf { LxmfAddress.isMeshAddress(it) }
+        if (sender != null) {
+            return sender
+        }
+
+        val participantAddress = message.participants
+            .asSequence()
+            .flatMap { it.phoneNumbers.asSequence() }
+            .map { it.value }
+            .firstOrNull { LxmfAddress.isMeshLike(it) }
+            ?.let { LxmfAddress.normalize(it) }
+            ?.takeIf { LxmfAddress.isMeshAddress(it) }
+        if (participantAddress != null) {
+            return participantAddress
+        }
+
+        return null
     }
 
     private fun buildMeshParticipant(address: String): SimpleContact {

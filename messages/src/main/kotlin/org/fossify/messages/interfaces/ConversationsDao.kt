@@ -29,6 +29,7 @@ interface ConversationsDao {
             "FROM conversations " +
             "LEFT JOIN message_category_cache ON message_category_cache.thread_id = conversations.thread_id " +
             "WHERE archived = 0 AND (" +
+            "conversations.thread_id < 0 OR " +
             "message_category_cache.thread_id IS NULL OR " +
             "message_category_cache.category = 0 OR " +
             "(message_category_cache.category = 2 AND message_category_cache.is_blocked = 0)" +

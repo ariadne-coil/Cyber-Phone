@@ -32,7 +32,6 @@ import org.fossify.commons.extensions.beGone
 import org.fossify.commons.extensions.beGoneIf
 import org.fossify.commons.extensions.beVisible
 import org.fossify.commons.extensions.beVisibleIf
-import org.fossify.commons.extensions.checkAppSideloading
 import org.fossify.commons.extensions.checkWhatsNew
 import org.fossify.commons.extensions.convertToBitmap
 import org.fossify.commons.extensions.fadeIn
@@ -85,6 +84,7 @@ import org.fossify.messages.models.Events
 import org.fossify.messages.models.Message
 import org.fossify.messages.models.SearchResult
 import org.fossify.mesh.lxmf.LxmfAddress
+import org.fossify.mesh.lxmf.LxmfStore
 import org.fossify.messages.extensions.messageCategoryCacheDB
 import org.fossify.messages.models.MessageCategoryCache
 import org.greenrobot.eventbus.EventBus
@@ -155,7 +155,9 @@ class MessagesFragment(
         setupCategoryFilters()
         loadPersistentClassificationCache()
         refreshMenuItems()
-        activity?.setupEdgeToEdge(padBottomImeAndSystem = listOf(binding.conversationsList))
+        // Do not reconfigure activity-wide edge-to-edge from inside this fragment.
+        // MainActivity owns bottom-tab/system-bar insets; overriding it here can cause
+        // intermittent bottom-nav overlap with system navigation buttons.
         applyMenuInsets()
         activity?.let { E2eManager.ensureKeyPair(it) }
     }
@@ -187,10 +189,6 @@ class MessagesFragment(
         val host = activity ?: return
         isTabActive = true
         ensureClassificationExecutor()
-        if (host.checkAppSideloading()) {
-            return
-        }
-
         applyMenuInsets()
         if (!hasInitializedLoad) {
             hasInitializedLoad = true
@@ -439,6 +437,9 @@ class MessagesFragment(
     private fun getCachedConversations() {
         val host = activity ?: return
         ensureBackgroundThread {
+            runCatching {
+                LxmfStore.backfillMissingConversations(host)
+            }
             val conversations = try {
                 host.conversationsDB.getNonArchived().toMutableList() as ArrayList<Conversation>
             } catch (_: Exception) {
@@ -775,6 +776,9 @@ class MessagesFragment(
             showOrHidePlaceholder(false)
         }
         ensureBackgroundThread {
+            runCatching {
+                LxmfStore.backfillMissingConversations(host)
+            }
             val conversations = try {
                 when (host.messagesConfig.messageCategoryFilter) {
                     MESSAGE_CATEGORY_OTP ->

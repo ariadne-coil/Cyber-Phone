@@ -357,12 +357,16 @@ object LxmfRouter {
         }
         val local = deliveryDestination ?: return false
         val remoteIdentity = RnsNode.recallIdentity(destinationHash) ?: run {
-            RnsNode.requestPath(destinationHash)
+            RnsNode.requestPath(destinationHash, minIntervalMs = 1_000L)
+            RnsNode.announceAll()
             if (propagationEnabled) {
                 triggerBurstSync(force = true)
             }
             return false
         }
+        // Keep route state fresh during active conversations; stale path entries can otherwise
+        // introduce long one-way delays until the next passive announce cycle.
+        RnsNode.requestPath(destinationHash, minIntervalMs = 2_000L)
         val stampCost = outboundStampCosts[RnsHex.encode(destinationHash)]
         val remoteDestination = RnsDestination.createWithHash(
             identity = remoteIdentity,
@@ -395,6 +399,10 @@ object LxmfRouter {
         val payload = packed.copyOfRange(DESTINATION_HASH_LEN, packed.size)
         val packet = RnsPacket(destination = remoteDestination, data = payload)
         return try {
+            // Dual-path send for small payloads:
+            // 1) direct packet for lowest latency
+            // 2) link path in parallel for reliability on networks that suppress broadcast/multicast
+            RnsNode.sendPacketViaLink(local, remoteDestination, payload, RnsPacket.NONE)
             if (onDelivered != null) {
                 RnsNode.sendWithReceipt(packet, destinationHash, onDelivered)
             } else {

@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.READ_SYNC_SETTINGS" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
@@ -125,13 +126,6 @@
             android:exported="false"
             android:label="@string/profile_mesh_scan_prompt"
             android:parentActivityName=".activities.ManageE2eKeysActivity" />
-
-        <activity
-            android:name="org.fossify.commons.activities.AboutActivity"
-            android:configChanges="orientation"
-            android:exported="false"
-            android:label="@string/about"
-            android:parentActivityName=".activities.MainActivity" />
 
         <activity
             android:name="org.fossify.commons.activities.CustomizationActivity"

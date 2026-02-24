@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.5 (2026-02-24)
+- Wallet reliability: expanded Bitcoin Mainnet recovery with stronger Esplora endpoint failover/health scoring, fee-rate preflight hardening, and improved node restart/sync behavior to reduce "balance unavailable" and startup outages.
+- Wallet/Fedimint: upgraded and hardened Fedimint compatibility/runtime probing, improved federation switching/join flows, and stabilized invoice/payment execution paths across mixed federation capabilities.
+- Wallet UX: improved send/pay/invoice dialogs and overall wallet visual consistency with Fossify theme/accent/font settings, including refined amount-entry and action flows for exchange/mint/withdraw operations.
+- Wallet conversions: rebuilt BTC mainnet on-chain/Lightning conversion UX with explicit amount handling and safer bidirectional conversion behavior.
+- Wallet + messaging: enhanced payment request/approval flow in threads with stronger request/invoice validation (amount, destination, uniqueness) and cleaner inline message rendering.
+- Wallet + threads: improved "send in messages" selection to better support mesh conversations and existing-thread dispatch from wallet actions.
+- Contacts/identity: expanded wallet contact data support (including Lightning fields), improved QR/vCard payload handling, and reduced duplicate custom-field import issues.
+- Mesh reliability: reduced asymmetric delivery delay with event-driven burst propagation windows and tuned sync behavior, improving message/call responsiveness without continuous high overhead.
+- Mesh calls: fixed multiple mesh call stability regressions (answer-time crash, one-way lifecycle issues, and robustness around connect/disconnect handling).
+- Mesh thread visibility: fixed missing mesh conversation discovery by adding DB backfill/self-heal for mesh conversation rows and category/visibility safeguards in conversation listing/pickers.
+- Branding and app identity: normalized branding to **Cyber Phone** across repo/app assets and advanced package identity migration to `org.cyberphone` with compatibility fixes.
+- Commons decoupling: removed or overrode ecosystem-specific commons behavior that is not appropriate for this fork, including fake-version popup paths.
+- App stability: fixed settings startup crash caused by missing bound settings sections after package/branding refactors.
+- Security hardening: strengthened wallet/secret backup and restore integrity paths, plus additional defensive validation from security/code-review sweeps.
+- Release automation: added GitHub Actions workflow support for building and attaching signed APK assets to GitHub releases via repository secrets.
+- Known issue: Fedimint withdrawals can still be unreliable on some federation/network states and may require retries.
+
 ## v0.4.4 (2026-02-22)
 - Mesh reliability: added event-driven burst propagation sync (startup/announce/send/manual-trigger windows) with strict caps and exponential backoff to reduce delivery latency without sustained battery drain.
 - Mesh transport/runtime: improved service/interface startup behavior and transport coordination across UDP multicast, BLE, Wi-Fi Direct, and Wi-Fi Aware paths.

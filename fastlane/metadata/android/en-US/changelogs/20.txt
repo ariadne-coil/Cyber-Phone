@@ -1,0 +1,8 @@
+Added:
+
+• Cyber Features hub for mesh controls, key management, and discovery
+• Contact-level mesh address support and QR import/share
+
+Changed:
+
+• App naming and in-app branding updated to Cyber Phone

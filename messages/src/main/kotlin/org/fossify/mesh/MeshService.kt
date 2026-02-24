@@ -69,6 +69,7 @@ class MeshService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
+                statusHandler.removeCallbacks(statusUpdater)
                 RnsNode.stop()
                 stopSelf()
                 return START_NOT_STICKY
@@ -79,6 +80,7 @@ class MeshService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        statusHandler.removeCallbacks(statusUpdater)
         statusHandler.postDelayed(statusUpdater, STATUS_UPDATE_INTERVAL_MS)
 
         return try {
@@ -97,6 +99,7 @@ class MeshService : Service() {
             START_STICKY
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start mesh service", e)
+            statusHandler.removeCallbacks(statusUpdater)
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             START_NOT_STICKY

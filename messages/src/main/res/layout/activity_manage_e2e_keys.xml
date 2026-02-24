@@ -133,7 +133,7 @@
 
             <RelativeLayout
                 android:id="@+id/profile_show_qr_holder"
-                style="@style/SettingsHolderTextViewOneLinerStyle"
+                style="@style/SettingsHolderTextViewStyle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
 
@@ -143,6 +143,14 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/profile_show_qr" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/profile_show_qr_value"
+                    style="@style/SettingsTextValueStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@+id/profile_show_qr_label"
+                    android:text="@string/profile_show_qr_subtitle" />
 
             </RelativeLayout>
 

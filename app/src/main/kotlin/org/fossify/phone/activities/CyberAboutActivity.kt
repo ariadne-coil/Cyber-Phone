@@ -18,6 +18,7 @@ class CyberAboutActivity : SimpleActivity() {
 
         setupEdgeToEdge(padBottomSystem = listOf(binding.aboutScrollview))
         binding.aboutAuthorLink.movementMethod = LinkMovementMethod.getInstance()
+        binding.aboutRepoLink.movementMethod = LinkMovementMethod.getInstance()
         binding.aboutVersion.text = getString(R.string.about_version_format, BuildConfig.VERSION_NAME)
         updateTextColors(binding.aboutHolder)
     }

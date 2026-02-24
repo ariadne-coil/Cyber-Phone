@@ -39,6 +39,16 @@ interface MessagesDao {
     @Query("SELECT messages.* FROM messages LEFT OUTER JOIN recycle_bin_messages ON messages.id = recycle_bin_messages.id WHERE recycle_bin_messages.id IS NULL AND thread_id = :threadId AND is_scheduled = 1")
     fun getScheduledThreadMessages(threadId: Long): List<Message>
 
+    @Query(
+        "SELECT m.* FROM messages m " +
+            "INNER JOIN (" +
+            "SELECT thread_id, MAX(date) AS max_date FROM messages WHERE thread_id < 0 GROUP BY thread_id" +
+            ") latest ON latest.thread_id = m.thread_id AND latest.max_date = m.date " +
+            "WHERE m.thread_id < 0 " +
+            "ORDER BY m.date DESC"
+    )
+    fun getLatestMeshMessages(): List<Message>
+
     @Query("SELECT * FROM messages WHERE thread_id = :threadId AND id = :messageId AND is_scheduled = 1")
     fun getScheduledMessageWithId(threadId: Long, messageId: Long): Message
 

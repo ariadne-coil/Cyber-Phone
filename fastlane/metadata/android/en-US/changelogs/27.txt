@@ -1,0 +1,8 @@
+Changed:
+
+• Mainnet/federation payment flow and liquidity bootstrap tuning
+• Exchange and conversion UX updates in wallet UI
+
+Fixed:
+
+• Several payment pipeline regressions and stale-state handling issues

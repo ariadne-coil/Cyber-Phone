@@ -159,8 +159,15 @@ object MeshCallRouter {
 
         var identity = RnsNode.recallIdentity(remoteDeliveryHash)
         if (identity == null) {
-            RnsNode.requestPath(remoteDeliveryHash)
+            var lastPathRequestAt = 0L
             while (SystemClock.elapsedRealtime() - start < timeoutMs) {
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastPathRequestAt >= 750L) {
+                    RnsNode.requestPath(remoteDeliveryHash, minIntervalMs = 1_000L)
+                    // Also announce ourselves while probing so the peer can resolve our return path quickly.
+                    RnsNode.announceAll()
+                    lastPathRequestAt = now
+                }
                 identity = RnsNode.recallIdentity(remoteDeliveryHash)
                 if (identity != null) break
                 try {
@@ -179,10 +186,15 @@ object MeshCallRouter {
         val owner = callDestination ?: return ProbeResult(success = false)
         val local = localIdentity ?: return ProbeResult(success = false)
 
-        RnsNode.requestPath(remoteCallDestination.hash)
+        var lastCallPathRequestAt = 0L
         val requestDeadline = SystemClock.elapsedRealtime() + timeoutMs
         var receipt: org.fossify.mesh.rns.RnsRequestReceipt? = null
         while (SystemClock.elapsedRealtime() < requestDeadline && receipt == null) {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastCallPathRequestAt >= 750L) {
+                RnsNode.requestPath(remoteCallDestination.hash, minIntervalMs = 1_000L)
+                lastCallPathRequestAt = now
+            }
             RnsNode.identifyLink(owner, remoteCallDestination, local)
             receipt = RnsNode.requestOverLink(
                 owner = owner,

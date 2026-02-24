@@ -1,0 +1,8 @@
+Changed:
+
+• Wallet reliability improvements for federation switching and sync
+• Expanded endpoint failover and connectivity diagnostics
+
+Fixed:
+
+• Multiple balance unavailable and startup regression paths

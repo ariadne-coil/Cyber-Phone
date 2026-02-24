@@ -179,7 +179,8 @@
     <string name="profile_stopped">Stopped</string>
     <string name="profile_mesh_announce">Announce mesh presence</string>
     <string name="profile_mesh_announced">Mesh announce sent.</string>
-    <string name="profile_show_qr">Show QR code</string>
+    <string name="profile_show_qr">Show QR code vCard</string>
+    <string name="profile_show_qr_subtitle">Mesh address, Bitcoin address, E2E Public key</string>
     <string name="profile_scan_qr">Scan QR code</string>
     <string name="profile_rotate_mesh">Cycle mesh address</string>
     <string name="profile_mesh_rotated">Mesh address updated.</string>

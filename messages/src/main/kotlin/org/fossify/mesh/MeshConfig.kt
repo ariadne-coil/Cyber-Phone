@@ -2,6 +2,7 @@ package org.fossify.mesh
 
 import android.content.Context
 import org.fossify.commons.helpers.BaseConfig
+import org.fossify.mesh.call.MeshCallQuality
 
 class MeshConfig(context: Context) : BaseConfig(context) {
     companion object {
@@ -13,7 +14,7 @@ class MeshConfig(context: Context) : BaseConfig(context) {
         set(value) = prefs.edit().putInt(MESH_MODE, value).apply()
 
     var meshRoutingEnabled: Boolean
-        get() = prefs.getBoolean(MESH_ROUTING_ENABLED, false)
+        get() = prefs.getBoolean(MESH_ROUTING_ENABLED, getMeshMode() != MeshMode.STANDARD_ONLY)
         set(value) = prefs.edit().putBoolean(MESH_ROUTING_ENABLED, value).apply()
 
     fun getMeshMode(): MeshMode = MeshMode.fromId(meshMode)
@@ -35,7 +36,7 @@ class MeshConfig(context: Context) : BaseConfig(context) {
         set(value) = prefs.edit().putLong(MESH_RATCHETS_UPDATED, value).apply()
 
     var meshCallQuality: Int
-        get() = prefs.getInt(MESH_CALL_QUALITY, 0)
+        get() = prefs.getInt(MESH_CALL_QUALITY, MeshCallQuality.HIGH.id)
         set(value) = prefs.edit().putInt(MESH_CALL_QUALITY, value).apply()
 
     var meshOutboundStampCosts: String?
@@ -43,9 +44,7 @@ class MeshConfig(context: Context) : BaseConfig(context) {
         set(value) = prefs.edit().putString(MESH_OUTBOUND_STAMP_COSTS, value).apply()
 
     var meshWifiDirectEnabled: Boolean
-        // Default to OFF. Some OEM builds show disruptive system dialogs when apps engage
-        // Wi‑Fi Direct in the background. Users can explicitly enable it from Cyber Features.
-        get() = prefs.getBoolean(MESH_WIFI_DIRECT_ENABLED, false)
+        get() = prefs.getBoolean(MESH_WIFI_DIRECT_ENABLED, getMeshMode() != MeshMode.STANDARD_ONLY)
         set(value) = prefs.edit().putBoolean(MESH_WIFI_DIRECT_ENABLED, value).apply()
 
     var meshBleEnabled: Boolean

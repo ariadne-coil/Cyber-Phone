@@ -15,6 +15,14 @@ Customize your mobile experience with the Cyber Phone App. Adjust your app setti
 🔋 EFFICIENT RESOURCE MANAGEMENT:  
 The Cyber Phone App is designed for optimal resource usage, contributing to extended battery life. It's light on your phone's resources, ensuring your device runs efficiently with minimized battery drain.
 
+🛡️ NETWORK & PRIVACY DEFAULTS:
+Cyber Phone ships without analytics and without Google Play Services.
+Network-backed features are optional and disabled until you opt in:
+- Community spam reputation sync
+- AI spam model downloads
+- Mesh networking transports
+- Wallet federation/rate refresh
+
 Download the Cyber Phone App now and step into a mobile world where privacy seamlessly blends with functionality. Your journey towards a safer, personalized mobile experience starts here.
 
 Explore more Cyber apps: https://github.com/ariadne-coil/Cyber-Phone

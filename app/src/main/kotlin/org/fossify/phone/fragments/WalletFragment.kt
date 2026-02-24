@@ -59,6 +59,7 @@ import org.fossify.messages.helpers.WalletPaymentRequestStateManager
 import org.fossify.messages.helpers.WalletTokenParser
 import org.fossify.messages.models.Conversation
 import org.fossify.mesh.lxmf.LxmfAddress
+import org.fossify.mesh.lxmf.LxmfStore
 import org.lightningdevkit.ldknode.Bolt11Invoice
 import org.lightningdevkit.ldknode.PaymentStatus
 import java.text.DateFormat
@@ -623,12 +624,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
         if (shouldRefreshInvoice) {
             val memo = context.getString(R.string.app_launcher_name)
             val expirySeconds = 24 * 60 * 60 // "My receive" defaults should be usable for a while.
-            val created = LdkWalletManager.createBolt11Invoice(
-                amountSats = null,
-                memo = memo,
-                expirySeconds = expirySeconds,
-                preferJitChannel = true,
-            )
+            val created = createDefaultReceiveInvoiceWithFallback(memo, expirySeconds)
             if (!created.isNullOrBlank()) {
                 cfg.setWalletLastInvoiceForFederation(fedId, created)
                 cfg.setWalletLastInvoiceCreatedMsForFederation(fedId, now)
@@ -670,12 +666,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                 val memo = context.getString(R.string.app_launcher_name)
                 val expirySeconds = 24 * 60 * 60
 
-                val newInvoice = LdkWalletManager.createBolt11Invoice(
-                    amountSats = null,
-                    memo = memo,
-                    expirySeconds = expirySeconds,
-                    preferJitChannel = true,
-                )
+                val newInvoice = createDefaultReceiveInvoiceWithFallback(memo, expirySeconds)
                 if (!newInvoice.isNullOrBlank()) {
                     context.config.setWalletLastInvoiceForFederation(fed.id, newInvoice)
                     context.config.setWalletLastInvoiceCreatedMsForFederation(fed.id, System.currentTimeMillis())
@@ -718,6 +709,30 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
         if (text.isBlank()) return false
         return text.contains("incoming lightning liquidity is unavailable") ||
             text.contains("incoming lightning liquidity is too low")
+    }
+
+    private fun createDefaultReceiveInvoiceWithFallback(memo: String, expirySeconds: Int): String? {
+        val firstTry = LdkWalletManager.createBolt11Invoice(
+            amountSats = null,
+            memo = memo,
+            expirySeconds = expirySeconds,
+            preferJitChannel = true,
+        )
+        if (!firstTry.isNullOrBlank()) return firstTry
+        return LdkWalletManager.createBolt11Invoice(
+            amountSats = null,
+            memo = memo,
+            expirySeconds = expirySeconds,
+            preferJitChannel = false,
+        )
+    }
+
+    private fun clearReceiveCacheForFederation(federationId: String) {
+        val cfg = context.config
+        cfg.setWalletLastInvoiceForFederation(federationId, "")
+        cfg.setWalletLastInvoiceCreatedMsForFederation(federationId, 0L)
+        cfg.setWalletLastOnchainAddressForFederation(federationId, "")
+        cfg.setWalletLastOnchainAddressCreatedMsForFederation(federationId, 0L)
     }
 
     private fun getBip21ForSelected(selected: FederationEntry?): String {
@@ -2582,11 +2597,13 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                         extractWalletBackupZip(zip, backupFederation.id)
                     }
                     host.config.walletSelectedFederationId = backupFederation.id
+                    clearReceiveCacheForFederation(backupFederation.id)
                     ok = true
 
                     val started = LdkWalletManager.ensureStartedBlocking(host, backupFederation)
                     if (started) {
                         LdkWalletManager.syncWalletsBlocking()
+                        ensureDefaultReceiveDataBlocking(backupFederation)
                     } else {
                         message = LdkWalletManager.getLastErrorMessage()
                             .orEmpty()
@@ -3097,6 +3114,9 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
         val host = activity ?: return
         binding.walletProgress.beVisible()
         ensureBackgroundThread {
+            runCatching {
+                LxmfStore.backfillMissingConversations(context)
+            }
             val conversations = runCatching {
                 context.conversationsDB.getNonArchived()
             }.getOrDefault(emptyList())

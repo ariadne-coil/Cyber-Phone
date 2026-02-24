@@ -96,8 +96,12 @@ object MeshCallController : MeshCallRouter.Listener {
     fun answerCall(sessionId: ByteArray) {
         val session = sessions[RnsHex.encode(sessionId)] ?: return
         MeshCallRouter.sendAccept(sessionId)
-        startAudio(session)
-        session.connection?.setActive()
+        if (startAudio(session)) {
+            session.connection?.setActive()
+        } else {
+            MeshCallRouter.sendEnd(sessionId)
+            endSession(sessionId, DisconnectCause(DisconnectCause.ERROR))
+        }
     }
 
     fun rejectCall(sessionId: ByteArray) {
@@ -118,14 +122,23 @@ object MeshCallController : MeshCallRouter.Listener {
         state.connection?.destroy()
     }
 
-    private fun startAudio(state: MeshCallSessionState) {
-        if (state.audioEngine != null) return
+    private fun startAudio(state: MeshCallSessionState): Boolean {
+        if (state.audioEngine != null) return true
         val engine = MeshAudioEngine(state.session.quality) { frame ->
             val seq = state.connection?.nextSequence() ?: 0
             MeshCallRouter.sendAudioFrame(state.session.sessionId, seq, frame)
         }
         state.audioEngine = engine
-        engine.start()
+        val started = try {
+            engine.start()
+        } catch (_: Exception) {
+            false
+        }
+        if (!started) {
+            state.audioEngine = null
+            return false
+        }
+        return true
     }
 
     override fun onIncomingInvite(session: MeshCallRouter.MeshCallSession) {
@@ -148,8 +161,12 @@ object MeshCallController : MeshCallRouter.Listener {
 
     override fun onCallAccepted(sessionId: ByteArray) {
         val state = sessions[RnsHex.encode(sessionId)] ?: return
-        startAudio(state)
-        state.connection?.setActive()
+        if (startAudio(state)) {
+            state.connection?.setActive()
+        } else {
+            MeshCallRouter.sendEnd(sessionId)
+            endSession(sessionId, DisconnectCause(DisconnectCause.ERROR))
+        }
     }
 
     override fun onCallDeclined(sessionId: ByteArray) {

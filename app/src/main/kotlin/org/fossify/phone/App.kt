@@ -15,6 +15,7 @@ import org.fossify.commons.FossifyApp
 import org.fossify.commons.extensions.baseConfig
 import org.fossify.commons.extensions.hasPermission
 import org.fossify.commons.helpers.PERMISSION_READ_CONTACTS
+import org.fossify.commons.helpers.SIDELOADING_FALSE
 import org.fossify.mesh.MeshManager
 import org.fossify.messages.extensions.config
 import org.fossify.messages.helpers.MessagingCache
@@ -31,6 +32,8 @@ class App : FossifyApp() {
         super.onCreate()
         // Keep premium-gated customization features unlocked in this fork.
         baseConfig.hadThankYouInstalled = true
+        // This fork uses a custom applicationId and should not trigger upstream sideload warnings.
+        baseConfig.appSideloadingStatus = SIDELOADING_FALSE
         configureWalletNativeLoading()
         if (config.yacbCommunityEnabled) {
             runCatching { YacbSiaManager.init(this) }.onFailure {

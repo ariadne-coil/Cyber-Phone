@@ -34,8 +34,14 @@ object WalletPaymentRequestStateManager {
     private const val STATUS_PAID = "paid"
     private const val STATUS_DENIED = "denied"
     private const val MAX_HANDLED_RESPONSE_MESSAGES = 1024
+    private const val REQUEST_RETENTION_MS = 180L * 24L * 60L * 60L * 1000L
+    private const val REQUEST_PRUNE_INTERVAL_MS = 10L * 60L * 1000L
+    private const val REQUEST_MAX_ENTRIES = 20_000
+    private const val REQUEST_TRIM_TO_ENTRIES = 12_000
 
     private val lock = Any()
+    @Volatile
+    private var lastRequestsPruneAt = 0L
 
     fun registerOutgoingRequest(
         context: Context,
@@ -60,6 +66,7 @@ object WalletPaymentRequestStateManager {
                 put("invoiceFp", "")
             }
             requests.put(requestId, obj)
+            maybePruneRequestsLocked(requests, now)
             prefs.edit().putString(KEY_REQUESTS_JSON, requests.toString()).apply()
         }
     }
@@ -163,6 +170,7 @@ object WalletPaymentRequestStateManager {
             obj.put("invoiceFp", fingerprint(invoice))
             obj.put("updatedAtMs", System.currentTimeMillis())
             requests.put(requestId, obj)
+            maybePruneRequestsLocked(requests)
             prefs.edit().putString(KEY_REQUESTS_JSON, requests.toString()).apply()
             return ValidationResult(true)
         }
@@ -177,7 +185,59 @@ object WalletPaymentRequestStateManager {
             obj.put("status", status)
             obj.put("updatedAtMs", System.currentTimeMillis())
             requests.put(requestId, obj)
+            maybePruneRequestsLocked(requests)
             prefs.edit().putString(KEY_REQUESTS_JSON, requests.toString()).apply()
+        }
+    }
+
+    private fun maybePruneRequestsLocked(requests: JSONObject, now: Long = System.currentTimeMillis()) {
+        val overLimit = requests.length() > REQUEST_MAX_ENTRIES
+        val due = now - lastRequestsPruneAt >= REQUEST_PRUNE_INTERVAL_MS
+        if (!overLimit && !due) return
+        lastRequestsPruneAt = now
+
+        val minKeepTime = now - REQUEST_RETENTION_MS
+        val keys = ArrayList<String>()
+        val iterator = requests.keys()
+        while (iterator.hasNext()) {
+            keys.add(iterator.next())
+        }
+
+        // First pass: remove malformed/expired entries.
+        keys.forEach { key ->
+            val obj = requests.optJSONObject(key)
+            if (obj == null) {
+                requests.remove(key)
+                return@forEach
+            }
+            val createdAt = obj.optLong("createdAtMs", 0L)
+            val updatedAt = obj.optLong("updatedAtMs", createdAt)
+            if (updatedAt in 1 until minKeepTime) {
+                requests.remove(key)
+            }
+        }
+
+        if (requests.length() <= REQUEST_MAX_ENTRIES) return
+
+        // Hard cap: keep only the most recently touched entries.
+        val scored = ArrayList<Pair<String, Long>>()
+        val remainingIterator = requests.keys()
+        while (remainingIterator.hasNext()) {
+            val key = remainingIterator.next()
+            val obj = requests.optJSONObject(key) ?: continue
+            val createdAt = obj.optLong("createdAtMs", 0L)
+            val updatedAt = obj.optLong("updatedAtMs", createdAt)
+            scored.add(key to updatedAt)
+        }
+        val keep = scored
+            .sortedByDescending { it.second }
+            .take(REQUEST_TRIM_TO_ENTRIES)
+            .mapTo(LinkedHashSet()) { it.first }
+
+        scored.forEach { (key, _) ->
+            if (!keep.contains(key)) {
+                requests.remove(key)
+            }
         }
     }
 

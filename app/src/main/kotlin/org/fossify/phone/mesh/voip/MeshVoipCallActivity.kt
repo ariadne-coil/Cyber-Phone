@@ -1,8 +1,10 @@
 package org.fossify.phone.mesh.voip
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.app.KeyguardManager
 import android.media.AudioManager
 import android.media.Ringtone
@@ -19,6 +21,7 @@ import android.view.MotionEvent
 import android.view.WindowManager
 import android.widget.ImageView
 import androidx.appcompat.content.res.AppCompatResources
+import androidx.core.content.ContextCompat
 import androidx.core.os.postDelayed
 import org.fossify.commons.extensions.adjustAlpha
 import org.fossify.commons.extensions.applyColorFilter
@@ -84,6 +87,8 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
     private var outgoingSession: MeshCallRouter.MeshCallSession? = null
     private val inviteRetryHandler = Handler(Looper.getMainLooper())
     private var inviteRetryCount = 0
+    private var micPermissionRequestInFlight = false
+    private var pendingMicPermissionAction: (() -> Unit)? = null
 
     private val callDurationHandler = Handler(Looper.getMainLooper())
     private var callDurationSeconds = 0
@@ -324,28 +329,36 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
     }
 
     private fun answer() {
-        val id = sessionId ?: return
-        stopRingtone()
-        MeshCallRouter.sendAccept(id)
-        // Accept is small and can still be lost. Send it a few times to improve call setup reliability.
-        inviteRetryHandler.postDelayed(200L) {
-            if (!isDestroyed && !isFinishing && sessionId?.contentEquals(id) == true) {
-                MeshCallRouter.sendAccept(id)
+        if (isCallActive) return
+        ensureMicrophonePermission {
+            val id = sessionId ?: return@ensureMicrophonePermission
+            stopRingtone()
+            MeshCallRouter.sendAccept(id)
+            // Accept is small and can still be lost. Send it a few times to improve call setup reliability.
+            inviteRetryHandler.postDelayed(200L) {
+                if (!isDestroyed && !isFinishing && sessionId?.contentEquals(id) == true) {
+                    MeshCallRouter.sendAccept(id)
+                }
             }
-        }
-        inviteRetryHandler.postDelayed(800L) {
-            if (!isDestroyed && !isFinishing && sessionId?.contentEquals(id) == true) {
-                MeshCallRouter.sendAccept(id)
+            inviteRetryHandler.postDelayed(800L) {
+                if (!isDestroyed && !isFinishing && sessionId?.contentEquals(id) == true) {
+                    MeshCallRouter.sendAccept(id)
+                }
             }
+            if (!startAudio()) {
+                MeshCallRouter.sendEnd(id)
+                toast(R.string.mesh_call_audio_start_failed)
+                finish()
+                return@ensureMicrophonePermission
+            }
+            isCallActive = true
+            lastRemotePacketMs = SystemClock.elapsedRealtime()
+            stopInviteRetries()
+            showOngoingUi(null)
+            startCallDuration()
+            startCallWatchdog()
+            enableProximitySensor()
         }
-        startAudio()
-        isCallActive = true
-        lastRemotePacketMs = SystemClock.elapsedRealtime()
-        stopInviteRetries()
-        showOngoingUi(null)
-        startCallDuration()
-        startCallWatchdog()
-        enableProximitySensor()
     }
 
     private fun hangup() {
@@ -364,9 +377,9 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
         finish()
     }
 
-    private fun startAudio() {
-        if (audioEngine != null) return
-        val id = sessionId ?: return
+    private fun startAudio(): Boolean {
+        if (audioEngine != null) return true
+        val id = sessionId ?: return false
         val engine = MeshAudioEngine(quality) { frame ->
             val seq = audioSeq++
             MeshCallRouter.sendAudioFrame(id, seq, frame)
@@ -374,7 +387,16 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
         audioEngine = engine
         setAudioModeForCall()
         startAudioRouting()
-        engine.start()
+        val started = try {
+            engine.start()
+        } catch (_: Exception) {
+            false
+        }
+        if (!started) {
+            stopAudio()
+            return false
+        }
+        return true
     }
 
     private fun stopAudio() {
@@ -677,14 +699,21 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
 
     private fun setCallActiveIfNeeded() {
         if (isCallActive) return
-        isCallActive = true
-        lastRemotePacketMs = SystemClock.elapsedRealtime()
-        stopInviteRetries()
-        showOngoingUi(null)
-        startAudio()
-        startCallDuration()
-        startCallWatchdog()
-        enableProximitySensor()
+        ensureMicrophonePermission {
+            if (isDestroyed || isFinishing || isCallActive) return@ensureMicrophonePermission
+            if (!startAudio()) {
+                toast(R.string.mesh_call_audio_start_failed)
+                hangup()
+                return@ensureMicrophonePermission
+            }
+            isCallActive = true
+            lastRemotePacketMs = SystemClock.elapsedRealtime()
+            stopInviteRetries()
+            showOngoingUi(null)
+            startCallDuration()
+            startCallWatchdog()
+            enableProximitySensor()
+        }
     }
 
     private fun startInviteRetries() {
@@ -986,6 +1015,40 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
 
     private fun getInactiveButtonColor() = getProperTextColor().adjustAlpha(0.10f)
 
+    private fun ensureMicrophonePermission(onGranted: () -> Unit) {
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            onGranted()
+            return
+        }
+        pendingMicPermissionAction = onGranted
+        if (micPermissionRequestInFlight) return
+        micPermissionRequestInFlight = true
+        requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_RECORD_AUDIO)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != REQUEST_RECORD_AUDIO) return
+        micPermissionRequestInFlight = false
+        val action = pendingMicPermissionAction
+        pendingMicPermissionAction = null
+        val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            action?.invoke()
+        } else {
+            toast(R.string.mesh_call_microphone_permission_required)
+            hangup()
+        }
+    }
+
     private fun toggleButtonColor(view: ImageView, enabled: Boolean) {
         if (enabled) {
             val color = getActiveButtonColor()
@@ -1006,6 +1069,7 @@ class MeshVoipCallActivity : SimpleActivity(), MeshCallRouter.Listener {
         private const val EXTRA_DISPLAY_NAME = "mesh_voip_display_name"
         private const val EXTRA_FALLBACK_NUMBER = "mesh_voip_fallback_number"
         private const val EXTRA_ALLOW_FALLBACK = "mesh_voip_allow_fallback"
+        private const val REQUEST_RECORD_AUDIO = 1083
 
         fun startOutgoing(
             context: Context,

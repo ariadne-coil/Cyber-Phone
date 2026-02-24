@@ -6,9 +6,12 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.Manifest
+import android.net.Uri
 import android.os.Bundle
 import android.os.Build
 import android.provider.ContactsContract
+import android.telephony.SubscriptionManager
+import android.telephony.TelephonyManager
 import android.widget.ImageView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -234,8 +237,9 @@ class ManageE2eKeysActivity : SimpleActivity() {
     }
 
     private fun refreshProfile() {
-        binding.profileContactValue.text = getProfileDisplayName() ?: getString(R.string.profile_unknown)
-        binding.profilePhoneValue.text = getProfilePhoneNumber() ?: getString(R.string.profile_unknown)
+        val detectedPhone = getProfilePhoneNumber()
+        binding.profileContactValue.text = getProfileDisplayName(detectedPhone) ?: getString(R.string.profile_unknown)
+        binding.profilePhoneValue.text = detectedPhone ?: getString(R.string.profile_unknown)
         binding.profileMeshAddressValue.text = MeshDiscoveryManager.getLocalMeshAddress(this)
             ?: getString(R.string.profile_unknown)
         binding.manageE2eKeysPublicValue.text = E2eManager.getPublicKeyBase64(this)
@@ -316,7 +320,15 @@ class ManageE2eKeysActivity : SimpleActivity() {
                 RadioItem(MeshMode.MESH_ONLY.id, getString(R.string.mesh_mode_mesh_only))
             )
             RadioGroupDialog(this@ManageE2eKeysActivity, items, meshConfig.meshMode) {
+                val previousMode = meshConfig.getMeshMode()
                 meshConfig.meshMode = it as Int
+                val updatedMode = meshConfig.getMeshMode()
+                if (previousMode == MeshMode.STANDARD_ONLY && updatedMode != MeshMode.STANDARD_ONLY) {
+                    meshConfig.meshRoutingEnabled = true
+                    meshConfig.meshWifiDirectEnabled = true
+                    profileMeshRouting.isChecked = true
+                    profileMeshWifidirect.isChecked = true
+                }
                 profileMeshModeValue.text = getMeshModeLabel(meshConfig.getMeshMode())
                 updateMeshRoutingUi(meshConfig)
                 updateMeshStatus(meshConfig)
@@ -885,9 +897,9 @@ class ManageE2eKeysActivity : SimpleActivity() {
         }?.trim()?.takeIf { it.isNotBlank() }
     }
 
-    private fun getProfileDisplayName(): String? {
+    private fun getProfileDisplayName(phoneHint: String? = null): String? {
         if (!hasPermission(PERMISSION_READ_CONTACTS)) return null
-        return contentResolver.query(
+        val profileName = contentResolver.query(
             ContactsContract.Profile.CONTENT_URI,
             arrayOf(ContactsContract.Profile.DISPLAY_NAME_PRIMARY),
             null,
@@ -896,9 +908,37 @@ class ManageE2eKeysActivity : SimpleActivity() {
         )?.use { cursor ->
             if (cursor.moveToFirst()) cursor.getString(0) else null
         }
+        if (!profileName.isNullOrBlank()) {
+            return profileName
+        }
+
+        val number = phoneHint?.trim().orEmpty().ifBlank { getProfilePhoneNumber().orEmpty() }
+        if (number.isBlank()) return null
+
+        val lookupUri = Uri.withAppendedPath(
+            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+            Uri.encode(number)
+        )
+        return contentResolver.query(
+            lookupUri,
+            arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME),
+            null,
+            null,
+            null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        }?.trim()?.takeIf { it.isNotBlank() }
     }
 
     private fun getProfilePhoneNumber(): String? {
+        val profilePhone = getProfilePhoneNumberFromContact()
+        if (!profilePhone.isNullOrBlank()) {
+            return profilePhone
+        }
+        return getProfilePhoneNumberFromSubscriptions()
+    }
+
+    private fun getProfilePhoneNumberFromContact(): String? {
         if (!hasPermission(PERMISSION_READ_CONTACTS)) return null
         val profileId = contentResolver.query(
             ContactsContract.Profile.CONTENT_URI,
@@ -918,7 +958,40 @@ class ManageE2eKeysActivity : SimpleActivity() {
             null
         )?.use { cursor ->
             if (cursor.moveToFirst()) cursor.getString(0) else null
+        }?.trim()?.takeIf { it.isNotBlank() }
+    }
+
+    private fun getProfilePhoneNumberFromSubscriptions(): String? {
+        val canReadLineNumber =
+            hasAndroidPermission(Manifest.permission.READ_PHONE_STATE) ||
+                hasAndroidPermission(Manifest.permission.READ_PHONE_NUMBERS) ||
+                hasAndroidPermission(Manifest.permission.READ_SMS)
+        if (!canReadLineNumber) return null
+
+        val subscriptionManager = getSystemService(SubscriptionManager::class.java)
+        if (subscriptionManager != null) {
+            val subs = runCatching { subscriptionManager.activeSubscriptionInfoList }.getOrNull().orEmpty()
+            for (sub in subs) {
+                val number = runCatching {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        subscriptionManager.getPhoneNumber(sub.subscriptionId)
+                    } else {
+                        sub.number
+                    }
+                }.getOrNull()?.trim().orEmpty()
+                if (number.isNotBlank()) {
+                    return number
+                }
+            }
         }
+
+        val telephonyManager = getSystemService(TelephonyManager::class.java)
+        val line1 = runCatching { telephonyManager?.line1Number }.getOrNull()?.trim().orEmpty()
+        return line1.takeIf { it.isNotBlank() }
+    }
+
+    private fun hasAndroidPermission(permission: String): Boolean {
+        return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun createQrBitmap(content: String, size: Int): Bitmap? {

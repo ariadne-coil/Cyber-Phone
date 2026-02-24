@@ -2,6 +2,7 @@ package org.fossify.phone.wallet.fedimint
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -31,6 +32,8 @@ object FedimintWebEngine {
     private const val TAG = "FedimintWebEngine"
     // Versioned query forces WebView to load the latest bundled engine script after updates.
     private const val ENGINE_URL = "https://appassets.androidplatform.net/assets/fedimint/engine.html?v=20260217d"
+    private const val ENGINE_HOST = "appassets.androidplatform.net"
+    private const val ENGINE_SCHEME = "https"
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val nextId = AtomicInteger(1)
@@ -101,6 +104,15 @@ object FedimintWebEngine {
 
         wv.addJavascriptInterface(Bridge(), "CyberPhoneFedimint")
         wv.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                if (!request.isForMainFrame) return false
+                if (isTrustedEngineUrl(request.url)) return false
+
+                lastError = RuntimeException("Blocked unexpected Fedimint engine navigation")
+                readyLatch?.countDown()
+                return true
+            }
+
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
                 val url = request.url
                 // Serve local engine assets from appassets. All other traffic (Fedimint federation networking)
@@ -177,6 +189,12 @@ object FedimintWebEngine {
         }
 
         step()
+    }
+
+    private fun isTrustedEngineUrl(url: Uri?): Boolean {
+        if (url == null) return false
+        return url.scheme.equals(ENGINE_SCHEME, ignoreCase = true) &&
+            url.host.equals(ENGINE_HOST, ignoreCase = true)
     }
 
     private fun resetEngine(reason: String? = null) {

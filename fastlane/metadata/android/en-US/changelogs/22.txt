@@ -1,0 +1,9 @@
+Added:
+
+• Mesh VoIP calling (prototype) with in-call UI parity improvements
+• File transfer support in mesh conversations
+
+Fixed:
+
+• Contact action flow now avoids accidental direct calling
+• Attachment handling reliability in conversations

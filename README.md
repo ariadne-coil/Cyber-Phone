@@ -82,6 +82,12 @@ Cyber Phone does not ship analytics or Play Services. Network access is only use
 
 By default, these network-backed features are disabled until you opt in.
 
+## F-Droid Notes
+
+*   No analytics SDKs or Play Services are included.
+*   Network behavior is feature-gated and opt-in as described above.
+*   Release builds are produced from pinned dependency versions and static app version metadata.
+
 ## Permissions
 
 Cyber Phone needs core telephony permissions to function as a full replacement Phone/SMS app:

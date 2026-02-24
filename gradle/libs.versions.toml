@@ -42,6 +42,7 @@ zxingCore = "3.5.4"
 zxingEmbedded = "4.3.0"
 concentus = "6c2328dc19"
 junit = "4.13.2"
+robolectric = "4.12.2"
 ldkNode = "0.7.0"
 #build
 app-build-compileSDKVersion = "36"
@@ -90,6 +91,7 @@ zxing-core = { module = "com.google.zxing:core", version.ref = "zxingCore" }
 zxing-embedded = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxingEmbedded" }
 concentus = { module = "com.github.lostromb:concentus", version.ref = "concentus" }
 junit = { module = "junit:junit", version.ref = "junit" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 ldk-node-android = { module = "org.lightningdevkit:ldk-node-android", version.ref = "ldkNode" }
 
 [bundles]

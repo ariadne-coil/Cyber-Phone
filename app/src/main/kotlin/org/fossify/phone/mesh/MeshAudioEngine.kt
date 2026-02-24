@@ -32,29 +32,24 @@ class MeshAudioEngine(
     private val maxQueuedFrames = 15 // cap latency; drop oldest when exceeded (~300ms at 20ms frames)
     private val trimToFrames = 8
 
-    fun start() {
-        if (!isRunning.compareAndSet(false, true)) return
-        setupCodec()
-        setupAudioIO()
-        startCapture()
-        startPlayback()
+    fun start(): Boolean {
+        if (!isRunning.compareAndSet(false, true)) return true
+        return try {
+            setupCodec()
+            setupAudioIO()
+            startCapture()
+            startPlayback()
+            true
+        } catch (_: Exception) {
+            isRunning.set(false)
+            releaseAudioResources()
+            false
+        }
     }
 
     fun stop() {
         isRunning.set(false)
-        recordThread?.interrupt()
-        playbackThread?.interrupt()
-        audioRecord?.stop()
-        audioTrack?.stop()
-        audioRecord?.release()
-        audioTrack?.release()
-        audioRecord = null
-        audioTrack = null
-        encoder = null
-        decoder = null
-        synchronized(incomingLock) {
-            incomingFrames.clear()
-        }
+        releaseAudioResources()
     }
 
     fun enqueueFrame(opusFrame: ByteArray) {
@@ -91,6 +86,9 @@ class MeshAudioEngine(
             AudioFormat.ENCODING_PCM_16BIT,
             minIn * 2
         )
+        if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+            throw IllegalStateException("AudioRecord initialization failed")
+        }
 
         val minOut = AudioTrack.getMinBufferSize(
             quality.sampleRate,
@@ -115,6 +113,9 @@ class MeshAudioEngine(
             .setBufferSizeInBytes(minOut * 2)
             .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
             .build()
+        if (audioTrack?.state != AudioTrack.STATE_INITIALIZED) {
+            throw IllegalStateException("AudioTrack initialization failed")
+        }
     }
 
     private fun startCapture() {
@@ -129,12 +130,33 @@ class MeshAudioEngine(
             val pcm = ShortArray(frameSize)
             val output = ByteArray(4000)
             while (isRunning.get()) {
-                val read = record.read(pcm, 0, pcm.size)
-                if (read <= 0) continue
-                val encodedLength = enc.encode(pcm, 0, frameSize, output, 0, output.size)
+                val read = try {
+                    record.read(pcm, 0, pcm.size)
+                } catch (_: Exception) {
+                    break
+                }
+                if (read <= 0) {
+                    if (read == AudioRecord.ERROR_DEAD_OBJECT || read == AudioRecord.ERROR_INVALID_OPERATION) {
+                        break
+                    }
+                    try {
+                        Thread.sleep(5)
+                    } catch (_: InterruptedException) {
+                        break
+                    }
+                    continue
+                }
+                val encodedLength = try {
+                    enc.encode(pcm, 0, frameSize, output, 0, output.size)
+                } catch (_: Exception) {
+                    break
+                }
                 if (encodedLength > 0) {
                     val frame = output.copyOfRange(0, encodedLength)
-                    onEncodedFrame(frame)
+                    try {
+                        onEncodedFrame(frame)
+                    } catch (_: Exception) {
+                    }
                 }
             }
         }
@@ -161,11 +183,70 @@ class MeshAudioEngine(
                     }
                     continue
                 }
-                val decoded = dec.decode(frame, 0, frame.size, pcm, 0, frameSize, false)
+                val decoded = try {
+                    dec.decode(frame, 0, frame.size, pcm, 0, frameSize, false)
+                } catch (_: Exception) {
+                    break
+                }
                 if (decoded > 0) {
-                    track.write(pcm, 0, decoded)
+                    try {
+                        track.write(pcm, 0, decoded)
+                    } catch (_: Exception) {
+                        break
+                    }
                 }
             }
+        }
+    }
+
+    private fun releaseAudioResources() {
+        val record = audioRecord
+        val track = audioTrack
+        audioRecord = null
+        audioTrack = null
+
+        val recordWorker = recordThread
+        val playbackWorker = playbackThread
+        recordThread = null
+        playbackThread = null
+
+        recordWorker?.interrupt()
+        playbackWorker?.interrupt()
+
+        try {
+            record?.stop()
+        } catch (_: Exception) {
+        }
+        try {
+            track?.stop()
+        } catch (_: Exception) {
+        }
+        try {
+            record?.release()
+        } catch (_: Exception) {
+        }
+        try {
+            track?.release()
+        } catch (_: Exception) {
+        }
+
+        if (recordWorker != null && recordWorker != Thread.currentThread()) {
+            try {
+                recordWorker.join(150)
+            } catch (_: InterruptedException) {
+            }
+        }
+        if (playbackWorker != null && playbackWorker != Thread.currentThread()) {
+            try {
+                playbackWorker.join(150)
+            } catch (_: InterruptedException) {
+            }
+        }
+
+        encoder = null
+        decoder = null
+        synchronized(incomingLock) {
+            incomingFrames.clear()
         }
     }
 }

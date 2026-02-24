@@ -189,6 +189,8 @@ class RnsLink private constructor(
     @Volatile
     private var lastPendingTrimAtMs: Long = 0L
     private var remoteIdentity: RnsIdentity? = null
+    @Volatile
+    private var identifySent: Boolean = false
 
     fun buildLinkRequestPacket(): RnsPacket {
         if (!initiator) error("Only initiator can build link requests")
@@ -382,11 +384,16 @@ class RnsLink private constructor(
 
     fun identify(identity: RnsIdentity, sendPacket: (RnsLink, Int, Int, ByteArray) -> ByteArray?): Boolean {
         if (!initiator || !isActive()) return false
+        if (identifySent) return true
         val signedData = linkId + identity.publicKey
         val signature = identity.sign(signedData)
         val payload = identity.publicKey + signature
         val raw = sendPacket(this, RnsPacket.DATA, RnsPacket.LINKIDENTIFY, payload)
-        return raw != null
+        val sent = raw != null
+        if (sent) {
+            identifySent = true
+        }
+        return sent
     }
 
     fun handleIdentify(payload: ByteArray): Boolean {

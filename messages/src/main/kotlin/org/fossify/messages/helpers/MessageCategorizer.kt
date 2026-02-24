@@ -5,6 +5,7 @@ import android.util.Patterns
 import org.fossify.commons.extensions.baseConfig
 import org.fossify.commons.extensions.isNumberBlocked
 import org.fossify.commons.extensions.normalizePhoneNumber
+import org.fossify.mesh.lxmf.LxmfAddress
 import org.fossify.messages.extensions.config as messagesConfig
 import org.fossify.messages.models.Conversation
 import org.fossify.messages.messaging.isShortCode
@@ -86,6 +87,9 @@ object MessageCategorizer {
         isKnownContact: Boolean,
         isBlocked: Boolean
     ): MessageCategory {
+        if (LxmfAddress.isMeshLike(address)) {
+            return MessageCategory.MAIN
+        }
         if (isOtpMessage(body)) {
             return MessageCategory.OTP
         }
@@ -182,6 +186,9 @@ object MessageCategorizer {
         body: String,
         isKnownContact: Boolean
     ): Boolean {
+        if (LxmfAddress.isMeshLike(address)) {
+            return false
+        }
         val isOtp = isOtpMessage(body)
         val isShortCodeMessage = isShortCode(address)
         val shortCodeMode = context.messagesConfig.shortCodeFilterMode
@@ -284,6 +291,15 @@ object MessageCategorizer {
         context: Context,
         conversation: Conversation
     ): MessageClassification {
+        if (
+            LxmfAddress.isMeshThreadId(conversation.threadId) ||
+            LxmfAddress.isMeshLike(conversation.phoneNumber)
+        ) {
+            return MessageClassification(
+                category = MessageCategory.MAIN,
+                isBlocked = false
+            )
+        }
         val isKnownContact =
             conversation.title.isNotBlank() && conversation.title != conversation.phoneNumber
         return classifyMessage(context, conversation.phoneNumber, conversation.snippet, isKnownContact)

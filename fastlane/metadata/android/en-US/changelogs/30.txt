@@ -1,0 +1,10 @@
+Highlights in v0.5:
+
+• Major wallet reliability + UX pass (Bitcoin Mainnet, Lightning, and Fedimint stability improvements)
+• Mesh messaging/call reliability fixes and mesh-thread visibility fixes in Messages + wallet thread picker
+• Branding and app identity updates to Cyber Phone with additional commons-decoupling cleanup
+• New GitHub release workflow support for signed APK upload
+
+Known issues:
+
+• Fedimint withdrawals can still be unreliable in some federation/network conditions

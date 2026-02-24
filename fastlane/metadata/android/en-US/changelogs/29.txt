@@ -1,0 +1,8 @@
+Changed:
+
+• F-Droid release hardening: deterministic version naming and manifest cleanup
+• Repo metadata and store listing privacy/network disclosure updates
+
+Known issues:
+
+• Fedimint withdrawals can still be unreliable in some federation/network conditions

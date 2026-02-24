@@ -16,6 +16,8 @@ object RnsNode {
     private const val DEFAULT_UDP_PORT = 4242
     private const val DEFAULT_MULTICAST_GROUP = "239.255.0.1"
     private const val LINK_REQUEST_RETRY_MS = 1_500L
+    private const val LINK_REQUEST_RETRY_TICK_MS = 500L
+    private const val PENDING_LINK_TIMEOUT_MS = 60_000L
     private const val MAX_HOPS = 128
     private const val ANNOUNCE_CACHE_LIMIT = 256
     private const val RESOURCE_CACHE_LIMIT = 256
@@ -26,7 +28,8 @@ object RnsNode {
     private const val DIRECT_NEIGHBOR_TIMEOUT_MS = 5 * 60 * 1000L
     private const val ROUTING_ACTIVITY_WINDOW_MS = 2 * 60 * 1000L
     private const val ANNOUNCE_INTERVAL_MS = 10 * 60 * 1000L
-    private const val PATH_REQUEST_MIN_INTERVAL_MS = 20_000L
+    private const val PATH_REQUEST_MIN_INTERVAL_MS = 5_000L
+    private const val PATH_REQUEST_MIN_INTERVAL_FLOOR_MS = 500L
     private const val PATH_REQUEST_TAG_LIMIT = 32_000
     private const val PATH_REQUEST_APP = "rnstransport"
 
@@ -97,6 +100,8 @@ object RnsNode {
 
     private val unicastProbeScheduler = Executors.newSingleThreadScheduledExecutor()
     private var unicastProbeFuture: ScheduledFuture<*>? = null
+    private val pendingLinkRetryScheduler = Executors.newSingleThreadScheduledExecutor()
+    private var pendingLinkRetryFuture: ScheduledFuture<*>? = null
     @Volatile
     private var unicastProbeCursor = 0
 
@@ -135,6 +140,7 @@ object RnsNode {
             registerPathRequestDestination()
             startAnnounceScheduler()
             startUnicastProbeScheduler()
+            startPendingLinkRetryScheduler()
         } else {
             routingEnabled = routing
             this.networkConfig = networkConfig
@@ -169,6 +175,8 @@ object RnsNode {
             announceFuture = null
             unicastProbeFuture?.cancel(true)
             unicastProbeFuture = null
+            pendingLinkRetryFuture?.cancel(true)
+            pendingLinkRetryFuture = null
             unicastProbeCursor = 0
             udpInterfaceRef = null
             networkConfig = null
@@ -220,11 +228,12 @@ object RnsNode {
         handleIncoming(raw, iface)
     }
 
-    fun requestPath(destinationHash: ByteArray) {
+    fun requestPath(destinationHash: ByteArray, minIntervalMs: Long = PATH_REQUEST_MIN_INTERVAL_MS) {
         val now = System.currentTimeMillis()
         val key = RnsHex.encode(destinationHash)
+        val interval = minIntervalMs.coerceAtLeast(PATH_REQUEST_MIN_INTERVAL_FLOOR_MS)
         val last = lastPathRequestMs[key] ?: 0L
-        if (now - last < PATH_REQUEST_MIN_INTERVAL_MS) return
+        if (now - last < interval) return
         lastPathRequestMs[key] = now
 
         val tag = RnsHash.truncatedHash((destinationHash + now.toString().toByteArray()))
@@ -344,6 +353,51 @@ object RnsNode {
             3_000L,
             TimeUnit.MILLISECONDS
         )
+    }
+
+    private fun startPendingLinkRetryScheduler() {
+        pendingLinkRetryFuture?.cancel(true)
+        pendingLinkRetryFuture = pendingLinkRetryScheduler.scheduleAtFixedRate(
+            { retryPendingLinks() },
+            LINK_REQUEST_RETRY_MS,
+            LINK_REQUEST_RETRY_TICK_MS,
+            TimeUnit.MILLISECONDS
+        )
+    }
+
+    private fun retryPendingLinks() {
+        if (!isRunning()) return
+        val now = System.currentTimeMillis()
+        val staleLinkIds = ArrayList<String>()
+
+        pendingLinksById.forEach { (linkKey, link) ->
+            if (!link.initiator) return@forEach
+            val age = now - link.getLastRequestTimeMs()
+            when {
+                age > PENDING_LINK_TIMEOUT_MS -> staleLinkIds.add(linkKey)
+                age > LINK_REQUEST_RETRY_MS -> {
+                    try {
+                        send(link.buildLinkRequestPacket())
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+        }
+
+        if (staleLinkIds.isEmpty()) return
+        staleLinkIds.forEach { linkKey ->
+            pendingLinksById.remove(linkKey)
+            pendingLinkResources.remove(linkKey)
+            pendingLinkPackets.remove(linkKey)
+            val iter = pendingLinksByDestination.entries.iterator()
+            while (iter.hasNext()) {
+                val entry = iter.next()
+                if (entry.value == linkKey) {
+                    iter.remove()
+                    break
+                }
+            }
+        }
     }
 
     private fun unicastProbeTick() {
@@ -560,6 +614,7 @@ object RnsNode {
     fun sendResourceViaLink(owner: RnsDestination, destination: RnsDestination, resource: RnsResource): Boolean {
         val link = ensureLink(owner, destination) ?: return false
         if (link.isActive()) {
+            maybeIdentifyActiveInitiatorLink(link)
             sendResourceToLink(link, resource, null)
         } else {
             cacheResource(resource)
@@ -577,6 +632,7 @@ object RnsNode {
     ): Boolean {
         val link = ensureLink(owner, destination) ?: return false
         if (link.isActive()) {
+            maybeIdentifyActiveInitiatorLink(link)
             return sendLinkPacket(link, packetType, context, payload, null) != null
         } else {
             queueLinkPacket(link, packetType, context, payload)
@@ -598,6 +654,7 @@ object RnsNode {
     ): Boolean {
         val link = ensureLink(owner, destination) ?: return false
         if (!link.isActive()) return false
+        maybeIdentifyActiveInitiatorLink(link)
         return sendLinkPacket(link, packetType, context, payload, null) != null
     }
 
@@ -628,6 +685,7 @@ object RnsNode {
         onFailure: ((RnsRequestReceipt) -> Unit)? = null
     ): RnsRequestReceipt? {
         val link = ensureLink(owner, destination) ?: return null
+        maybeIdentifyActiveInitiatorLink(link)
         return link.request(path, data, { linkInstance, packetType, context, payload ->
             sendLinkPacket(linkInstance, packetType, context, payload, null)
         }, onResponse, onFailure, { payload, requestId, isResponse ->
@@ -1395,9 +1453,31 @@ object RnsNode {
         val destKey = RnsHex.encode(destination.hash)
         val activeId = activeLinksByDestination[destKey]
         val active = activeId?.let { activeLinksById[it] }
+        if (activeId != null && active == null) {
+            activeLinksByDestination.remove(destKey, activeId)
+        }
         if (active != null) return active
+
+        // If this destination already has an incoming active link (reverse direction), reuse it.
+        // Without this, one direction may repeatedly recreate links and suffer high setup latency.
+        val remotePublicKey = destination.identity.publicKey
+        val incomingMatch = activeLinksById.values.firstOrNull { link ->
+            !link.initiator &&
+                link.isActive() &&
+                link.owner.hash.contentEquals(owner.hash) &&
+                link.getRemoteIdentity()?.publicKey?.contentEquals(remotePublicKey) == true
+        }
+        if (incomingMatch != null) {
+            val incomingKey = RnsHex.encode(incomingMatch.linkId)
+            activeLinksByDestination[destKey] = incomingKey
+            return incomingMatch
+        }
+
         val pendingId = pendingLinksByDestination[destKey]
         val pending = pendingId?.let { pendingLinksById[it] }
+        if (pendingId != null && pending == null) {
+            pendingLinksByDestination.remove(destKey, pendingId)
+        }
         if (pending != null) {
             // Link requests are sent over lossy transports. If the initial request gets dropped,
             // we must retry or the link will never become active.
@@ -1503,6 +1583,14 @@ object RnsNode {
             isRequest = isRequest
         ) { packetType, context, data ->
             sendLinkPacket(link, packetType, context, data, null)
+        }
+    }
+
+    private fun maybeIdentifyActiveInitiatorLink(link: RnsLink) {
+        if (!link.initiator || !link.isActive()) return
+        val identity = link.owner.identity ?: return
+        link.identify(identity) { linkInstance, packetType, context, payload ->
+            sendLinkPacket(linkInstance, packetType, context, payload, null)
         }
     }
 

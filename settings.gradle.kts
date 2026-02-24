@@ -14,8 +14,9 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Required for dependencies that are not published on Maven Central.
+        // All such dependencies are pinned to immutable versions.
         maven { setUrl("https://jitpack.io") }
-        mavenLocal()
     }
 }
 include(":app")

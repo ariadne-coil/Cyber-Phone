@@ -23,6 +23,8 @@ object SensitivePrefs {
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
     private const val PREFIX = "enc:v1:"
     private const val TAG_BITS = 128
+    private const val CRYPTO_RETRY_COUNT = 3
+    private const val CRYPTO_RETRY_DELAY_MS = 80L
 
     private val lock = Any()
 
@@ -39,7 +41,7 @@ object SensitivePrefs {
         val decoded = decryptString(stored.removePrefix(PREFIX))
         if (decoded != null) return decoded
 
-        Log.w(TAG, "Failed decrypting sensitive preference key=$key")
+        Log.w(TAG, "Failed decrypting sensitive preference value")
         return defaultValue
     }
 
@@ -56,47 +58,83 @@ object SensitivePrefs {
         }
 
         // Last-resort fallback to preserve functionality on unsupported keystore devices.
-        Log.w(TAG, "Falling back to plaintext storage for key=$key")
+        Log.w(TAG, "Falling back to plaintext storage for sensitive preference value")
         prefs.edit().putString(key, value).apply()
     }
 
-    private fun encryptString(value: String): String? = synchronized(lock) {
-        runCatching {
-            val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(Cipher.ENCRYPT_MODE, getOrCreateSecretKey())
-            val iv = cipher.iv
-            val ciphertext = cipher.doFinal(value.toByteArray(Charsets.UTF_8))
+    private fun encryptString(value: String): String? {
+        repeat(CRYPTO_RETRY_COUNT) { attempt ->
+            val encoded = synchronized(lock) {
+                runCatching {
+                    val cipher = Cipher.getInstance(TRANSFORMATION)
+                    cipher.init(Cipher.ENCRYPT_MODE, getOrCreateSecretKey())
+                    val iv = cipher.iv
+                    val ciphertext = cipher.doFinal(value.toByteArray(Charsets.UTF_8))
 
-            val payload = ByteArray(1 + iv.size + ciphertext.size)
-            payload[0] = iv.size.toByte()
-            System.arraycopy(iv, 0, payload, 1, iv.size)
-            System.arraycopy(ciphertext, 0, payload, 1 + iv.size, ciphertext.size)
-            Base64.encodeToString(payload, Base64.NO_WRAP)
-        }.getOrElse {
-            Log.w(TAG, "encryptString failed", it)
-            null
+                    val payload = ByteArray(1 + iv.size + ciphertext.size)
+                    payload[0] = iv.size.toByte()
+                    System.arraycopy(iv, 0, payload, 1, iv.size)
+                    System.arraycopy(ciphertext, 0, payload, 1 + iv.size, ciphertext.size)
+                    Base64.encodeToString(payload, Base64.NO_WRAP)
+                }.getOrElse {
+                    Log.w(TAG, "encryptString failed (attempt ${attempt + 1}/$CRYPTO_RETRY_COUNT)", it)
+                    null
+                }
+            }
+            if (encoded != null) {
+                return encoded
+            }
+            if (attempt < CRYPTO_RETRY_COUNT - 1) {
+                try {
+                    Thread.sleep(CRYPTO_RETRY_DELAY_MS)
+                } catch (e: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return null
+                }
+            }
         }
+        return null
     }
 
-    private fun decryptString(value: String): String? = synchronized(lock) {
-        runCatching {
-            val payload = Base64.decode(value, Base64.DEFAULT)
-            if (payload.isEmpty()) return null
+    private fun decryptString(value: String): String? {
+        repeat(CRYPTO_RETRY_COUNT) { attempt ->
+            val decoded = synchronized(lock) {
+                runCatching {
+                    val payload = Base64.decode(value, Base64.DEFAULT)
+                    if (payload.isEmpty()) {
+                        null
+                    } else {
+                        val ivSize = payload[0].toInt() and 0xFF
+                        if (ivSize <= 0 || payload.size <= 1 + ivSize) {
+                            null
+                        } else {
+                            val iv = payload.copyOfRange(1, 1 + ivSize)
+                            val ciphertext = payload.copyOfRange(1 + ivSize, payload.size)
 
-            val ivSize = payload[0].toInt() and 0xFF
-            if (ivSize <= 0 || payload.size <= 1 + ivSize) return null
-
-            val iv = payload.copyOfRange(1, 1 + ivSize)
-            val ciphertext = payload.copyOfRange(1 + ivSize, payload.size)
-
-            val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(Cipher.DECRYPT_MODE, getOrCreateSecretKey(), GCMParameterSpec(TAG_BITS, iv))
-            val plaintext = cipher.doFinal(ciphertext)
-            String(plaintext, Charsets.UTF_8)
-        }.getOrElse {
-            Log.w(TAG, "decryptString failed", it)
-            null
+                            val cipher = Cipher.getInstance(TRANSFORMATION)
+                            cipher.init(Cipher.DECRYPT_MODE, getOrCreateSecretKey(), GCMParameterSpec(TAG_BITS, iv))
+                            val plaintext = cipher.doFinal(ciphertext)
+                            String(plaintext, Charsets.UTF_8)
+                        }
+                    }
+                }.getOrElse {
+                    Log.w(TAG, "decryptString failed (attempt ${attempt + 1}/$CRYPTO_RETRY_COUNT)", it)
+                    null
+                }
+            }
+            if (decoded != null) {
+                return decoded
+            }
+            if (attempt < CRYPTO_RETRY_COUNT - 1) {
+                try {
+                    Thread.sleep(CRYPTO_RETRY_DELAY_MS)
+                } catch (e: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return null
+                }
+            }
         }
+        return null
     }
 
     private fun getOrCreateSecretKey(): SecretKey {
