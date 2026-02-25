@@ -1,5 +1,7 @@
 package org.fossify.phone
 
+import android.app.Activity
+import android.app.Application
 import android.database.ContentObserver
 import android.net.Uri
 import android.os.Handler
@@ -20,6 +22,7 @@ import org.fossify.mesh.MeshManager
 import org.fossify.messages.extensions.config
 import org.fossify.messages.helpers.MessagingCache
 import org.fossify.phone.blocking.YacbSiaManager
+import org.fossify.phone.helpers.CustomizationUiPatcher
 import org.fossify.phone.mesh.voip.MeshVoipCallHandler
 import org.fossify.phone.wallet.WalletDirectoryUpdateWorker
 import org.fossify.phone.wallet.WalletExchangeRateUpdateWorker
@@ -42,6 +45,7 @@ class App : FossifyApp() {
             }
         }
         MeshVoipCallHandler.init(this)
+        registerCustomizationPatcher()
         scheduleWalletDirectoryUpdates()
         if (hasPermission(PERMISSION_READ_CONTACTS)) {
             listOf(
@@ -107,6 +111,26 @@ class App : FossifyApp() {
 
         WorkManager.getInstance(this)
             .enqueueUniquePeriodicWork("wallet_exchange_rate_update", ExistingPeriodicWorkPolicy.UPDATE, rateRequest)
+    }
+
+    private fun registerCustomizationPatcher() {
+        registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityCreated(activity: Activity, savedInstanceState: android.os.Bundle?) = Unit
+
+            override fun onActivityStarted(activity: Activity) = Unit
+
+            override fun onActivityResumed(activity: Activity) {
+                CustomizationUiPatcher.patch(activity)
+            }
+
+            override fun onActivityPaused(activity: Activity) = Unit
+
+            override fun onActivityStopped(activity: Activity) = Unit
+
+            override fun onActivitySaveInstanceState(activity: Activity, outState: android.os.Bundle) = Unit
+
+            override fun onActivityDestroyed(activity: Activity) = Unit
+        })
     }
 
     private val contactsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {

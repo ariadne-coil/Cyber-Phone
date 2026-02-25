@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.5.1 (2026-02-25)
+- Appearance: removed the non-functional **App icon color** option from customization.
+- Appearance: extended **App font** selection with additional detected system fonts while keeping built-in and custom file options.
+- Customization hardening: patched Commons customization UI at runtime to keep Cyber Phone behavior consistent without forking the Commons dependency.
+
 ## v0.5 (2026-02-24)
 - Wallet reliability: expanded Bitcoin Mainnet recovery with stronger Esplora endpoint failover/health scoring, fee-rate preflight hardening, and improved node restart/sync behavior to reduce "balance unavailable" and startup outages.
 - Wallet/Fedimint: upgraded and hardened Fedimint compatibility/runtime probing, improved federation switching/join flows, and stabilized invoice/payment execution paths across mixed federation capabilities.
