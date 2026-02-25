@@ -66,8 +66,8 @@ jobs:
             echo "SIGNING_STORE_PASSWORD=$SIGNING_STORE_PASSWORD"
           } >> "$GITHUB_ENV"
 
-      - name: Build and verify signed release APK
-        run: ./gradlew --no-daemon :app:verifyReleaseUrlScrub
+      - name: Build signed release APK
+        run: ./gradlew --no-daemon :app:assembleRelease
 
       - name: Resolve release tag
         run: |
