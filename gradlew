@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# Copyright © 2015-2021 the original authors.
+# Copyright © 2015 the original authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -114,21 +114,6 @@ case "$( uname )" in                #(
   NONSTOP* )        nonstop=true ;;
 esac
 
-# WSL + Windows SDK interop:
-# If this wrapper is executed from WSL, delegate to gradlew.bat so Android build tools
-# resolve exactly like Android Studio on Windows.
-if [ -n "${WSL_DISTRO_NAME:-}" ] && command -v cmd.exe >/dev/null 2>&1 && command -v wslpath >/dev/null 2>&1 && [ -f "$APP_HOME/gradlew.bat" ]; then
-    WIN_APP_HOME=$( wslpath -w "$APP_HOME" )
-    CMD_ARGS=
-    for arg in "$@"
-    do
-        CMD_ARGS="$CMD_ARGS $arg"
-    done
-    # Avoid extra escaped quotes here; cmd.exe can resolve this path with spaces via "cd /d <path>".
-    exec cmd.exe /c "cd /d $WIN_APP_HOME && gradlew.bat$CMD_ARGS"
-fi
-
-CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
 
 # Determine the Java command to use to start the JVM.
@@ -186,7 +171,6 @@ fi
 # For Cygwin or MSYS, switch paths to Windows format before running java
 if "$cygwin" || "$msys" ; then
     APP_HOME=$( cygpath --path --mixed "$APP_HOME" )
-    CLASSPATH=$( cygpath --path --mixed "$CLASSPATH" )
 
     JAVACMD=$( cygpath --unix "$JAVACMD" )
 
@@ -226,8 +210,7 @@ DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
 
 set -- \
         "-Dorg.gradle.appname=$APP_BASE_NAME" \
-        -classpath "$CLASSPATH" \
-        org.gradle.wrapper.GradleWrapperMain \
+        -jar "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" \
         "$@"
 
 # Stop when "xargs" is not available.
