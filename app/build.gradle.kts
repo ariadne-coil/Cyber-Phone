@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jetbrains.kotlin.konan.properties.Properties
 import java.io.FileInputStream
+import java.util.zip.ZipFile
 
 plugins {
     alias(libs.plugins.android)
@@ -21,6 +22,21 @@ fun hasSigningVars(): Boolean {
             && providers.environmentVariable("SIGNING_STORE_FILE").orNull != null
             && providers.environmentVariable("SIGNING_STORE_PASSWORD").orNull != null
 }
+
+val blockedReleaseUrlFragments = listOf(
+    "play.google.com/store/apps/",
+    "play.google.com/store/apps/dev",
+    "fossify.org/upgrade_to_pro",
+    "www.fossify.org/policy/",
+    "github.com/FossifyOrg",
+    "github.com/sponsors/FossifyOrg",
+    "opencollective.com/fossify/",
+    "www.patreon.com/naveen3singh",
+    "paypal.me/naveen3singh",
+    "liberapay.com/naveensingh",
+    "t.me/Fossify",
+    "www.reddit.com/r/Fossify"
+)
 
 android {
     compileSdk = project.libs.versions.app.build.compileSDKVersion.get().toInt()
@@ -72,6 +88,13 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            installation {
+                // Some Studio/device combinations fail APK deployment with
+                // INSTALL_BASELINE_PROFILE_FAILED on non-debuggable builds.
+                // Disable per-APK baseline profile sidecar generation to keep
+                // release APK installs reliable during local testing.
+                enableBaselineProfile = false
+            }
             if (keystorePropertiesFile.exists() || hasSigningVars()) {
                 signingConfig = signingConfigs.getByName("release")
             }
@@ -163,29 +186,40 @@ tasks.register("testClasses") {
     dependsOn("testDebugUnitTest")
 }
 
-// Strip URL literals from merged translatable resources so dependency metadata links
-// (stores/sponsors/social/docs) do not bleed into this fork's packaged strings.
-tasks.matching { it.name.matches(Regex("merge\\w+Resources")) }.configureEach {
+tasks.register("verifyReleaseUrlScrub") {
+    group = "verification"
+    description = "Checks that blocked ecosystem/store URL fragments are absent from the release APK."
+    dependsOn("assembleRelease")
     doLast {
-        val variant = name.removePrefix("merge").removeSuffix("Resources")
-            .replaceFirstChar { it.lowercaseChar() }
-        val mergedDir = layout.buildDirectory
-            .dir("intermediates/merged-not-compiled-resources/$variant")
-            .get()
-            .asFile
-        if (!mergedDir.exists()) return@doLast
+        val apkFile = layout.buildDirectory.file("outputs/apk/release/app-release.apk").get().asFile
+        if (!apkFile.exists()) {
+            throw GradleException("Release APK not found at ${apkFile.absolutePath}")
+        }
 
-        val urlRegex = Regex("""https?://[^\s<>"']+""")
+        val hits = LinkedHashSet<String>()
+        ZipFile(apkFile).use { zip ->
+            val entries = zip.entries()
+            while (entries.hasMoreElements()) {
+                val entry = entries.nextElement()
+                if (entry.isDirectory) continue
 
-        mergedDir.walkTopDown()
-            .filter { it.isFile && it.name.startsWith("values") && it.extension == "xml" }
-            .forEach { file ->
-                var text = file.readText()
-                val sanitized = urlRegex.replace(text, "link_removed")
-                if (sanitized != text) {
-                    text = sanitized
-                    file.writeText(text)
+                val content = zip.getInputStream(entry).use { it.readBytes() }.toString(Charsets.ISO_8859_1)
+                blockedReleaseUrlFragments.forEach { blocked ->
+                    if (content.contains(blocked)) {
+                        hits.add("${entry.name} -> $blocked")
+                    }
                 }
             }
+        }
+
+        if (hits.isNotEmpty()) {
+            throw GradleException(
+                buildString {
+                    appendLine("Blocked URL fragments detected in release APK:")
+                    hits.forEach { appendLine(it) }
+                }
+            )
+        }
+        logger.lifecycle("verifyReleaseUrlScrub: OK")
     }
 }

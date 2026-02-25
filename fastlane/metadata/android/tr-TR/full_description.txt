@@ -17,7 +17,6 @@ Cyber Phone Uygulaması, optimum kaynak kullanımı için tasarlanmıştır ve p
 
 Cyber Phone Uygulamasını şimdi indirin ve gizliliğin işlevsellikle sorunsuz bir şekilde harmanlandığı bir mobil dünyaya adım atın. Daha güvenli, kişiselleştirilmiş bir mobil deneyime doğru yolculuğunuz burada başlıyor.
 
-Daha fazla Cyber uygulaması keşfedin: https://github.com/ariadne-coil/Cyber-Phone
 Açık Kaynak Kodu: https://github.com/ariadne-coil/Cyber-Phone
-Reddit'teki topluluğa katılın: https://www.reddit.com/r/Cyber
-Telegram üzerinden bağlanın: https://t.me/Cyber
+
+

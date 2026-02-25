@@ -17,7 +17,6 @@
 <br><br>
 הורידו את אפליקציית Cyber Phone עכשיו וצעדו לעולם נייד שבו פרטיות משתלבת בצורה חלקה עם פונקציונליות. המסע שלכם לעבר חוויה ניידת בטוחה ומותאמת אישית מתחיל כאן.
 <br><br>
-חקרו עוד אפליקציות Cyber: https://github.com/ariadne-coil/Cyber-Phone<br>
 קוד פתוח: https://github.com/ariadne-coil/Cyber-Phone<br>
-הצטרפו לקהילה ב-Reddit: https://www.reddit.com/r/Cyber<br>
-התחברו בטלגרם: https://t.me/Cyber
+
+

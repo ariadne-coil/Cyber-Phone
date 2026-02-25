@@ -17,7 +17,6 @@
 
 Изтеглете Cyber Phone сега и навлезте в един мобилен свят, в който поверителността безпроблемно се съчетава с функционалността. Вашето пътуване към по-безопасно и персонализирано мобилно изживяване започва тук.
 
-Разгледайте още приложения на Cyber: https://github.com/ariadne-coil/Cyber-Phone
 Отворен изходен код: https://github.com/ariadne-coil/Cyber-Phone
-Присъединете се към общността в Reddit: https://www.reddit.com/r/Cyber
-Свържете се в Telegram: https://t.me/Cyber
+
+

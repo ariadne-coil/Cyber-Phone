@@ -22,10 +22,9 @@ Cyber Phone aplikacija dizajnirana je za optimalno korištenje resursa, što dop
 
 Preuzmite Cyber Phone aplikaciju sada i zakoračite u mobilni svijet gdje se privatnost besprijekorno stapa s funkcionalnošću. Vaše putovanje prema sigurnijem, personaliziranom mobilnom iskustvu počinje ovdje.
 
-Istražite više Cyber aplikacija: https://github.com/ariadne-coil/Cyber-Phone
 
 Otvoreni kod: https://github.com/ariadne-coil/Cyber-Phone
 
-Pridružite se zajednici na Redditu: https://www.reddit.com/r/Cyber
 
-Povežite se na Telegramu: https://t.me/Cyber
+
+

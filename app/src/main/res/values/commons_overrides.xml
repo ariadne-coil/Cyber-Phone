@@ -14,6 +14,72 @@
     <string name="donate_url">https://github.com/ariadne-coil/Cyber-Phone</string>
     <string name="thank_you_url">https://github.com/ariadne-coil/Cyber-Phone</string>
 
+    <!-- Strip metadata URLs bundled by upstream commons/license resources. -->
+    <string name="android_lame_text">License text available in source repository.</string>
+    <string name="android_lame_url">link_removed</string>
+    <string name="apng_text">License text available in source repository.</string>
+    <string name="apng_url">link_removed</string>
+    <string name="audio_record_view_text">License text available in source repository.</string>
+    <string name="audio_record_view_url">link_removed</string>
+    <string name="autofittextview_text">License text available in source repository.</string>
+    <string name="autofittextview_url">link_removed</string>
+    <string name="contributors_label" translatable="false">Contributors are credited in the project repository.</string>
+    <string name="cropper_text">License text available in source repository.</string>
+    <string name="cropper_url">link_removed</string>
+    <string name="donate_short" translatable="false">Support Cyber Phone development if you want to.</string>
+    <string name="espresso_text">License text available in source repository.</string>
+    <string name="espresso_url">link_removed</string>
+    <string name="evalex_text">License text available in source repository.</string>
+    <string name="evalex_url">link_removed</string>
+    <string name="event_bus_text">License text available in source repository.</string>
+    <string name="event_bus_url">link_removed</string>
+    <string name="exoplayer_text">License text available in source repository.</string>
+    <string name="exoplayer_url">link_removed</string>
+    <string name="filters_text">License text available in source repository.</string>
+    <string name="filters_url">link_removed</string>
+    <string name="gesture_views_text">License text available in source repository.</string>
+    <string name="gesture_views_url">link_removed</string>
+    <string name="gif_drawable_url">link_removed</string>
+    <string name="glide_url">link_removed</string>
+    <string name="gson_text">License text available in source repository.</string>
+    <string name="gson_url">link_removed</string>
+    <string name="indicator_fast_scroll_url">link_removed</string>
+    <string name="joda_text">License text available in source repository.</string>
+    <string name="joda_url">link_removed</string>
+    <string name="kotlin_text">License text available in source repository.</string>
+    <string name="kotlin_url">link_removed</string>
+    <string name="leakcanary_text">License text available in source repository.</string>
+    <string name="leakcanary_url">link_removed</string>
+    <string name="m3u_parser_url">link_removed</string>
+    <string name="number_picker_url">link_removed</string>
+    <string name="otto_text">License text available in source repository.</string>
+    <string name="otto_url">link_removed</string>
+    <string name="pattern_text">License text available in source repository.</string>
+    <string name="pattern_url">link_removed</string>
+    <string name="pdf_view_pager_text">License text available in source repository.</string>
+    <string name="pdf_view_pager_url">link_removed</string>
+    <string name="pdf_viewer_text">License text available in source repository.</string>
+    <string name="pdf_viewer_url">link_removed</string>
+    <string name="photoview_text">License text available in source repository.</string>
+    <string name="photoview_url">link_removed</string>
+    <string name="picasso_text">License text available in source repository.</string>
+    <string name="picasso_url">link_removed</string>
+    <string name="purchase_thank_you" translatable="false">This feature is included in Cyber Phone.</string>
+    <string name="reprint_text">License text available in source repository.</string>
+    <string name="reprint_url">link_removed</string>
+    <string name="robolectric_url">link_removed</string>
+    <string name="rtl_viewpager_text">License text available in source repository.</string>
+    <string name="rtl_viewpager_url">link_removed</string>
+    <string name="sanselan_text">License text available in source repository.</string>
+    <string name="sanselan_url">link_removed</string>
+    <string name="sms_mms_text">License text available in source repository.</string>
+    <string name="sms_mms_url">link_removed</string>
+    <string name="stetho_url">link_removed</string>
+    <string name="subsampling_text">License text available in source repository.</string>
+    <string name="subsampling_url">link_removed</string>
+    <string name="zip4j_text">License text available in source repository.</string>
+    <string name="zip4j_url">link_removed</string>
+
     <!-- Keep sideload warning text neutral if a defensive dialog is ever shown. -->
     <string name="sideloaded_app">App integrity check failed for this build.</string>
 </resources>

@@ -17,7 +17,6 @@ Cyber Phone on loodud optimaalseks ressursikasutuseks, mis aitab kaasa aku pikem
 
 Laadi rakendus Cyber Phone alla ja tegutse mobiilses maailmas, kus privaatsus sulandub sujuvalt funktsionaalsusega. Sinu teekond turvalisema ja isikupärastatud mobiilikogemuse suunas algab siit.
 
-Tutvu Cyber rakendustega: https://github.com/ariadne-coil/Cyber-Phone
 Avatud lähtekood: https://github.com/ariadne-coil/Cyber-Phone
-Liitu kogukonnaga Reddit'is: https://www.reddit.com/r/Cyber
-Suhtle Telegram'is: https://t.me/Cyber
+
+

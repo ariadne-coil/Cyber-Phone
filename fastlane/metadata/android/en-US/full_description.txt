@@ -25,7 +25,6 @@ Network-backed features are optional and disabled until you opt in:
 
 Download the Cyber Phone App now and step into a mobile world where privacy seamlessly blends with functionality. Your journey towards a safer, personalized mobile experience starts here.
 
-Explore more Cyber apps: https://github.com/ariadne-coil/Cyber-Phone
 Open-Source Code: https://github.com/ariadne-coil/Cyber-Phone
-Join the community on Reddit: https://www.reddit.com/r/Cyber
-Connect on Telegram: https://t.me/Cyber
+
+

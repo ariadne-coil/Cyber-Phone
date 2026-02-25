@@ -1,0 +1,6 @@
+v0.5.2
+- Fixed Settings crash caused by missing bound settings section IDs.
+- Hardened release process to avoid APK mutation and dex corruption.
+- Improved signed release automation with deterministic APK asset naming.
+- Cleaned upstream ecosystem/store links from packaged metadata while keeping Cyber Phone links.
+- Adjusted release install behavior to avoid baseline-profile install failures on affected devices.

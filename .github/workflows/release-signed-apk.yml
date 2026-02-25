@@ -66,17 +66,8 @@ jobs:
             echo "SIGNING_STORE_PASSWORD=$SIGNING_STORE_PASSWORD"
           } >> "$GITHUB_ENV"
 
-      - name: Build signed release APK
-        run: ./gradlew --no-daemon :app:assembleRelease
-
-      - name: Validate release APK output
-        run: |
-          set -euo pipefail
-          if [ ! -f "$APK_PATH" ]; then
-            echo "::error::Signed APK not found at $APK_PATH"
-            exit 1
-          fi
-          sha256sum "$APK_PATH" | tee "$APK_PATH.sha256"
+      - name: Build and verify signed release APK
+        run: ./gradlew --no-daemon :app:verifyReleaseUrlScrub
 
       - name: Resolve release tag
         run: |
@@ -92,18 +83,46 @@ jobs:
           fi
           echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
 
+      - name: Stage versioned release assets
+        run: |
+          set -euo pipefail
+          if [ ! -f "$APK_PATH" ]; then
+            echo "::error::Signed APK not found at $APK_PATH"
+            exit 1
+          fi
+
+          ASSET_DIR="$RUNNER_TEMP/release-assets"
+          ASSET_NAME="CyberPhone-${RELEASE_TAG}.apk"
+          ASSET_PATH="$ASSET_DIR/$ASSET_NAME"
+          mkdir -p "$ASSET_DIR"
+          cp "$APK_PATH" "$ASSET_PATH"
+          sha256sum "$ASSET_PATH" > "$ASSET_PATH.sha256"
+
+          echo "RELEASE_APK_PATH=$ASSET_PATH" >> "$GITHUB_ENV"
+          echo "RELEASE_APK_SHA_PATH=$ASSET_PATH.sha256" >> "$GITHUB_ENV"
+          echo "RELEASE_APK_NAME=$ASSET_NAME" >> "$GITHUB_ENV"
+
       - name: Upload signed APK to GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh release upload "$RELEASE_TAG" "$APK_PATH" "$APK_PATH.sha256" --clobber
+          gh release upload "$RELEASE_TAG" "$RELEASE_APK_PATH" "$RELEASE_APK_SHA_PATH" --clobber
+
+      - name: Remove legacy generic release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          for legacy in app-release.apk app-release.apk.sha256; do
+            gh release delete-asset "$RELEASE_TAG" "$legacy" -y || true
+          done
 
       - name: Upload workflow artifacts (backup)
         uses: actions/upload-artifact@v4
         with:
-          name: signed-apk-${{ env.RELEASE_TAG }}
+          name: signed-${{ env.RELEASE_APK_NAME }}
           path: |
-            app/build/outputs/apk/release/app-release.apk
-            app/build/outputs/apk/release/app-release.apk.sha256
+            ${{ env.RELEASE_APK_PATH }}
+            ${{ env.RELEASE_APK_SHA_PATH }}
           if-no-files-found: error

@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.5.2 (2026-02-25)
+- Stability: fixed the Settings crash caused by missing required bound layout IDs in settings includes.
+- Install reliability: disabled release baseline-profile sidecar generation to avoid `INSTALL_BASELINE_PROFILE_FAILED` on affected Studio/device combinations.
+- Release hardening: replaced post-build APK mutation with a safe `verifyReleaseUrlScrub` check to prevent dex/resource corruption.
+- Metadata/privacy cleanup: removed upstream ecosystem/store links from packaged commons/license metadata while preserving Cyber Phone-owned links.
+- About screen: restored explicit GitHub + Substack links and added safer external-link handling.
+- Release automation: switched to deterministic asset naming (`CyberPhone-v<version>.apk`) and cleanup of legacy generic APK asset names.
+- Fastlane metadata: aligned package ID to `org.cyberphone` and cleaned full-description footer links.
+
 ## v0.5.1 (2026-02-25)
 - Appearance: removed the non-functional **App icon color** option from customization.
 - Appearance: extended **App font** selection with additional detected system fonts while keeping built-in and custom file options.

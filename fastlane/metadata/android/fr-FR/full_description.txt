@@ -17,7 +17,6 @@ L'application Cyber Phone est conçue pour une utilisation optimale des ressourc
 
 Téléchargez dès maintenant l'application Cyber Phone et entrez dans un monde numérique où la confidentialité se marie parfaitement avec la fonctionnalité. Votre voyage vers une expérience mobile plus sûre et personnalisée commence ici.
 
-Découvrez d'autres applications Cyber : https://github.com/ariadne-coil/Cyber-Phone
 Code open source : https://github.com/ariadne-coil/Cyber-Phone
-Rejoignez la communauté sur Reddit : https://www.reddit.com/r/Cyber
-Connectez-vous sur Telegram : https://t.me/Cyber
+
+

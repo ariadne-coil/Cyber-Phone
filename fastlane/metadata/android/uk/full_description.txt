@@ -17,7 +17,6 @@
 
 Завантажте застосунок Cyber Phone зараз і пориньте у мобільний світ, де приватність бездоганно поєднується з функціональністю. Ваша подорож до безпечного, персоналізованого мобільного досвіду починається тут.
 
-Дізнайтеся більше про застосунки Cyber: https://github.com/ariadne-coil/Cyber-Phone
 Відкритий код: https://github.com/ariadne-coil/Cyber-Phone
-Приєднуйтесь до спільноти на Reddit: https://www.reddit.com/r/Cyber
-Приєднуйтесь в Telegram: https://t.me/Cyber
+
+

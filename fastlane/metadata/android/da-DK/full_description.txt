@@ -17,7 +17,6 @@ Cyber Phone App er designet til optimal ressourceudnyttelse, hvilket bidrager ti
 
 Download Cyber Phone App nu, og træd ind i en mobil verden, hvor privatliv problemfrit blandes med funktionalitet. Din rejse mod en mere sikker og personlig mobiloplevelse starter her.
 
-Udforsk flere Cyber-apps: https://github.com/ariadne-coil/Cyber-Phone
 Open Source-kode: https://github.com/ariadne-coil/Cyber-Phone
-Deltag i fællesskabet på Reddit: https://www.reddit.com/r/Cyber
-Forbind på Telegram: https://t.me/Cyber
+
+

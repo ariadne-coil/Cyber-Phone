@@ -17,7 +17,6 @@ Cyber Phonearen aplikazioa baliabideen erabilera optimorako diseinatuta dago, ba
 
 Deskargatu Cyber Phonea aplikazioa orain eta sartu pribatutasuna funtzionalitateekin ezin hobeto uztartzen den mundu mugikor batean. Zure mugikorren esperientzia pertsonalizatu eta seguruago baterako bidaia hemen hasten da.
 
-Arakatu Cyber aplikazio gehiago: https://github.com/ariadne-coil/Cyber-Phone
 Iturburu irekiko kodea: https://github.com/ariadne-coil/Cyber-Phone
-Sartu komunitatean Reddit-en: https://www.reddit.com/r/Cyber
-Konektatu Telegram-en: https://t.me/Cyber
+
+

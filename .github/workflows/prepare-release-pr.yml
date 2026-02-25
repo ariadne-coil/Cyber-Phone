@@ -1,15 +1,56 @@
 name: Prepare Release PR
 
 on:
-  repository_dispatch:
-    types: [prepare-release]
   workflow_dispatch:
   push:
     branches: [main]
     paths:
       - "CHANGELOG.md"
+      - "gradle.properties"
 
 jobs:
-  call-release-pr:
-    uses: FossifyOrg/.github/.github/workflows/prepare-release-pr.yml@main
-    secrets: inherit
+  prepare-release-summary:
+    name: Prepare release summary
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          VERSION_NAME=$(grep -E '^VERSION_NAME=' gradle.properties | cut -d'=' -f2-)
+          VERSION_CODE=$(grep -E '^VERSION_CODE=' gradle.properties | cut -d'=' -f2-)
+          APP_ID=$(grep -E '^APP_ID=' gradle.properties | cut -d'=' -f2-)
+
+          if [ -z "$VERSION_NAME" ] || [ -z "$VERSION_CODE" ] || [ -z "$APP_ID" ]; then
+            echo "::error::Failed to resolve VERSION_NAME, VERSION_CODE, or APP_ID from gradle.properties"
+            exit 1
+          fi
+
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "app_id=$APP_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Validate changelog entry exists
+        run: |
+          set -euo pipefail
+          VERSION_NAME="${{ steps.meta.outputs.version_name }}"
+          if ! grep -Eq "^##[[:space:]]+v?${VERSION_NAME}([[:space:]]|$)" CHANGELOG.md; then
+            echo "::warning::No CHANGELOG heading found for v$VERSION_NAME (expected a heading like '## v$VERSION_NAME')."
+          fi
+
+      - name: Publish release prep summary
+        run: |
+          {
+            echo "### Release Prep Summary"
+            echo "- App ID: \`${{ steps.meta.outputs.app_id }}\`"
+            echo "- Version name: \`${{ steps.meta.outputs.version_name }}\`"
+            echo "- Version code: \`${{ steps.meta.outputs.version_code }}\`"
+            echo "- Release asset naming: \`CyberPhone-v<version>.apk\` (enforced by release workflow)."
+            echo ""
+            echo "No upstream Fossify release-PR automation is used in this repo."
+          } >> "$GITHUB_STEP_SUMMARY"

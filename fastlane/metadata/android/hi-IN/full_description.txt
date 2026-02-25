@@ -17,7 +17,6 @@ Cyber Phone ऐप को इष्टतम संसाधन उपयोग 
 
 अभी Cyber Phone ऐप डाउनलोड करें और एक मोबाइल दुनिया में कदम रखें जहां गोपनीयता कार्यक्षमता के साथ सहजता से मिश्रित हो जाती है। एक सुरक्षित, वैयक्तिकृत मोबाइल अनुभव की ओर आपकी यात्रा यहीं से शुरू होती है।
 
-अधिक Cyber ऐप्स खोजें: https://github.com/ariadne-coil/Cyber-Phone
 ओपन-सोर्स कोड: https://github.com/ariadne-coil/Cyber-Phone
-Reddit पर समुदाय में शामिल हों: https://www.reddit.com/r/Cyber
-Telegram पर जुड़ें: https://t.me/Cyber
+
+

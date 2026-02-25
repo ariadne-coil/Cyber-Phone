@@ -17,7 +17,6 @@ Aplikace Cyber Phone je navržena tak, aby optimálně využívala zdroje a při
 
 Stáhněte si aplikaci Cyber Phone a vstupte do mobilního světa, kde se soukromí hladce skloubí s funkčností. Vaše cesta k bezpečnějšímu a personalizovanému mobilnímu prostředí začíná zde.
 
-Prozkoumejte další aplikace Cyber: https://github.com/ariadne-coil/Cyber-Phone
 Otevřený zdrojový kód: https://github.com/ariadne-coil/Cyber-Phone
-Připojte se ke komunitě na Redditu: https://www.reddit.com/r/Cyber
-Připojte se k Telegramu: https://t.me/Cyber
+
+

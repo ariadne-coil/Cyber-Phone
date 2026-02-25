@@ -358,13 +358,15 @@
     <!-- FAQ -->
 
     <!-- About -->
-    <string name="about_author_text">https://ariadnecyber.substack.com/</string>
+    <string name="about_author_text">Cyber Phone team</string>
     <string name="about_ack_title">Acknowledgements</string>
     <string name="about_ack_text">Cyber Phone (Ariadne Cyber)\nFossify Commons\nFossify Messages\nYet Another Call Blocker\nReticulum Network Stack\nLXMF\nFedimint\nFedimint Web SDK\nLightning Dev Kit (ldk-node)\nlibphonenumber\nHugging Face\nGoogle AI Edge / MediaPipe\nOpenAI Codex (implementation assistance)</string>
     <string name="about_app_icon">App icon</string>
     <string name="about_version_placeholder">Version</string>
     <string name="about_version_format">Version %1$s</string>
     <string name="about_repo_link">https://github.com/ariadne-coil/Cyber-Phone</string>
+    <string name="about_substack_link">https://ariadnecyber.substack.com</string>
+    <string name="about_open_link_failed">Could not open link.</string>
     <string name="about_ariadne_name">Ariadne Cyber</string>
     <string name="about_features_title">Key features</string>
     <string name="about_feature_1">- Smart dialer with caller ID and spam protection</string>

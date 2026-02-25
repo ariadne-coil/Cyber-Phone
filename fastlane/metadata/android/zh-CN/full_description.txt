@@ -17,7 +17,6 @@ Cyber Phone应用旨在优化资源使用，有助于延长电池寿命。它可
 
 立即下载 Cyber Phone应用，进入隐私与功能无缝融合的移动世界。您的更安全、个性化移动体验之旅从这里开始。
 
-探索更多 Cyber 应用：https://github.com/ariadne-coil/Cyber-Phone
 开源代码：https://github.com/ariadne-coil/Cyber-Phone
-加入 Reddit 社区：https://www.reddit.com/r/Cyber
-在 Telegram 上联系：https://t.me/Cyber
+
+
