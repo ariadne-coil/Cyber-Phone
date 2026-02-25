@@ -1,0 +1,4 @@
+v0.5.1
+- Removed non-functional App icon color option from customization.
+- Added additional detected system fonts to App font selection.
+- Hardened Commons customization handling to keep Cyber Phone behavior consistent.

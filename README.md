@@ -87,6 +87,7 @@ By default, these network-backed features are disabled until you opt in.
 *   No analytics SDKs or Play Services are included.
 *   Network behavior is feature-gated and opt-in as described above.
 *   Release builds are produced from pinned dependency versions and static app version metadata.
+*   Reviewer-facing submission details: `docs/F-DROID_SUBMISSION_NOTES.md`.
 
 ## Permissions
 
