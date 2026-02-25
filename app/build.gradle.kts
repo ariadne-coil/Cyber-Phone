@@ -162,3 +162,30 @@ tasks.register("testClasses") {
     description = "Runs unit tests (alias for testDebugUnitTest)."
     dependsOn("testDebugUnitTest")
 }
+
+// Strip URL literals from merged translatable resources so dependency metadata links
+// (stores/sponsors/social/docs) do not bleed into this fork's packaged strings.
+tasks.matching { it.name.matches(Regex("merge\\w+Resources")) }.configureEach {
+    doLast {
+        val variant = name.removePrefix("merge").removeSuffix("Resources")
+            .replaceFirstChar { it.lowercaseChar() }
+        val mergedDir = layout.buildDirectory
+            .dir("intermediates/merged-not-compiled-resources/$variant")
+            .get()
+            .asFile
+        if (!mergedDir.exists()) return@doLast
+
+        val urlRegex = Regex("""https?://[^\s<>"']+""")
+
+        mergedDir.walkTopDown()
+            .filter { it.isFile && it.name.startsWith("values") && it.extension == "xml" }
+            .forEach { file ->
+                var text = file.readText()
+                val sanitized = urlRegex.replace(text, "link_removed")
+                if (sanitized != text) {
+                    text = sanitized
+                    file.writeText(text)
+                }
+            }
+    }
+}
