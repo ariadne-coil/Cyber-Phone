@@ -40,7 +40,8 @@ class RnsUdpInterfacePeerPortTest {
             forwardPort = listenPort,
             inboundHandler = { _, _ -> },
             bindAddress = aAddr,
-            multicastGroupAddress = null
+            multicastGroupAddress = null,
+            allowLoopbackPeers = true
         )
 
         ifaceB.start()
@@ -67,4 +68,3 @@ class RnsUdpInterfacePeerPortTest {
         }
     }
 }
-
