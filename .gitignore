@@ -24,3 +24,4 @@ fastlane/report.xml
 /third_party/reticulum/
 /third_party/lxmf/
 /reticulum-messenger/
+/releases/app-release-*-from-gh*.apk

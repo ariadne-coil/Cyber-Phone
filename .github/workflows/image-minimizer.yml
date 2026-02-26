@@ -1,14 +1,63 @@
 name: Image Minimizer
 
 on:
-  issue_comment:
-    types: [created, edited]
-  issues:
-    types: [opened, edited]
-  pull_request_target:
-    types: [opened, edited]
+  pull_request:
+    types: [opened, reopened, synchronize]
+  workflow_dispatch:
 
 jobs:
-  call-image-minimizer-workflow:
-    uses: FossifyOrg/.github/.github/workflows/image-minimizer.yml@main
-    secrets: inherit
+  check-image-sizes:
+    name: Check image sizes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check changed image files
+        id: scan
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+            mapfile -t files < <(git diff --name-only --diff-filter=AM "$BASE...$HEAD" -- '*.png' '*.jpg' '*.jpeg' '*.webp' '*.gif')
+          else
+            mapfile -t files < <(find graphics fastlane/metadata -type f \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' -o -name '*.webp' -o -name '*.gif' \) 2>/dev/null || true)
+          fi
+
+          limit=$((1024 * 1024))
+          oversized=0
+
+          {
+            echo "### Image size report"
+            if [ ${#files[@]} -eq 0 ]; then
+              echo "- No image files changed."
+            fi
+
+            for f in "${files[@]}"; do
+              [ -f "$f" ] || continue
+              size=$(wc -c < "$f")
+              kib=$((size / 1024))
+              if [ "$size" -gt "$limit" ]; then
+                echo "- :warning: \\`$f\\` is ${kib} KiB (> 1024 KiB)"
+                oversized=1
+              else
+                echo "- \\`$f\\`: ${kib} KiB"
+              fi
+            done
+          } > image-size-report.md
+
+          cat image-size-report.md >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$oversized" -ne 0 ]; then
+            echo "oversized=true" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          echo "oversized=false" >> "$GITHUB_OUTPUT"

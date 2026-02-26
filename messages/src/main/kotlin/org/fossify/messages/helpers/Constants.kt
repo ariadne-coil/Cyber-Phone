@@ -97,7 +97,7 @@ const val EXTRA_WALLET_REQUEST_THREAD_ID = "org.fossify.phone.extra.WALLET_REQUE
 const val WALLET_REQUEST_ACTION_APPROVE = "approve"
 const val WALLET_REQUEST_ACTION_DENY = "deny"
 
-private const val PATH = "org.fossify.org.fossify.messages.action."
+private const val PATH = "org.fossify.messages.action."
 const val MARK_AS_READ = PATH + "mark_as_read"
 const val REPLY = PATH + "reply"
 const val COPY_OTP = PATH + "copy_otp"

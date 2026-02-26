@@ -1,48 +1,13 @@
-fastlane documentation
-----
+# Fastlane Notes
 
-# Installation
+This directory is kept for metadata compatibility and release documentation.
 
-Make sure you have the latest version of the Xcode command line tools installed:
+## Scope
 
-```sh
-xcode-select --install
-```
+- Store listing metadata is under `fastlane/metadata/android/`.
+- `Appfile` and `Fastfile` are retained for tooling compatibility.
+- Cyber Phone release publishing is handled by GitHub workflows, not by Fastlane Play upload lanes.
 
-For _fastlane_ installation instructions, see [Installing _fastlane_](https://docs.fastlane.tools/#installing-fastlane)
+## Local validation
 
-# Available Actions
-
-## Android
-
-### android test
-
-```sh
-[bundle exec] fastlane android test
-```
-
-Run unit & instrumentation tests
-
-### android deploy
-
-```sh
-[bundle exec] fastlane android deploy
-```
-
-Build & deploy AAB to Google Play (includes metadata)
-
-### android metadata
-
-```sh
-[bundle exec] fastlane android metadata
-```
-
-Push Play Store metadata
-
-----
-
-This README.md is auto-generated and will be re-generated every time [_fastlane_](https://fastlane.tools) is run.
-
-More information about _fastlane_ can be found on [fastlane.tools](https://fastlane.tools).
-
-The documentation of _fastlane_ can be found on [docs.fastlane.tools](https://docs.fastlane.tools).
+If needed, metadata checks can be run from CI workflows in `.github/workflows/validate-fastlane-metadata.yml`.

@@ -375,8 +375,5 @@
     <string name="about_feature_4">- Mesh messaging over Reticulum/LXMF with multi-interface transport</string>
     <string name="about_feature_5">- Mesh voice calling and file transfer</string>
     <string name="about_feature_6">- Built-in Bitcoin, Lightning, and Fedimint wallet</string>
-    <!--
-        Haven't found some strings? There's more at
-        https://github.com/FossifyOrg/Commons/tree/master/commons/src/main/res
-    -->
+    <!-- Additional shared string resources are provided by the bundled commons dependency. -->
 </resources>

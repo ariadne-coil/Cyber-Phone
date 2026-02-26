@@ -8,6 +8,68 @@ on:
     - cron: "0 6 * * 0"
 
 jobs:
-  update-commons:
-    uses: FossifyOrg/.github/.github/workflows/update-commons.yml@main
-    secrets: inherit
+  commons-audit:
+    name: Commons dependency audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compare pinned commons versions with Maven Central
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import re
+          import urllib.request
+          from pathlib import Path
+
+          toml = Path('gradle/libs.versions.toml').read_text(encoding='utf-8')
+
+          def get_version(key):
+            m = re.search(rf'^{re.escape(key)}\s*=\s*"([^"]+)"', toml, re.MULTILINE)
+            if not m:
+              raise SystemExit(f"Missing version key: {key}")
+            return m.group(1)
+
+          def latest_maven(group, artifact):
+            path = f"https://repo1.maven.org/maven2/{group.replace('.', '/')}/{artifact}/maven-metadata.xml"
+            try:
+              data = urllib.request.urlopen(path, timeout=20).read().decode('utf-8', 'replace')
+            except Exception:
+              return 'unavailable'
+            m = re.search(r'<release>([^<]+)</release>', data) or re.search(r'<latest>([^<]+)</latest>', data)
+            return m.group(1) if m else 'unknown'
+
+          checks = [
+            ("commons", "org.fossify", "commons"),
+            ("mmslib", "org.fossify", "mmslib"),
+          ]
+
+          print("# Commons dependency audit")
+          outdated = []
+          for key, group, artifact in checks:
+            pinned = get_version(key)
+            latest = latest_maven(group, artifact)
+            status = "up-to-date" if pinned == latest else "update available"
+            print(f"- {group}:{artifact} pinned={pinned} latest={latest} ({status})")
+            if pinned != latest and latest not in ('unknown', 'unavailable'):
+              outdated.append((group, artifact, pinned, latest))
+
+          summary = Path('.commons_audit_summary.md')
+          lines = ["### Commons dependency audit", ""]
+          for key, group, artifact in checks:
+            pinned = get_version(key)
+            latest = latest_maven(group, artifact)
+            status = "up-to-date" if pinned == latest else "update available"
+            lines.append(f"- `{group}:{artifact}` pinned `{pinned}`, latest `{latest}` ({status})")
+          summary.write_text("\n".join(lines) + "\n", encoding='utf-8')
+
+          if outdated:
+            print("\nOutdated dependencies detected.")
+          PY
+
+      - name: Publish summary
+        run: cat .commons_audit_summary.md >> "$GITHUB_STEP_SUMMARY"

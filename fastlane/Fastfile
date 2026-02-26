@@ -4,9 +4,9 @@ platform :android do
   desc 'Run unit & instrumentation tests'
   lane(:test) { test_android }
 
-  desc 'Build & deploy AAB to Google Play (includes metadata)'
+  desc 'Build release artifacts'
   lane(:deploy) { deploy_android }
 
-  desc 'Push Play Store metadata'
+  desc 'Process app-store metadata'
   lane(:metadata) { metadata_android }
 end

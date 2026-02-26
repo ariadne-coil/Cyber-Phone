@@ -1,126 +1,133 @@
 name: Bug report
-description: Create a bug report to help us improve
+description: Report a reproducible bug in Cyber Phone
 labels: [ "bug", "needs triage" ]
 body:
   - type: markdown
     attributes:
       value: |
         ## Hi there 👋
-        Thanks for helping us improve Cyber Phone by reporting a bug!
-        Please fill in as much information as possible about your bug to avoid unnecessary and time-consuming back-and-forth communication.
+        Thanks for helping improve Cyber Phone.
+        Please provide a clear, reproducible report with concrete steps.
+
+        Security note:
+        - Do **not** share private keys, seed phrases, wallet backup payloads, or full personal contact data.
 
   - type: checkboxes
     id: checklist
     attributes:
-      label: "Checklist"
+      label: Checklist
       options:
-        - label: "I can reproduce the bug with the latest version given [here](https://github.com/ariadne-coil/Cyber-Phone/releases/latest)."
+        - label: I can reproduce this on the latest release from https://github.com/ariadne-coil/Cyber-Phone/releases/latest
           required: true
-        - label: "I made sure that there are **no existing issues** - [open](https://github.com/ariadne-coil/Cyber-Phone/issues) or [closed](https://github.com/ariadne-coil/Cyber-Phone/issues?q=is%3Aissue+is%3Aclosed) - to which I could contribute my information."
+        - label: I searched existing open/closed issues and discussions before filing
           required: true
-        - label: "I made sure that there are **no existing discussions** - [open](https://github.com/ariadne-coil/Cyber-Phone/discussions) or [closed](https://github.com/ariadne-coil/Cyber-Phone/discussions?discussions_q=is%3Aclosed) - to which I could contribute my information."
+        - label: This report contains exactly one bug
           required: true
-        - label: "I have read the FAQs inside the app (Menu -> About -> FAQs) and my problem isn't listed."
-          required: true
-        - label: "**I have taken the time to fill in all the required details. I understand that the bug report will be dismissed otherwise.**"
-          required: true
-        - label: "This issue contains only one bug."
-          required: true
-        - label: "I have read and understood the [contribution guidelines](https://github.com/ariadne-coil/Cyber-Phone/blob/main/CONTRIBUTING.md)."
+        - label: I removed or redacted sensitive/private information from logs and screenshots
           required: true
 
-  - type: input
-    id: app-version
+  - type: dropdown
+    id: affected_area
     attributes:
-      label: Affected app version
-      description: "Which app version were you using when you found the bug?"
-      placeholder: "x.x.x - Go to App Main Menu > About > Version."
-    validations:
-      required: true
-
-  - type: input
-    id: device-os-info
-    attributes:
-      label: Affected Android/Custom ROM version
-      description: |
-        What operating system and version were you using when you encounter the bug?
-      placeholder: "Example: Android 12 / LineageOS 18.1"
-    validations:
-      required: true
-
-  - type: input
-    id: device-model-info
-    attributes:
-      label: Affected device model
-      description: |
-        What device model were you using when you encountered the bug?
-      placeholder: "Example: Pixel 8 Pro / Samsung Galaxy S20"
+      label: Affected area
+      options:
+        - Calls / Dialer
+        - Messages / SMS / MMS
+        - Mesh messaging
+        - Mesh calls
+        - Wallet (Bitcoin Mainnet / Lightning)
+        - Wallet (Fedimint)
+        - Contacts
+        - Cyber Features settings
+        - UI / Theme / Fonts
+        - Backup / Restore
+        - Install / Update
+        - Other
     validations:
       required: true
 
   - type: dropdown
-    id: download
+    id: install_source
     attributes:
-      label: How did you install the app?
+      label: Install source
       options:
-        - F-Droid / IzzyOnDroid
-        - Google Play Store
-        - GitHub releases
+        - F-Droid
+        - GitHub release APK
         - Built from source
-        - Third-party website
+        - Other
+    validations:
+      required: true
 
-  - type: textarea
-    id: steps-to-reproduce
+  - type: input
+    id: app_version
     attributes:
-      label: Steps to reproduce the bug
-      description: |
-        What did you do for the bug to show up?
+      label: Affected app version
+      placeholder: "Example: 0.5.2"
+    validations:
+      required: true
 
-        If you can't cause the bug to show up again reliably (and hence don't have a proper set of steps to give us), please still try to give as many details as possible on how you think you encountered the bug.
-      placeholder: |
-        1. Go to '...'
-        2. Click on '....'
-        3. Scroll down to '....'
+  - type: input
+    id: android_version
+    attributes:
+      label: Android / ROM version
+      placeholder: "Example: Android 14 / One UI 6.1"
+    validations:
+      required: true
+
+  - type: input
+    id: device_model
+    attributes:
+      label: Device model
+      placeholder: "Example: Pixel 8 Pro / Galaxy S23"
     validations:
       required: true
 
   - type: textarea
-    id: expected-behavior
+    id: steps_to_reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include exact steps and timing.
+      placeholder: |
+        1. Open ...
+        2. Tap ...
+        3. Wait ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
     attributes:
       label: Expected behavior
-      description: |
-        Tell us what you expect to happen.
     validations:
       required: true
 
   - type: textarea
-    id: actual-behavior
+    id: actual_behavior
     attributes:
       label: Actual behavior
-      description: |
-        Tell us what happens with the steps given above.
     validations:
       required: true
 
   - type: textarea
-    id: screen-media
+    id: environment_details
     attributes:
-      label: Screenshots/Screen recordings
+      label: Relevant runtime details (if applicable)
       description: |
-        A picture or video is worth a thousand words.
-
-        If applicable, drag and drop screenshots or a screen recording to help explain your problem. If your file is too big for Github to accept, try to compress it (ZIP file), or feel free to paste a link to an image/video instead.
+        Include only what applies:
+        - Wallet: selected federation, balance state, send/receive/sync action
+        - Mesh: mesh mode, active interfaces (BLE / Wi-Fi Direct / Wi-Fi Aware), routing setting
+        - Calls/Messages: SIM setup, default apps, permission state
+      placeholder: |
+        Federation: Bitcoin Mainnet
+        Mesh mode: Mesh with fallback
+        Interfaces: Wi-Fi Aware ON, BLE OFF, Wi-Fi Direct ON
 
   - type: textarea
-    id: additional-information
+    id: logs
     attributes:
-      label: Additional information
-      description: |
-        Please provide any additional information or context that may be relevant, for example:
-        * any file or media that led to this bug
-        * any crash logs (if you know how to get one)
-        * the affected device is rooted, a foldable or a TV
-        * you have disabled all animations on your device
-        * your rabbit chewed your network cable
-        * ...
-
+      label: Logs / stack trace / screenshots
+      description: Paste relevant redacted logcat excerpt and attach screenshots if possible.
+      placeholder: |
+        - Timestamp:
+        - Exception:
+        - Top stack frames:

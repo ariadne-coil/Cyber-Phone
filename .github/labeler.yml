@@ -1,0 +1,58 @@
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+
+build-system:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'gradle/**'
+          - '*.gradle.kts'
+          - 'settings.gradle.kts'
+          - 'gradle.properties'
+          - 'buildSrc/**'
+
+app:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'app/**'
+
+messages:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'messages/**'
+
+wallet:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'wallet/**'
+          - 'app/src/main/kotlin/**/wallet/**'
+          - 'messages/src/main/kotlin/**/wallet/**'
+
+mesh:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'app/src/main/kotlin/**/mesh/**'
+          - 'messages/src/main/kotlin/**/mesh/**'
+          - 'reticulum-messenger/**'
+
+metadata:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'fastlane/**'
+          - 'docs/**'
+
+release:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'CHANGELOG.md'
+          - 'releases/**'
+          - '.fossify/**'
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'gradle/libs.versions.toml'
+          - 'Gemfile'
+          - 'Gemfile.lock'
+          - 'package.json'
