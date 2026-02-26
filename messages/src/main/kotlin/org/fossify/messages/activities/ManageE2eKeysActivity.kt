@@ -1,5 +1,6 @@
 package org.fossify.messages.activities
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -961,6 +962,7 @@ class ManageE2eKeysActivity : SimpleActivity() {
         }?.trim()?.takeIf { it.isNotBlank() }
     }
 
+    @SuppressLint("MissingPermission")
     private fun getProfilePhoneNumberFromSubscriptions(): String? {
         val canReadLineNumber =
             hasAndroidPermission(Manifest.permission.READ_PHONE_STATE) ||
