@@ -53,6 +53,13 @@ class RnsUdpInterfacePeerPortTest {
                 sock.send(DatagramPacket(prime, prime.size, aAddr, listenPort))
             }
 
+            // Wait for ifaceA to process the prime packet and remember ifaceB as a peer.
+            val peerReadyDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+            while (ifaceA.getPeerCount() == 0 && System.nanoTime() < peerReadyDeadline) {
+                Thread.sleep(10)
+            }
+            assertTrue("Expected ifaceA to discover at least one peer", ifaceA.getPeerCount() > 0)
+
             val msg1 = "one".toByteArray(Charsets.UTF_8)
             val msg2 = "two".toByteArray(Charsets.UTF_8)
             ifaceA.send(msg1)
