@@ -52,9 +52,9 @@ Before each release/RFP update:
 2. `fastlane/metadata/android/en-US/changelogs/<VERSION_CODE>.txt` exists.
 3. `fastlane` title/short/full descriptions reflect current features.
 4. RFP links point to current source and current tag/release page.
+5. `fdroiddata/metadata/org.cyberphone.yml` is updated for the target release.
 
 ## RFP Template Notes
 
 - Multiple categories are valid.
 - Donation checkbox is optional.
-

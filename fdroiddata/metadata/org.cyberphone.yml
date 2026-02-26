@@ -1,0 +1,36 @@
+Categories:
+  - Phone & SMS
+  - Security
+License: AGPL-3.0-only
+AuthorName: Ariadne Coil
+AutoName: Cyber Phone
+Summary: Privacy-first dialer and messaging app with mesh and Bitcoin wallet support
+WebSite: https://github.com/ariadne-coil/Cyber-Phone
+SourceCode: https://github.com/ariadne-coil/Cyber-Phone
+IssueTracker: https://github.com/ariadne-coil/Cyber-Phone/issues
+Changelog: https://github.com/ariadne-coil/Cyber-Phone/releases
+
+Description: |
+    Cyber Phone is a privacy-focused replacement for stock phone and SMS apps.
+
+    It combines dialer, SMS/MMS, optional mesh messaging/calling, and optional
+    Bitcoin wallet features in one app without analytics SDKs.
+
+    Network-backed behavior is feature-gated and user-controlled.
+
+RepoType: git
+Repo: https://github.com/ariadne-coil/Cyber-Phone.git
+
+Builds:
+  - versionName: 0.5.2
+    versionCode: 32
+    commit: 21f9d43ee668efaebc35d0f0db3c4afede3a1569
+    gradle:
+      - yes
+    output: app/build/outputs/apk/release/app-release-unsigned.apk
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+UpdateCheckData: gradle.properties|VERSION_CODE=(\d+)|.|VERSION_NAME=(.*)
+CurrentVersion: 0.5.2
+CurrentVersionCode: 32

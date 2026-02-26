@@ -88,6 +88,7 @@ By default, these network-backed features are disabled until you opt in.
 *   Network behavior is feature-gated and opt-in as described above.
 *   Release builds are produced from pinned dependency versions and static app version metadata.
 *   Reviewer-facing submission details: `docs/F-DROID_SUBMISSION_NOTES.md`.
+*   `fdroiddata` metadata template for faster packaging MR: `fdroiddata/metadata/org.cyberphone.yml`.
 
 ## Permissions
 
