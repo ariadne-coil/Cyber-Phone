@@ -21,7 +21,9 @@ class RnsUdpInterface(
     private val preferredMulticastInterface: NetworkInterface? = null,
     private val extraForwardAddresses: List<String> = emptyList(),
     // If set, we will join this multicast group (best-effort) and also forward packets to it.
-    private val multicastGroupAddress: String? = null
+    private val multicastGroupAddress: String? = null,
+    // Test hook: allow remembering loopback peers on local JVM transports.
+    private val allowLoopbackPeers: Boolean = false
 ) : RnsInterface {
     private val running = AtomicBoolean(false)
     private var socket: DatagramSocket? = null
@@ -186,7 +188,8 @@ class RnsUdpInterface(
     private fun rememberPeer(socketAddress: SocketAddress?) {
         val remote = socketAddress as? InetSocketAddress ?: return
         val addr = remote.address ?: return
-        if (addr.isAnyLocalAddress || addr.isLoopbackAddress) return
+        if (addr.isAnyLocalAddress) return
+        if (!allowLoopbackPeers && addr.isLoopbackAddress) return
         synchronized(peers) {
             peers[addr] = System.currentTimeMillis()
             trimPeersLocked(System.currentTimeMillis())
