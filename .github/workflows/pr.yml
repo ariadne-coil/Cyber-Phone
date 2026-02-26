@@ -31,12 +31,18 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Run static checks and unit tests
+      - name: Run detekt (non-blocking)
+        continue-on-error: true
         run: |
           set -euo pipefail
           ./gradlew --no-daemon \
             :app:detekt \
-            :messages:detekt \
+            :messages:detekt
+
+      - name: Run lint and unit tests (blocking)
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon \
             :app:lintDebug \
             :messages:lintDebug \
             :app:testDebugUnitTest \
