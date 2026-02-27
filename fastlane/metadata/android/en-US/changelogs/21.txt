@@ -1,8 +1,0 @@
-Added:
-
-• Mesh messaging transport upgrades across UDP, multicast, BLE, and Wi-Fi Aware
-• Custom in-app QR scan flow for mesh links
-
-Fixed:
-
-• Multiple startup/runtime crashes in mesh service initialization

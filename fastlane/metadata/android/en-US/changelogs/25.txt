@@ -1,8 +1,0 @@
-Added:
-
-• Payment request/approve/deny flow in message threads
-• Safer wallet backup/restore handling and validation hardening
-
-Fixed:
-
-• Thread-level wallet action routing and request state handling

@@ -1,8 +1,0 @@
-Added:
-
-• Built-in wallet tab with Bitcoin, Lightning, and federation-aware flows
-• Wallet-aware contact integration and message actions
-
-Changed:
-
-• Wallet UX and status reporting improvements

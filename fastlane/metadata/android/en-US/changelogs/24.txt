@@ -1,8 +1,0 @@
-Added:
-
-• Federation directory sync and selectable federation list
-• Wallet address/invoice sharing improvements
-
-Fixed:
-
-• Initial wallet startup and native loading edge cases
