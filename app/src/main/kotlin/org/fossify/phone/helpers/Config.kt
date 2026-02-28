@@ -185,6 +185,10 @@ class Config(context: Context) : BaseConfig(context) {
         get() = prefs.getLong(WALLET_LAST_INVOICE_CREATED_MS, 0L)
         set(value) = prefs.edit { putLong(WALLET_LAST_INVOICE_CREATED_MS, value) }
 
+    var walletLastLightningAddress: String
+        get() = prefs.getString(WALLET_LAST_LIGHTNING_ADDRESS, "") ?: ""
+        set(value) = prefs.edit { putString(WALLET_LAST_LIGHTNING_ADDRESS, value) }
+
     var walletLastOnchainAddress: String
         get() = prefs.getString(WALLET_LAST_ONCHAIN_ADDRESS, "") ?: ""
         set(value) = prefs.edit { putString(WALLET_LAST_ONCHAIN_ADDRESS, value) }
@@ -270,6 +274,45 @@ class Config(context: Context) : BaseConfig(context) {
         val key = walletKey(WALLET_LAST_INVOICE_CREATED_MS, federationId)
         prefs.edit { putLong(key, createdMs) }
         walletLastInvoiceCreatedMs = createdMs
+    }
+
+    fun getWalletLastLightningAddressForFederation(federationId: String): String {
+        val key = walletKey(WALLET_LAST_LIGHTNING_ADDRESS, federationId)
+        val scoped = prefs.getString(key, "")?.trim().orEmpty()
+        if (scoped.isNotBlank()) return scoped
+
+        val legacy = walletLastLightningAddress.trim()
+        if (legacy.isNotBlank() && federationId == walletSelectedFederationId) {
+            setWalletLastLightningAddressForFederation(federationId, legacy)
+            return legacy
+        }
+        return ""
+    }
+
+    fun setWalletLastLightningAddressForFederation(federationId: String, address: String) {
+        val key = walletKey(WALLET_LAST_LIGHTNING_ADDRESS, federationId)
+        prefs.edit { putString(key, address.trim()) }
+        walletLastLightningAddress = address.trim()
+    }
+
+    fun getWalletRecurringRootPrivateKeyForFederation(federationId: String): String {
+        val key = walletKey(WALLET_RECURRING_ROOT_PRIVKEY, federationId)
+        return prefs.getString(key, "")?.trim().orEmpty()
+    }
+
+    fun setWalletRecurringRootPrivateKeyForFederation(federationId: String, privateKeyHex: String) {
+        val key = walletKey(WALLET_RECURRING_ROOT_PRIVKEY, federationId)
+        prefs.edit { putString(key, privateKeyHex.trim().lowercase(Locale.ROOT)) }
+    }
+
+    fun isWalletFederationZapCapable(federationId: String): Boolean {
+        val key = walletKey(WALLET_FEDERATION_ZAP_CAPABLE, federationId)
+        return prefs.getBoolean(key, false)
+    }
+
+    fun setWalletFederationZapCapable(federationId: String, isCapable: Boolean) {
+        val key = walletKey(WALLET_FEDERATION_ZAP_CAPABLE, federationId)
+        prefs.edit { putBoolean(key, isCapable) }
     }
 
     fun getWalletLastOnchainAddressForFederation(federationId: String): String {

@@ -29,10 +29,10 @@
     <string name="wallet_rate_line">Rate: %1$s / BTC\nUpdated: %2$s</string>
     <string name="wallet_rate_line_unavailable">Rate unavailable</string>
     <string name="wallet_rate_short">Rate: %1$s / BTC</string>
-    <string name="wallet_send_destination_hint">BOLT11 invoice or Bitcoin address</string>
+    <string name="wallet_send_destination_hint">BOLT11 invoice, LNURL / Lightning Address, or Bitcoin address</string>
     <string name="wallet_send_amount_hint">Amount (sats)</string>
     <string name="wallet_send_hint">Tip: Leave amount blank for invoices that already specify an amount.</string>
-    <string name="wallet_send_destination_required">Please enter an invoice or address</string>
+    <string name="wallet_send_destination_required">Please enter a Lightning or Bitcoin destination</string>
     <string name="wallet_send_success">Payment sent</string>
     <string name="wallet_send_submitted">Payment submitted</string>
     <string name="wallet_send_pending">Payment submitted and still pending. Check recent activity in a moment.</string>
@@ -90,6 +90,17 @@
     <string name="wallet_unknown_error">Unknown error</string>
     <string name="wallet_receive_lightning">Lightning invoice</string>
     <string name="wallet_receive_onchain">On-chain address</string>
+    <string name="wallet_receive_lnurl_withdraw">Redeem LNURL-withdraw</string>
+    <string name="wallet_lnurl_withdraw_title">Redeem LNURL-withdraw</string>
+    <string name="wallet_lnurl_withdraw_destination_hint">LNURL-withdraw link or QR payload</string>
+    <string name="wallet_lnurl_withdraw_destination_required">Enter an LNURL-withdraw destination</string>
+    <string name="wallet_lnurl_withdraw_amount_hint">Amount (sats, optional)</string>
+    <string name="wallet_lnurl_withdraw_hint">Tip: Leave amount blank when the endpoint has a fixed amount.</string>
+    <string name="wallet_lnurl_withdraw_amount_required">Enter an amount between %1$s and %2$s sats.</string>
+    <string name="wallet_lnurl_withdraw_amount_out_of_range">Amount must be between %1$s and %2$s sats.</string>
+    <string name="wallet_lnurl_withdraw_success">LNURL withdraw submitted</string>
+    <string name="wallet_lnurl_withdraw_pending">LNURL withdraw is pending. Check activity in a moment.</string>
+    <string name="wallet_lnurl_withdraw_failed">Couldn\'t redeem LNURL-withdraw: %1$s</string>
     <string name="wallet_create_invoice">Create invoice</string>
     <string name="wallet_invoice">Invoice</string>
     <string name="wallet_invoice_failed">Couldn\'t create invoice: %1$s</string>
@@ -116,7 +127,11 @@
     <string name="wallet_my_addresses">My receive</string>
     <string name="wallet_my_lightning_invoice">Lightning invoice</string>
     <string name="wallet_my_onchain_address">On-chain address</string>
+    <string name="wallet_my_lightning_address">Lightning wallet address</string>
     <string name="wallet_my_unified_uri">Unified URI (BIP21)</string>
+    <string name="wallet_set_lightning_address_title">Set Lightning wallet address</string>
+    <string name="wallet_set_lightning_address_hint">name@domain</string>
+    <string name="wallet_set_lightning_address_invalid">Enter a valid Lightning address</string>
     <string name="wallet_not_generated_yet">Not generated yet</string>
     <string name="wallet_tap_to_copy">Tap to copy</string>
     <string name="wallet_generate_new">Generate new</string>
@@ -140,6 +155,8 @@
     <string name="wallet_backup_too_large">Backup exceeds the supported size limit</string>
     <string name="wallet_fedimint_no_onchain">Fedimint mode does not support on-chain addresses yet.</string>
     <string name="wallet_fedimint_invoice_only">Fedimint mode currently supports Lightning invoices only.</string>
+    <string name="wallet_fedimint_lnurl_unsupported">Selected federation does not support recurring LNURL addresses.</string>
+    <string name="wallet_fedimint_lnurl_generate_failed">Couldn\'t generate Lightning wallet address: %1$s</string>
     <string name="wallet_fedimint_fixed_amount_required">Fedimint invoices require an amount.</string>
     <string name="wallet_fedimint_variable_invoice_requires_mainnet">Variable-amount invoices require a Bitcoin Mainnet source wallet.</string>
 

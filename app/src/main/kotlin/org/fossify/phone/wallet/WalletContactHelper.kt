@@ -197,9 +197,11 @@ object WalletContactHelper {
         )
 
         var onchainLabeled: String? = null
-        var lightningLabeled: String? = null
+        var lightningLabeledPreferred: String? = null
+        var lightningLabeledFallback: String? = null
         var onchainHeuristic: String? = null
-        var lightningHeuristic: String? = null
+        var lightningHeuristicPreferred: String? = null
+        var lightningHeuristicFallback: String? = null
 
         context.contentResolver.query(
             ContactsContract.Data.CONTENT_URI,
@@ -222,10 +224,26 @@ object WalletContactHelper {
 
                 if (isOnchainLabeled && !isOnchainPlaceholder && onchainLabeled == null) {
                     onchainLabeled = value
-                } else if (isLightningLabeled && !isLightningPlaceholder && lightningLabeled == null) {
-                    lightningLabeled = value
-                } else if (looksLikeLightningDestination(value) && !isLightningPlaceholder && lightningHeuristic == null) {
-                    lightningHeuristic = value
+                } else if (isLightningLabeled && !isLightningPlaceholder) {
+                    when {
+                        looksLikePreferredLightningDestination(value) && lightningLabeledPreferred == null -> {
+                            lightningLabeledPreferred = value
+                        }
+
+                        looksLikeLightningDestination(value) && lightningLabeledFallback == null -> {
+                            lightningLabeledFallback = value
+                        }
+                    }
+                } else if (looksLikeLightningDestination(value) && !isLightningPlaceholder) {
+                    when {
+                        looksLikePreferredLightningDestination(value) && lightningHeuristicPreferred == null -> {
+                            lightningHeuristicPreferred = value
+                        }
+
+                        lightningHeuristicFallback == null -> {
+                            lightningHeuristicFallback = value
+                        }
+                    }
                 } else if (looksLikeOnchainDestination(value) && !isOnchainPlaceholder && onchainHeuristic == null) {
                     onchainHeuristic = value
                 }
@@ -234,7 +252,10 @@ object WalletContactHelper {
 
         return WalletDestinations(
             onchain = onchainLabeled ?: onchainHeuristic,
-            lightning = lightningLabeled ?: lightningHeuristic,
+            lightning = lightningLabeledPreferred
+                ?: lightningHeuristicPreferred
+                ?: lightningLabeledFallback
+                ?: lightningHeuristicFallback,
         )
     }
 
@@ -249,13 +270,32 @@ object WalletContactHelper {
     }
 
     private fun looksLikeLightningDestination(value: String): Boolean {
-        val v = value.trim()
+        val v = stripLightningPrefix(value)
         if (v.isBlank()) return false
-        if (v.startsWith("lightning:", ignoreCase = true)) return true
         if (v.startsWith("ln", ignoreCase = true)) return true // BOLT11 / LNURL
         // Lightning Address (name@domain)
         if (v.contains('@') && !v.contains(' ')) return true
         return false
+    }
+
+    private fun looksLikePreferredLightningDestination(value: String): Boolean {
+        val v = stripLightningPrefix(value)
+        if (v.isBlank()) return false
+
+        // Prefer stable reusable destinations over single-use invoices.
+        if (v.startsWith("lnurl", ignoreCase = true)) return true
+        if (v.startsWith("lnurlp://", ignoreCase = true)) return true
+        if (v.startsWith("https://", ignoreCase = true) || v.startsWith("http://", ignoreCase = true)) return true
+        return v.contains('@') && !v.contains(' ')
+    }
+
+    private fun stripLightningPrefix(value: String): String {
+        val trimmed = value.trim()
+        return if (trimmed.startsWith("lightning:", ignoreCase = true)) {
+            trimmed.substringAfter(':').trim()
+        } else {
+            trimmed
+        }
     }
 
     private fun hasWalletPhoneRow(context: Context, rawId: Long, label: String): Boolean {

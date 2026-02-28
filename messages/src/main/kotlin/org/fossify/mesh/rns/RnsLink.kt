@@ -188,6 +188,10 @@ class RnsLink private constructor(
     private val pendingRequests = ConcurrentHashMap<String, RnsRequestReceipt>()
     @Volatile
     private var lastPendingTrimAtMs: Long = 0L
+    @Volatile
+    private var lastInboundActivityMs: Long = 0L
+    @Volatile
+    private var lastOutboundActivityMs: Long = 0L
     private var remoteIdentity: RnsIdentity? = null
     @Volatile
     private var identifySent: Boolean = false
@@ -204,6 +208,7 @@ class RnsLink private constructor(
         val raw = packet.pack()
         linkId = linkIdFromRequest(raw, payload.size)
         requestTimeMs = System.currentTimeMillis()
+        lastOutboundActivityMs = requestTimeMs
         return packet
     }
 
@@ -258,34 +263,48 @@ class RnsLink private constructor(
             updateMdu()
         }
         status = ACTIVE
-        val rtt = (System.currentTimeMillis() - requestTimeMs).toDouble() / 1000.0
+        val now = System.currentTimeMillis()
+        lastInboundActivityMs = now
+        val rtt = (now - requestTimeMs).toDouble() / 1000.0
         rttSeconds = rtt
         return rtt
     }
 
     fun handleRttPayload(payload: ByteArray): Boolean {
         val received = unpackRttPayload(payload) ?: return false
-        val measured = (System.currentTimeMillis() - requestTimeMs).toDouble() / 1000.0
+        val now = System.currentTimeMillis()
+        lastInboundActivityMs = now
+        val measured = (now - requestTimeMs).toDouble() / 1000.0
         rttSeconds = maxOf(measured, received)
         status = ACTIVE
         return true
     }
 
     fun encryptForPacket(packetType: Int, context: Int, payload: ByteArray): ByteArray? {
-        if (!shouldEncrypt(packetType, context)) return payload
+        if (!shouldEncrypt(packetType, context)) {
+            lastOutboundActivityMs = System.currentTimeMillis()
+            return payload
+        }
         val activeToken = token ?: return null
         return try {
-            activeToken.encrypt(payload)
+            activeToken.encrypt(payload).also {
+                lastOutboundActivityMs = System.currentTimeMillis()
+            }
         } catch (_: Exception) {
             null
         }
     }
 
     fun decryptForPacket(packetType: Int, context: Int, payload: ByteArray): ByteArray? {
-        if (!shouldEncrypt(packetType, context)) return payload
+        if (!shouldEncrypt(packetType, context)) {
+            lastInboundActivityMs = System.currentTimeMillis()
+            return payload
+        }
         val activeToken = token ?: return null
         return try {
-            activeToken.decrypt(payload)
+            activeToken.decrypt(payload).also {
+                lastInboundActivityMs = System.currentTimeMillis()
+            }
         } catch (_: Exception) {
             null
         }
@@ -310,6 +329,13 @@ class RnsLink private constructor(
     }
 
     fun isActive(): Boolean = status == ACTIVE
+
+    fun hasRecentInboundActivity(maxAgeMs: Long, now: Long = System.currentTimeMillis()): Boolean {
+        if (!isActive()) return false
+        val lastInbound = lastInboundActivityMs
+        if (lastInbound <= 0L) return false
+        return now - lastInbound <= maxAgeMs
+    }
 
     fun request(
         path: String,

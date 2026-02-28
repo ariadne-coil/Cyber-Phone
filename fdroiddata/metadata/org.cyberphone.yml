@@ -1,38 +1,50 @@
 Categories:
-  - Phone & SMS
   - Messaging
+  - Phone & SMS
   - Security
   - Wallet
 License: AGPL-3.0-only
 AuthorName: Ariadne Coil
-AutoName: Cyber Phone
-Summary: Privacy-first dialer and messaging app with mesh and Bitcoin wallet support
 WebSite: https://github.com/ariadne-coil/Cyber-Phone
 SourceCode: https://github.com/ariadne-coil/Cyber-Phone
 IssueTracker: https://github.com/ariadne-coil/Cyber-Phone/issues
 Changelog: https://github.com/ariadne-coil/Cyber-Phone/releases
 
+AutoName: Cyber Phone
 Description: |
-    Cyber Phone is a privacy-focused replacement for stock phone and SMS apps.
+  Cyber Phone is a privacy-focused replacement for stock phone and SMS apps.
 
-    It combines dialer, SMS/MMS, optional mesh messaging/calling, and optional
-    Bitcoin wallet features in one app without analytics SDKs.
+  It combines dialer, SMS/MMS, optional mesh messaging/calling, and optional
+  Bitcoin wallet features in one app without analytics SDKs.
 
-    Network-backed behavior is feature-gated and user-controlled.
+  Network-backed behavior is feature-gated and user-controlled.
 
 RepoType: git
 Repo: https://github.com/ariadne-coil/Cyber-Phone.git
 
 Builds:
-  - versionName: 0.5.2
-    versionCode: 32
-    commit: 21f9d43ee668efaebc35d0f0db3c4afede3a1569
+  - versionName: 0.6.0
+    versionCode: 33
+    commit: v0.6.0
+    subdir: app
+    submodules: true
+    sudo:
+      - apt-get update
+      - apt-get install -y rustup binaryen nodejs clang
+    init:
+      - export PATH="$HOME/.cargo/bin:$PATH"
+      - rustup default stable
+      - rustup target add wasm32-unknown-unknown
+      - cargo install --locked wasm-bindgen-cli --version 0.2.100
     gradle:
       - yes
-    output: app/build/outputs/apk/release/app-release-unsigned.apk
+    output: build/outputs/apk/release/app-release-unsigned.apk
+    prebuild:
+      - sed -i -e '/foojay/d' ../settings.gradle.kts
+      - rm -f ../releases/CyberPhone-v*.apk ../releases/CyberPhone-v*.apk.sha256
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
 UpdateCheckData: gradle.properties|VERSION_CODE=(\d+)|.|VERSION_NAME=(.*)
-CurrentVersion: 0.5.2
-CurrentVersionCode: 32
+CurrentVersion: 0.6.0
+CurrentVersionCode: 33

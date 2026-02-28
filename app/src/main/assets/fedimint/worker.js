@@ -1,5 +1,5 @@
-// Web Worker for Fedimint WASM runtime.
-// Runtime package: @fedimint/fedimint-client-wasm-web@0.0.0-canary-ba376955df27b42d3afa7c84f1e2458d5bac019b
+// Web Worker for the Fedimint WASM runtime.
+// Low-level module is generated at build time from third_party/fedimint-web (pinned source).
 
 // HACK: Fixes vitest browser runner
 globalThis.__vitest_browser_runner__ = { wrapDynamicImport: (foo) => foo() }
@@ -151,7 +151,7 @@ const ensureRpcHandler = async (filename) => {
   }
 
   dbAccessHandle = await fileHandle.createSyncAccessHandle()
-  rpcHandler = new RpcHandlerCtor(dbAccessHandle)
+  rpcHandler = await new RpcHandlerCtor(dbAccessHandle)
 }
 
 const sendRpc = (request, onMessage) => {

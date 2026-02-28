@@ -23,6 +23,41 @@ fun hasSigningVars(): Boolean {
             && providers.environmentVariable("SIGNING_STORE_PASSWORD").orNull != null
 }
 
+fun isCommandOnPath(name: String): Boolean {
+    val pathEntries = (System.getenv("PATH") ?: return false)
+        .split(File.pathSeparator)
+        .filter { it.isNotBlank() }
+
+    val candidates = if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) {
+        val pathext = (System.getenv("PATHEXT") ?: ".COM;.EXE;.BAT;.CMD")
+            .split(";")
+            .filter { it.isNotBlank() }
+        if (name.contains(".")) {
+            listOf(name)
+        } else {
+            listOf(name) + pathext.map { ext ->
+                if (ext.startsWith(".")) "$name$ext" else "$name.$ext"
+            }
+        }
+    } else {
+        listOf(name)
+    }
+
+    return pathEntries.any { entry ->
+        candidates.any { candidate -> File(entry, candidate).isFile }
+    }
+}
+
+fun toWslPath(file: File): String? {
+    val normalized = file.absolutePath.replace('\\', '/')
+    val match = Regex("^([A-Za-z]):/(.*)$").matchEntire(normalized) ?: return null
+    val drive = match.groupValues[1].lowercase()
+    val rest = match.groupValues[2]
+    return "/mnt/$drive/$rest"
+}
+
+fun shellSingleQuote(value: String): String = value.replace("'", "'\"'\"'")
+
 val blockedReleaseUrlFragments = listOf(
     "play.google.com/store/apps/",
     "play.google.com/store/apps/dev",
@@ -37,6 +72,47 @@ val blockedReleaseUrlFragments = listOf(
     "t.me/Fossify",
     "www.reddit.com/r/Fossify"
 )
+
+val fedimintSourceRoot = rootProject.file("third_party/fedimint-web")
+val fedimintGeneratedAssetRootDir = layout.buildDirectory.dir("generated/fedimintRuntime/assets")
+val fedimintGeneratedAssetDir = layout.buildDirectory.dir("generated/fedimintRuntime/assets/fedimint")
+val fedimintRustTargetDir = layout.buildDirectory.dir("intermediates/fedimintRuntime/target")
+val fedimintRuntimeBuildScript = rootProject.file("scripts/build-fedimint-web-runtime.mjs")
+val isWindowsHost = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+val hasLocalCargo = isCommandOnPath("cargo")
+val hasWsl = isCommandOnPath("wsl")
+val fedimintWslRoot = if (isWindowsHost && !hasLocalCargo) toWslPath(rootProject.projectDir) else null
+
+val generateFedimintWebRuntime by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Builds the Fedimint Web runtime from pinned source into generated Android assets."
+    doNotTrackState("Fedimint runtime generation depends on external toolchain state and submodule contents.")
+
+    val outputDir = fedimintGeneratedAssetDir.get().asFile
+    val targetDir = fedimintRustTargetDir.get().asFile
+
+    inputs.dir(fedimintSourceRoot)
+    inputs.file(fedimintRuntimeBuildScript)
+    outputs.dir(outputDir)
+
+    if (fedimintWslRoot != null && hasWsl) {
+        val wslCommand =
+            "cd '${shellSingleQuote(fedimintWslRoot)}' && " +
+                    "node scripts/build-fedimint-web-runtime.mjs " +
+                    "third_party/fedimint-web " +
+                    "app/build/generated/fedimintRuntime/assets/fedimint " +
+                    "app/build/intermediates/fedimintRuntime/target"
+        commandLine("wsl.exe", "bash", "-lc", wslCommand)
+    } else {
+        commandLine(
+            "node",
+            fedimintRuntimeBuildScript.absolutePath,
+            fedimintSourceRoot.absolutePath,
+            outputDir.absolutePath,
+            targetDir.absolutePath,
+        )
+    }
+}
 
 android {
     compileSdk = project.libs.versions.app.build.compileSDKVersion.get().toInt()
@@ -147,6 +223,8 @@ android {
             enableSplit = false
         }
     }
+
+    sourceSets.getByName("main").assets.directories.add(fedimintGeneratedAssetRootDir.get().asFile.absolutePath)
 }
 
 detekt {
@@ -167,6 +245,7 @@ dependencies {
     implementation(libs.geocoder)
     implementation(libs.libphonenumberinfo)
     implementation(libs.okhttp)
+    implementation(libs.bouncycastle)
     implementation(libs.slf4j.android)
     implementation(libs.androidx.swiperefreshlayout)
     implementation(libs.androidx.webkit)
@@ -184,6 +263,10 @@ tasks.register("testClasses") {
     group = "verification"
     description = "Runs unit tests (alias for testDebugUnitTest)."
     dependsOn("testDebugUnitTest")
+}
+
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
+    dependsOn(generateFedimintWebRuntime)
 }
 
 tasks.register("verifyReleaseUrlScrub") {

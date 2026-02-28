@@ -399,10 +399,13 @@ object LxmfRouter {
         val payload = packed.copyOfRange(DESTINATION_HASH_LEN, packed.size)
         val packet = RnsPacket(destination = remoteDestination, data = payload)
         return try {
-            // Dual-path send for small payloads:
-            // 1) direct packet for lowest latency
-            // 2) link path in parallel for reliability on networks that suppress broadcast/multicast
-            RnsNode.sendPacketViaLink(local, remoteDestination, payload, RnsPacket.NONE)
+            // If we already have an active link, prefer it for low-latency delivery. Crucially, this
+            // does not create/queue a new link for small packets, so we avoid the link churn that caused
+            // asymmetric delays after invoice and call traffic.
+            if (RnsNode.trySendPacketViaExistingLink(local, remoteDestination, payload, RnsPacket.NONE)) {
+                onDelivered?.invoke()
+                return true
+            }
             if (onDelivered != null) {
                 RnsNode.sendWithReceipt(packet, destinationHash, onDelivered)
             } else {

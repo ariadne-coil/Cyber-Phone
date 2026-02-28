@@ -40,7 +40,8 @@ Network access is feature-gated and user-driven:
 
 - Dependency versions are pinned in `gradle/libs.versions.toml`.
 - One repository source is JitPack (`https://jitpack.io`) for specific pinned artifacts.
-- Fedimint web runtime assets are currently vendored in `app/src/main/assets/fedimint/` (JS + WASM).
+- Fedimint web runtime is source-built from the pinned `third_party/fedimint-web` submodule during the app build.
+- `app/src/main/assets/fedimint/` now contains only the checked-in loader/worker glue; generated runtime artifacts are emitted under `app/build/generated/fedimintRuntime/`.
 
 These two points are intentionally documented because they may be review-sensitive.
 

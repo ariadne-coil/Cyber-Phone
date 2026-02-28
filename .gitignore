@@ -11,6 +11,8 @@ keystore.properties
 fastlane/fastlane.json
 fastlane/report.xml
 .kotlin/
+/buildSrc/.gradle/
+/buildSrc/build/
 /app/Keystore/
 /app/core/
 /app/release/
@@ -19,9 +21,13 @@ fastlane/report.xml
 /tmp/
 /LXMF-0.9.3.zip
 /third_party/
+!/third_party/fedimint-web/
+!/third_party/fedimint-web/**
 
 # Local-only reference materials
 /third_party/reticulum/
 /third_party/lxmf/
 /reticulum-messenger/
+/releases/CyberPhone-v*.apk
+/releases/CyberPhone-v*.apk.sha256
 /releases/app-release-*-from-gh*.apk

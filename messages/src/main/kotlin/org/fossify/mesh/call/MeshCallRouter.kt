@@ -317,23 +317,35 @@ object MeshCallRouter {
         buffer.putInt(sequence)
         buffer.put(opusFrame)
         val payload = buffer.array()
+        val owner = callDestination ?: return
+        // Prefer destination-based link routing so we use the freshest active link mapping instead of
+        // pinning audio to the first observed link ID, which may go stale after link churn.
+        if (session.remoteDestination.identity != null &&
+            RnsNode.trySendPacketViaLink(owner, session.remoteDestination, payload, RnsPacket.NONE)
+        ) {
+            return
+        }
         val linkId = session.linkId
         if (linkId != null && RnsNode.sendPacketOnLink(linkId, payload, RnsPacket.NONE)) {
             return
         }
-        val owner = callDestination ?: return
         // Do not queue audio. If the link/path isn't ready, drop frames to avoid building up
         // seconds of latency ("slow-mo" audio) when the link becomes active again.
         RnsNode.trySendPacketViaLink(owner, session.remoteDestination, payload, RnsPacket.NONE)
     }
 
     private fun sendControlPayload(session: MeshCallSession, payload: ByteArray) {
+        val owner = callDestination ?: return
+        // For control packets, prefer destination-based link routing so retransmits follow the current
+        // active link instead of a possibly stale cached link ID.
+        if (session.remoteDestination.identity != null) {
+            RnsNode.sendPacketViaLink(owner, session.remoteDestination, payload, RnsPacket.NONE)
+            return
+        }
         val linkId = session.linkId
         if (linkId != null && RnsNode.sendPacketOnLink(linkId, payload, RnsPacket.NONE)) {
             return
         }
-        val owner = callDestination ?: return
-        RnsNode.sendPacketViaLink(owner, session.remoteDestination, payload, RnsPacket.NONE)
     }
 
     private fun handleCallPacket(packet: RnsPacket, payload: ByteArray) {
@@ -452,7 +464,7 @@ object MeshCallRouter {
     private fun updateSessionLink(sessionId: ByteArray, linkId: ByteArray?) {
         if (linkId == null) return
         val session = sessions[RnsHex.encode(sessionId)] ?: return
-        if (session.linkId == null) {
+        if (session.linkId == null || !session.linkId!!.contentEquals(linkId)) {
             session.linkId = linkId
         }
     }

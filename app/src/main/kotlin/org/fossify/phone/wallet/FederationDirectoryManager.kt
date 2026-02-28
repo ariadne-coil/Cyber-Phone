@@ -59,6 +59,8 @@ data class FederationEntry(
     val onchainDepositsDisabled: Boolean? = null,
     @SerialName("vetted_gateways")
     val vettedGateways: List<String> = emptyList(),
+    @SerialName("recurringd_api")
+    val recurringdApi: String? = null,
 )
 
 @Serializable
@@ -229,6 +231,9 @@ object FederationDirectoryManager {
                 val vettedGateways = parseGatewayNodeIds(
                     obj["vetted_gateways"]?.jsonPrimitive?.contentOrNull
                 )
+                val recurringdApi = normalizeRecurringdApi(
+                    obj["recurringd_api"]?.jsonPrimitive?.contentOrNull
+                )
 
                 FederationEntry(
                     id = key.trim().ifBlank { name.lowercase().replace(" ", "-") },
@@ -240,6 +245,7 @@ object FederationDirectoryManager {
                     description = description.ifBlank { "Public Fedimint federation." },
                     onchainDepositsDisabled = onchainDisabled,
                     vettedGateways = vettedGateways,
+                    recurringdApi = recurringdApi,
                 )
             }.distinctBy { it.id }
 
@@ -427,6 +433,7 @@ object FederationDirectoryManager {
             kind = normalizedKind,
             invite = normalizedInvite,
             vettedGateways = normalizedGateways,
+            recurringdApi = normalizeRecurringdApi(entry.recurringdApi),
         )
     }
 
@@ -452,8 +459,9 @@ object FederationDirectoryManager {
         val websiteLooksFedimint = website.contains("fedimint") || website.contains("fedibtc.com") || website.contains("fedi")
         val idLooksFedimint = id.startsWith("fedimint-")
         val nameLooksFedimint = name.contains("fedimint")
+        val hasRecurringdApi = !normalizeRecurringdApi(entry.recurringdApi).isNullOrBlank()
 
-        return websiteLooksFedimint || idLooksFedimint || nameLooksFedimint
+        return websiteLooksFedimint || idLooksFedimint || nameLooksFedimint || hasRecurringdApi
     }
 
     private fun mergeEntryKeepingValidFallback(
@@ -473,11 +481,36 @@ object FederationDirectoryManager {
             lsps1Address = primary.lsps1Address?.takeIf { it.isNotBlank() } ?: fallback.lsps1Address,
             lsps1Token = primary.lsps1Token?.takeIf { it.isNotBlank() } ?: fallback.lsps1Token,
             onchainDepositsDisabled = primary.onchainDepositsDisabled ?: fallback.onchainDepositsDisabled,
+            recurringdApi = normalizeRecurringdApi(primary.recurringdApi)
+                ?: normalizeRecurringdApi(fallback.recurringdApi),
             vettedGateways = (fallback.vettedGateways + primary.vettedGateways)
                 .map { it.trim() }
                 .filter { it.matches(Regex("^(02|03)[0-9a-fA-F]{64}$")) }
                 .distinct(),
         )
+    }
+
+    private fun normalizeRecurringdApi(raw: String?): String? {
+        val trimmed = raw?.trim().orEmpty()
+            .removeSurrounding("\"")
+            .removeSurrounding("'")
+            .trim()
+        if (trimmed.isBlank()) {
+            return null
+        }
+
+        val withScheme = if (trimmed.startsWith("https://", ignoreCase = true) || trimmed.startsWith("http://", ignoreCase = true)) {
+            trimmed
+        } else {
+            "https://$trimmed"
+        }
+        val url = withScheme.toHttpUrlOrNull() ?: return null
+        val normalizedPath = url.encodedPath.trimEnd('/')
+        val normalized = url.newBuilder()
+            .encodedPath(if (normalizedPath.isBlank()) "/" else normalizedPath)
+            .build()
+            .toString()
+        return normalized.removeSuffix("/")
     }
 
     private fun canonicalFederationKey(entry: FederationEntry): String {

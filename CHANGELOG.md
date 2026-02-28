@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.6.0 (2026-02-28)
+- Mesh reliability: rolled back the regressive small-message dual-path send behavior and replaced it with an active-link-only fast path plus safer direct-packet fallback, substantially reducing the remaining one-way delay/loss pattern.
+- Mesh link health: added responsive-link checks for message fast-path routing so stale one-sided links stop hijacking text delivery after invoice/call activity.
+- Mesh calls: stopped pinning call sessions to stale link IDs; control/audio now prefer the freshest destination-based active link mapping, improving post-invoice call stability.
+- Fedimint runtime: replaced vendored WASM blobs with a source-built runtime pipeline (pinned submodule + build scripts), keeping the wallet reproducible and F-Droid-friendlier.
+- Fedimint compatibility: fixed WebView runtime integration for the new generated client (`env` import issue and async `RpcHandler` construction), restoring working federation access.
+- Lightning UX: added federation recurring LNURL generation support, capability detection, and wallet UI handling for reusable Lightning payment codes.
+- Wallet identity/sharing: switched user-facing Lightning address display toward LNURL where available, reduced invoice clutter in the wallet UI, and expanded thread sharing flows for wallet/contact payloads.
+- Release/docs: updated release metadata and F-Droid notes to reflect the new source-built Fedimint runtime path.
+
 ## v0.5.2 (2026-02-25)
 - Stability: fixed the Settings crash caused by missing required bound layout IDs in settings includes.
 - Install reliability: disabled release baseline-profile sidecar generation to avoid `INSTALL_BASELINE_PROFILE_FAILED` on affected Studio/device combinations.

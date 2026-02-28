@@ -60,6 +60,9 @@ class ManageE2eKeysActivity : SimpleActivity() {
     private companion object {
         const val MAX_E2E_BACKUP_IMPORT_BYTES = 256 * 1024
         const val PREFS_NAME = "Prefs"
+        const val WALLET_SELECTED_FEDERATION_ID = "wallet_selected_federation_id"
+        const val WALLET_LAST_LIGHTNING_ADDRESS = "wallet_last_lightning_address"
+        const val WALLET_LAST_INVOICE = "wallet_last_invoice"
         const val WALLET_LIQUIDITY_PROVIDER_MODE = "wallet_liquidity_provider_mode"
         const val WALLET_LIQUIDITY_PROVIDER_ID = "wallet_liquidity_provider_id"
         const val WALLET_DIRECTORY_JSON = "wallet_directory_json"
@@ -621,7 +624,7 @@ class ManageE2eKeysActivity : SimpleActivity() {
             meshUri = meshUri,
             e2ePublicKeyBase64 = E2eManager.getPublicKeyBase64(this),
             walletOnchainAddress = getLocalWalletOnchainAddress(),
-            walletLightningDestination = getLocalWalletLightningDestination(),
+            walletLightningDestination = getLocalWalletLightningDestinationForQr(),
         )
         val size = resources.getDimensionPixelSize(R.dimen.profile_qr_size)
         val bitmap = createQrBitmap(content, size) ?: return
@@ -841,7 +844,7 @@ class ManageE2eKeysActivity : SimpleActivity() {
     private fun getLocalWalletOnchainAddress(): String? {
         // Stored by the Wallet feature in the shared BaseConfig prefs ("Prefs").
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val selectedId = prefs.getString("wallet_selected_federation_id", "")?.trim().orEmpty()
+        val selectedId = prefs.getString(WALLET_SELECTED_FEDERATION_ID, "")?.trim().orEmpty()
         val scoped = if (selectedId.isNotBlank()) {
             prefs.getString("wallet_last_onchain_address_$selectedId", "")?.trim().orEmpty()
         } else {
@@ -853,24 +856,50 @@ class ManageE2eKeysActivity : SimpleActivity() {
 
     private fun getLocalWalletLastInvoice(): String? {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val selectedId = prefs.getString("wallet_selected_federation_id", "")?.trim().orEmpty()
+        val selectedId = prefs.getString(WALLET_SELECTED_FEDERATION_ID, "")?.trim().orEmpty()
         val scoped = if (selectedId.isNotBlank()) {
-            prefs.getString("wallet_last_invoice_$selectedId", "")?.trim().orEmpty()
+            prefs.getString("${WALLET_LAST_INVOICE}_$selectedId", "")?.trim().orEmpty()
         } else {
             ""
         }
         if (scoped.isNotBlank()) return scoped
-        return prefs.getString("wallet_last_invoice", "")?.trim()?.takeIf { it.isNotBlank() }
+        return prefs.getString(WALLET_LAST_INVOICE, "")?.trim()?.takeIf { it.isNotBlank() }
     }
 
-    private fun getLocalWalletLightningDestination(): String? {
-        val fromProfile = getProfileCustomWalletDestination("Lightning")
+    private fun getLocalWalletLightningAddress(): String? {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val selectedId = prefs.getString(WALLET_SELECTED_FEDERATION_ID, "")?.trim().orEmpty()
+        val scoped = if (selectedId.isNotBlank()) {
+            prefs.getString("${WALLET_LAST_LIGHTNING_ADDRESS}_$selectedId", "")?.trim().orEmpty()
+        } else {
+            ""
+        }
+        if (scoped.isNotBlank()) return scoped
+        return prefs.getString(WALLET_LAST_LIGHTNING_ADDRESS, "")?.trim()?.takeIf { it.isNotBlank() }
+    }
+
+    private fun getLocalWalletLightningDestinationForQr(): String? {
+        val fromProfile = getProfileCustomWalletLightningDestination(allowInvoiceFallback = false)
         if (!fromProfile.isNullOrBlank()) return fromProfile
-        return getLocalWalletLastInvoice()
+        return getLocalWalletLightningAddress()
     }
 
-    private fun getProfileCustomWalletDestination(label: String): String? {
-        if (!hasPermission(PERMISSION_READ_CONTACTS)) return null
+    private fun getProfileCustomWalletLightningDestination(allowInvoiceFallback: Boolean): String? {
+        val candidates = getProfileCustomWalletDestinations(label = "Lightning")
+        if (candidates.isEmpty()) return null
+
+        val preferred = candidates.firstOrNull { isPreferredLightningDestination(it) }
+        if (!preferred.isNullOrBlank()) return preferred
+
+        if (allowInvoiceFallback) {
+            return candidates.firstOrNull { looksLikeLightningInvoice(it) || it.isNotBlank() }
+        }
+
+        return null
+    }
+
+    private fun getProfileCustomWalletDestinations(label: String): List<String> {
+        if (!hasPermission(PERMISSION_READ_CONTACTS)) return emptyList()
         val profileId = contentResolver.query(
             ContactsContract.Profile.CONTENT_URI,
             arrayOf(ContactsContract.Profile._ID),
@@ -879,9 +908,10 @@ class ManageE2eKeysActivity : SimpleActivity() {
             null
         )?.use { cursor ->
             if (cursor.moveToFirst()) cursor.getLong(0) else null
-        } ?: return null
+        } ?: return emptyList()
 
-        return contentResolver.query(
+        val destinations = ArrayList<String>()
+        contentResolver.query(
             ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
             arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
             "${ContactsContract.CommonDataKinds.Phone.CONTACT_ID}=? AND " +
@@ -894,8 +924,41 @@ class ManageE2eKeysActivity : SimpleActivity() {
             ),
             null
         )?.use { cursor ->
-            if (cursor.moveToFirst()) cursor.getString(0) else null
-        }?.trim()?.takeIf { it.isNotBlank() }
+            while (cursor.moveToNext()) {
+                val value = cursor.getString(0)?.trim().orEmpty()
+                if (value.isNotBlank()) {
+                    destinations.add(value)
+                }
+            }
+        }
+        return destinations
+    }
+
+    private fun stripLightningPrefix(value: String): String {
+        val trimmed = value.trim()
+        return if (trimmed.startsWith("lightning:", ignoreCase = true)) {
+            trimmed.substringAfter(':').trim()
+        } else {
+            trimmed
+        }
+    }
+
+    private fun isPreferredLightningDestination(value: String): Boolean {
+        val normalized = stripLightningPrefix(value)
+        if (normalized.isBlank()) return false
+        if (normalized.startsWith("lnurl", ignoreCase = true)) return true
+        if (normalized.startsWith("lnurlp://", ignoreCase = true)) return true
+        if (normalized.startsWith("https://", ignoreCase = true) || normalized.startsWith("http://", ignoreCase = true)) {
+            return true
+        }
+        return normalized.contains('@') && !normalized.contains(' ')
+    }
+
+    private fun looksLikeLightningInvoice(value: String): Boolean {
+        val normalized = stripLightningPrefix(value)
+        return normalized.startsWith("lnbc", ignoreCase = true) ||
+            normalized.startsWith("lntb", ignoreCase = true) ||
+            normalized.startsWith("lnbcrt", ignoreCase = true)
     }
 
     private fun getProfileDisplayName(phoneHint: String? = null): String? {

@@ -1,6 +1,7 @@
 package org.fossify.messages.helpers
 
 import java.nio.charset.StandardCharsets
+import java.net.URLDecoder
 import java.util.Base64
 import java.util.UUID
 
@@ -56,6 +57,11 @@ object WalletTokenParser {
     )
 
     private val bolt11Regex = Regex("(?i)(?:lightning:)?(ln(?:bc|tb|bcrt)[0-9a-z]+)")
+    private val lnurlRegex = Regex("(?i)(?:lightning:)?(lnurl1[0-9a-z]+)")
+    private val lnurlpRegex = Regex("(?i)(lnurlp://[^\\s<>\"]+)")
+    private val lightningAddressPrefixedRegex = Regex("(?i)lightning:([a-z0-9._%+\\-]{1,64}@[a-z0-9.-]+\\.[a-z]{2,63})")
+    private val lightningAddressStrictRegex = Regex("(?i)^([a-z0-9._%+\\-]{1,64}@[a-z0-9.-]+\\.[a-z]{2,63})$")
+    private val bip21LightningParamRegex = Regex("(?i)(?:^|[?&])lightning=([^&\\s]+)")
     private val bech32BtcRegex = Regex("(?i)(?:bitcoin:)?((?:bc1|tb1|bcrt1)[0-9a-z]{20,})")
 
     // Cyber Phone Fedimint out-of-band token format.
@@ -93,13 +99,42 @@ object WalletTokenParser {
         val raw = text.trim()
         if (raw.isBlank()) return null
 
-        // 1) BOLT11 invoice (optionally prefixed with "lightning:").
+        // 1) BIP21 URI with an embedded Lightning param.
+        bip21LightningParamRegex.find(raw)?.groupValues?.getOrNull(1)?.let { candidate ->
+            val decoded = decodePercentEncoded(candidate)
+            val cleaned = cleanToken(decoded)
+            if (cleaned.isNotBlank()) return cleaned
+        }
+
+        // 2) BOLT11 invoice (optionally prefixed with "lightning:").
         bolt11Regex.find(raw)?.groupValues?.getOrNull(1)?.let { candidate ->
             val cleaned = cleanToken(candidate)
             if (cleaned.isNotBlank()) return cleaned
         }
 
-        // 2) Bitcoin bech32 address (optionally "bitcoin:" URI).
+        // 3) LNURL bech32 (optionally prefixed with "lightning:").
+        lnurlRegex.find(raw)?.groupValues?.getOrNull(1)?.let { candidate ->
+            val cleaned = cleanToken(candidate)
+            if (cleaned.isNotBlank()) return cleaned
+        }
+
+        // 4) LNURLP URL.
+        lnurlpRegex.find(raw)?.groupValues?.getOrNull(1)?.let { candidate ->
+            val cleaned = cleanUrlToken(candidate)
+            if (cleaned.isNotBlank()) return cleaned
+        }
+
+        // 5) Lightning Address.
+        lightningAddressPrefixedRegex.find(raw)?.groupValues?.getOrNull(1)?.let { candidate ->
+            val cleaned = cleanToken(candidate)
+            if (cleaned.isNotBlank()) return cleaned
+        }
+        lightningAddressStrictRegex.find(raw)?.groupValues?.getOrNull(1)?.let { candidate ->
+            val cleaned = cleanToken(candidate)
+            if (cleaned.isNotBlank()) return cleaned
+        }
+
+        // 6) Bitcoin bech32 address (optionally "bitcoin:" URI).
         // If a BIP21 URI is present, strip query params.
         bech32BtcRegex.find(raw)?.groupValues?.getOrNull(1)?.let { candidate ->
             val cleaned = cleanToken(candidate)
@@ -360,6 +395,12 @@ object WalletTokenParser {
         return t
     }
 
+    private fun cleanUrlToken(token: String): String {
+        var t = token.trim()
+        if (t.startsWith("lightning:", ignoreCase = true)) t = t.substringAfter("lightning:", "")
+        return t.trim().trimEnd('.', ',', ')', ']', '}', ';', '!')
+    }
+
     private fun parseFederationInvoiceToken(text: String): Pair<String, String>? {
         val match = federationInvoiceRegex.find(text) ?: return null
         val federationId = match.groupValues.getOrNull(1).orEmpty().trim().ifBlank { return null }
@@ -395,5 +436,11 @@ object WalletTokenParser {
         // Android's Base64 decoder is tolerant in many cases, but padding to 4 bytes makes it reliable.
         val mod = input.length % 4
         return if (mod == 0) input else input + "=".repeat(4 - mod)
+    }
+
+    private fun decodePercentEncoded(value: String): String {
+        val trimmed = value.trim()
+        return runCatching { URLDecoder.decode(trimmed, StandardCharsets.UTF_8) }
+            .getOrDefault(trimmed)
     }
 }

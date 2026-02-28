@@ -1,0 +1,3 @@
+[submodule "third_party/fedimint-web"]
+	path = third_party/fedimint-web
+	url = https://github.com/fedimint/fedimint.git

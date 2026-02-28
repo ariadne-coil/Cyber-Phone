@@ -23,6 +23,7 @@ import org.fossify.phone.wallet.FederationDirectoryManager
 import org.fossify.phone.wallet.FederationEntry
 import org.fossify.phone.wallet.FedimintWalletManager
 import org.fossify.phone.wallet.LdkWalletManager
+import org.fossify.phone.wallet.LnurlPayManager
 import org.fossify.phone.wallet.WalletFederationTopupManager
 import org.fossify.phone.wallet.WalletPolicy
 import org.fossify.phone.wallet.WalletUiDialogs
@@ -279,10 +280,11 @@ class WalletPayActivity : SimpleActivity() {
         }
         var effectiveFederation: FederationEntry = selected
         var isFm = FederationDirectoryManager.isFedimintFederation(effectiveFederation)
+        val isLnurlDestination = LnurlPayManager.isLnurlPayDestination(destination)
 
         val isBolt11 = LdkWalletManager.isBolt11Invoice(destination)
         val fixedInvoiceSats = if (isBolt11) parseFixedInvoiceSats(destination) else null
-        if (isFm && (!isBolt11 || fixedInvoiceSats == null)) {
+        if (isFm && !isLnurlDestination && (!isBolt11 || fixedInvoiceSats == null)) {
             WalletFederationTopupManager.findMainnetSourceFederation(
                 context = this,
                 targetFederationId = selected.id,
@@ -293,12 +295,12 @@ class WalletPayActivity : SimpleActivity() {
             }
         }
 
-        if (isFm && !isBolt11) {
+        if (isFm && !isLnurlDestination && !isBolt11) {
             toast(R.string.wallet_fedimint_invoice_only)
             return
         }
 
-        if (isFm && fixedInvoiceSats == null) {
+        if (isFm && !isLnurlDestination && fixedInvoiceSats == null) {
             toast(R.string.wallet_fedimint_variable_invoice_requires_mainnet)
             return
         }
@@ -308,7 +310,7 @@ class WalletPayActivity : SimpleActivity() {
             return
         }
 
-        if (!isBolt11 && (amountSats == null || amountSats <= 0L)) {
+        if (!isLnurlDestination && !isBolt11 && (amountSats == null || amountSats <= 0L)) {
             toast(R.string.wallet_send_amount_required)
             return
         }
@@ -382,6 +384,42 @@ class WalletPayActivity : SimpleActivity() {
 
         ensureBackgroundThread {
             try {
+                var effectiveDestination = destination
+                var effectiveAmountSats = amountSats
+                if (LnurlPayManager.isLnurlPayDestination(effectiveDestination)) {
+                    when (val resolved = LnurlPayManager.resolveInvoiceBlocking(effectiveDestination, effectiveAmountSats)) {
+                        is LnurlPayManager.ResolveResult.Failure -> {
+                            runOnUiThread {
+                                binding.walletPayProgress.isVisible = false
+                                binding.walletPayError.text = getString(R.string.wallet_send_failed, resolved.errorMessage)
+                                binding.walletPayError.isVisible = true
+                            }
+                            return@ensureBackgroundThread
+                        }
+
+                        is LnurlPayManager.ResolveResult.Success -> {
+                            effectiveDestination = resolved.invoice
+                            effectiveAmountSats = resolved.resolvedAmountSats ?: effectiveAmountSats
+                        }
+                    }
+                }
+                val effectiveFixedInvoiceSats = if (LdkWalletManager.isBolt11Invoice(effectiveDestination)) {
+                    parseFixedInvoiceSats(effectiveDestination)
+                } else {
+                    null
+                }
+                val effectivePolicySats = effectiveFixedInvoiceSats ?: effectiveAmountSats
+                if (effectivePolicySats != null && !WalletPolicy.isAmountWithinSingleTxLimit(effectivePolicySats)) {
+                    val limitText = NumberFormat.getIntegerInstance(Locale.getDefault())
+                        .format(WalletPolicy.MAX_SINGLE_TX_SATS)
+                    runOnUiThread {
+                        binding.walletPayProgress.isVisible = false
+                        binding.walletPayError.text = getString(R.string.wallet_amount_over_limit, limitText)
+                        binding.walletPayError.isVisible = true
+                    }
+                    return@ensureBackgroundThread
+                }
+
                 val started = if (isFm) {
                     FedimintWalletManager.ensureStartedBlocking(this, selected)
                 } else {
@@ -393,19 +431,19 @@ class WalletPayActivity : SimpleActivity() {
                 var pendingMessage: String? = null
                 var mainnetRecoveryError: String? = null
                 if (started) {
-                    val isBolt11 = LdkWalletManager.isBolt11Invoice(destination)
+                    val isBolt11 = LdkWalletManager.isBolt11Invoice(effectiveDestination)
                     if (isFm && allowTopupPrompt && isBolt11) {
                         // Proactive top-up only when we can confidently read federation balance.
                         val proactiveTopupQuote = WalletFederationTopupManager.buildTopupQuote(
                             context = this,
                             targetFederation = selected,
-                            invoice = destination,
+                            invoice = effectiveDestination,
                             assumeZeroOnUnknownBalance = false,
                         )
                         if (proactiveTopupQuote != null) {
                             runOnUiThread {
                                 binding.walletPayProgress.isVisible = false
-                                showMintTopupDialog(quote = proactiveTopupQuote, destination = destination)
+                                showMintTopupDialog(quote = proactiveTopupQuote, destination = effectiveDestination)
                             }
                             return@ensureBackgroundThread
                         }
@@ -413,11 +451,11 @@ class WalletPayActivity : SimpleActivity() {
 
                     if (isFm) {
                         // Fedimint backend supports Lightning invoices only.
-                        ok = isBolt11 && FedimintWalletManager.payBolt11InvoiceBlocking(this, selected, destination)
+                        ok = isBolt11 && FedimintWalletManager.payBolt11InvoiceBlocking(this, selected, effectiveDestination)
                     } else {
                         if (isBolt11) {
                             var allowFedimintFallback = true
-                            val paymentId = LdkWalletManager.payBolt11Invoice(destination, amountSats)
+                            val paymentId = LdkWalletManager.payBolt11Invoice(effectiveDestination, effectiveAmountSats)
                             if (paymentId != null) {
                                 when (LdkWalletManager.awaitOutgoingLightningPaymentStatusBlocking(paymentId)) {
                                     PaymentStatus.SUCCEEDED -> {
@@ -438,15 +476,15 @@ class WalletPayActivity : SimpleActivity() {
                                 }
                             }
                             if (!ok && pendingMessage == null) {
-                                val requiredSats = WalletFederationTopupManager.parseFixedInvoiceSats(destination)
-                                    ?: amountSats?.takeIf { it > 0L }
+                                val requiredSats = WalletFederationTopupManager.parseFixedInvoiceSats(effectiveDestination)
+                                    ?: effectiveAmountSats?.takeIf { it > 0L }
                                 val currentError = LdkWalletManager.getLastErrorMessage()
                                 if (WalletFederationTopupManager.shouldAttemptMainnetLightningRecovery(requiredSats, currentError)) {
                                     val recovery = WalletFederationTopupManager.recoverMainnetLightningPaymentBlocking(
                                         context = this,
                                         sourceFederation = selected,
-                                        invoice = destination,
-                                        amountSats = amountSats,
+                                        invoice = effectiveDestination,
+                                        amountSats = effectiveAmountSats,
                                     )
                                     when {
                                         recovery.success -> {
@@ -472,11 +510,11 @@ class WalletPayActivity : SimpleActivity() {
                                 ok = fmStarted && FedimintWalletManager.payBolt11InvoiceBlocking(
                                     context = this,
                                     federation = selected,
-                                    invoice = destination,
+                                    invoice = effectiveDestination,
                                 )
                             }
                         } else {
-                            ok = LdkWalletManager.sendOnchain(destination, amountSats ?: 0L) != null
+                            ok = LdkWalletManager.sendOnchain(effectiveDestination, effectiveAmountSats ?: 0L) != null
                         }
                     }
                 }
@@ -500,7 +538,7 @@ class WalletPayActivity : SimpleActivity() {
                     WalletFederationTopupManager.buildTopupQuote(
                         context = this,
                         targetFederation = selected,
-                        invoice = destination,
+                        invoice = effectiveDestination,
                     )
                 } else {
                     null
@@ -522,7 +560,7 @@ class WalletPayActivity : SimpleActivity() {
                         toast(pendingMessage)
                         finish()
                     } else if (topupQuote != null) {
-                        showMintTopupDialog(quote = topupQuote, destination = destination)
+                        showMintTopupDialog(quote = topupQuote, destination = effectiveDestination)
                     } else {
                         binding.walletPayError.text = getString(R.string.wallet_send_failed, finalError)
                         binding.walletPayError.isVisible = true

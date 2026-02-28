@@ -30,6 +30,7 @@ object RnsNode {
     private const val ANNOUNCE_INTERVAL_MS = 10 * 60 * 1000L
     private const val PATH_REQUEST_MIN_INTERVAL_MS = 5_000L
     private const val PATH_REQUEST_MIN_INTERVAL_FLOOR_MS = 500L
+    private const val ACTIVE_LINK_INBOUND_FRESHNESS_MS = 10_000L
     private const val PATH_REQUEST_TAG_LIMIT = 32_000
     private const val PATH_REQUEST_APP = "rnstransport"
 
@@ -638,6 +639,25 @@ object RnsNode {
             queueLinkPacket(link, packetType, context, payload)
         }
         return true
+    }
+
+    /**
+     * Best-effort send on an already-active link only.
+     *
+     * Unlike [sendPacketViaLink], this never creates or queues a new pending link. It is useful for
+     * latency-sensitive messaging where we want to benefit from an existing link, but avoid causing
+     * link churn just because a small packet was sent.
+     */
+    fun trySendPacketViaExistingLink(
+        owner: RnsDestination,
+        destination: RnsDestination,
+        payload: ByteArray,
+        context: Int = RnsPacket.NONE,
+        packetType: Int = RnsPacket.DATA
+    ): Boolean {
+        val link = findResponsiveActiveLink(owner, destination) ?: return false
+        maybeIdentifyActiveInitiatorLink(link)
+        return sendLinkPacket(link, packetType, context, payload, null) != null
     }
 
     /**
@@ -1448,7 +1468,7 @@ object RnsNode {
         }
     }
 
-    private fun ensureLink(owner: RnsDestination, destination: RnsDestination): RnsLink? {
+    private fun findExistingActiveLink(owner: RnsDestination, destination: RnsDestination): RnsLink? {
         if (destination.identity == null) return null
         val destKey = RnsHex.encode(destination.hash)
         val activeId = activeLinksByDestination[destKey]
@@ -1456,7 +1476,7 @@ object RnsNode {
         if (activeId != null && active == null) {
             activeLinksByDestination.remove(destKey, activeId)
         }
-        if (active != null) return active
+        if (active != null && active.isActive()) return active
 
         // If this destination already has an incoming active link (reverse direction), reuse it.
         // Without this, one direction may repeatedly recreate links and suffer high setup latency.
@@ -1472,6 +1492,23 @@ object RnsNode {
             activeLinksByDestination[destKey] = incomingKey
             return incomingMatch
         }
+        return null
+    }
+
+    private fun findResponsiveActiveLink(owner: RnsDestination, destination: RnsDestination): RnsLink? {
+        val link = findExistingActiveLink(owner, destination) ?: return null
+        return if (link.hasRecentInboundActivity(ACTIVE_LINK_INBOUND_FRESHNESS_MS)) {
+            link
+        } else {
+            null
+        }
+    }
+
+    private fun ensureLink(owner: RnsDestination, destination: RnsDestination): RnsLink? {
+        if (destination.identity == null) return null
+        val existing = findExistingActiveLink(owner, destination)
+        if (existing != null) return existing
+        val destKey = RnsHex.encode(destination.hash)
 
         val pendingId = pendingLinksByDestination[destKey]
         val pending = pendingId?.let { pendingLinksById[it] }

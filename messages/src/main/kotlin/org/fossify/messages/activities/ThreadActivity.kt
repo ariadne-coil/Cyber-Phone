@@ -1,5 +1,6 @@
 package org.fossify.messages.activities
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlarmManager
@@ -7,6 +8,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
 import android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.drawable.LayerDrawable
 import android.net.Uri
@@ -22,6 +24,7 @@ import android.provider.Telephony.Sms.STATUS_NONE
 import android.telephony.SmsManager
 import android.telephony.SmsMessage
 import android.telephony.SubscriptionInfo
+import android.telephony.TelephonyManager
 import android.text.TextUtils
 import android.text.format.DateUtils
 import android.text.format.DateUtils.FORMAT_NO_YEAR
@@ -170,6 +173,7 @@ import org.fossify.messages.extensions.updateScheduledMessagesThreadId
 import org.fossify.messages.helpers.CAPTURE_AUDIO_INTENT
 import org.fossify.messages.helpers.CAPTURE_PHOTO_INTENT
 import org.fossify.messages.helpers.CAPTURE_VIDEO_INTENT
+import org.fossify.messages.helpers.CyberIdentityQr
 import org.fossify.messages.helpers.E2eManager
 import org.fossify.messages.helpers.FILE_SIZE_NONE
 import org.fossify.messages.helpers.IS_LAUNCHED_FROM_SHORTCUT
@@ -443,6 +447,7 @@ class ThreadActivity : SimpleActivity() {
             findItem(R.id.edit_contact_key).isVisible = canEditContactKey
             findItem(R.id.exchange_mesh_address).isVisible = canUseMeshDiscovery
             findItem(R.id.start_mesh_chat).isVisible = canUseMeshDiscovery && !meshAddress.isNullOrBlank()
+            findItem(R.id.share_identity_vcard).isVisible = participants.isNotEmpty() && !isSpecialNumber() && !isRecycleBin
         }
         updateSpamThreadStatus()
     }
@@ -565,6 +570,7 @@ class ThreadActivity : SimpleActivity() {
             R.id.exchange_keys -> sendKeyExchange()
             R.id.exchange_mesh_address -> sendMeshAddressExchange()
             R.id.start_mesh_chat -> startMeshChat()
+            R.id.share_identity_vcard -> shareIdentityVCardInline()
             R.id.encrypt_messages -> toggleEncryption(menuItem)
             R.id.edit_contact_key -> editContactKey()
             R.id.mark_as_not_spam -> markAsNotSpam()
@@ -627,6 +633,151 @@ class ThreadActivity : SimpleActivity() {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             startActivity(this)
         }
+    }
+
+    private fun shareIdentityVCardInline() {
+        if (isRecycleBin || isSpecialNumber()) {
+            return
+        }
+
+        ensureBackgroundThread {
+            val meshUri = MeshDiscoveryManager.getLocalMeshAddress(this)
+            if (meshUri.isNullOrBlank()) {
+                runOnUiThread {
+                    showErrorToast(getString(org.fossify.commons.R.string.unknown_error_occurred))
+                }
+                return@ensureBackgroundThread
+            }
+
+            val payload = CyberIdentityQr.buildVCard(
+                displayName = getProfileDisplayNameForIdentity(),
+                phoneNumber = getProfilePhoneNumberForIdentity(),
+                meshUri = meshUri,
+                e2ePublicKeyBase64 = E2eManager.getPublicKeyBase64(this),
+                walletOnchainAddress = getLocalWalletOnchainAddress(),
+                walletLightningDestination = getLocalWalletLightningAddress(),
+            )
+
+            runCatching {
+                val outputFile = File.createTempFile("cyber_identity_", ".vcf", getAttachmentsDir())
+                outputFile.writeText(payload, Charsets.UTF_8)
+                getMyFileUri(outputFile)
+            }.onSuccess { uri ->
+                runOnUiThread {
+                    addAttachment(uri)
+                    toast(R.string.identity_vcard_attached)
+                }
+            }.onFailure { error ->
+                runOnUiThread {
+                    val exception = error as? Exception ?: Exception(error)
+                    showErrorToast(exception)
+                }
+            }
+        }
+    }
+
+    private fun getLocalWalletOnchainAddress(): String? {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val selectedId = prefs.getString(WALLET_SELECTED_FEDERATION_ID, "")?.trim().orEmpty()
+        val scoped = if (selectedId.isNotBlank()) {
+            prefs.getString("${WALLET_LAST_ONCHAIN_ADDRESS}_$selectedId", "")?.trim().orEmpty()
+        } else {
+            ""
+        }
+        if (scoped.isNotBlank()) return scoped
+        return prefs.getString(WALLET_LAST_ONCHAIN_ADDRESS, "")?.trim()?.takeIf { it.isNotBlank() }
+    }
+
+    private fun getLocalWalletLightningAddress(): String? {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val selectedId = prefs.getString(WALLET_SELECTED_FEDERATION_ID, "")?.trim().orEmpty()
+        val scoped = if (selectedId.isNotBlank()) {
+            prefs.getString("${WALLET_LAST_LIGHTNING_ADDRESS}_$selectedId", "")?.trim().orEmpty()
+        } else {
+            ""
+        }
+        if (scoped.isNotBlank()) return scoped
+        return prefs.getString(WALLET_LAST_LIGHTNING_ADDRESS, "")?.trim()?.takeIf { it.isNotBlank() }
+    }
+
+    private fun getProfileDisplayNameForIdentity(): String? {
+        if (!hasAndroidPermission(Manifest.permission.READ_CONTACTS)) return null
+        return contentResolver.query(
+            ContactsContract.Profile.CONTENT_URI,
+            arrayOf(ContactsContract.Profile.DISPLAY_NAME_PRIMARY),
+            null,
+            null,
+            null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        }?.trim()?.takeIf { it.isNotBlank() }
+    }
+
+    private fun getProfilePhoneNumberForIdentity(): String? {
+        val profilePhone = getProfilePhoneNumberFromContact()
+        if (!profilePhone.isNullOrBlank()) {
+            return profilePhone
+        }
+        return getProfilePhoneNumberFromSubscriptions()
+    }
+
+    private fun getProfilePhoneNumberFromContact(): String? {
+        if (!hasAndroidPermission(Manifest.permission.READ_CONTACTS)) return null
+        val profileId = contentResolver.query(
+            ContactsContract.Profile.CONTENT_URI,
+            arrayOf(ContactsContract.Profile._ID),
+            null,
+            null,
+            null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getLong(0) else null
+        } ?: return null
+
+        return contentResolver.query(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
+            "${ContactsContract.CommonDataKinds.Phone.CONTACT_ID}=?",
+            arrayOf(profileId.toString()),
+            null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        }?.trim()?.takeIf { it.isNotBlank() }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun getProfilePhoneNumberFromSubscriptions(): String? {
+        val canReadLineNumber =
+            hasAndroidPermission(Manifest.permission.READ_PHONE_STATE) ||
+                hasAndroidPermission(Manifest.permission.READ_PHONE_NUMBERS) ||
+                hasAndroidPermission(Manifest.permission.READ_SMS)
+        if (!canReadLineNumber) return null
+
+        val subscriptionManager = subscriptionManagerCompat()
+        val subs = runCatching { subscriptionManager.activeSubscriptionInfoList }.getOrNull().orEmpty()
+        for (sub in subs) {
+            val number = runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    subscriptionManager.getPhoneNumber(sub.subscriptionId)
+                } else {
+                    @Suppress("DEPRECATION")
+                    sub.number
+                }
+            }.getOrNull()?.trim().orEmpty()
+            if (number.isNotBlank()) {
+                return number
+            }
+        }
+
+        val telephonyManager = getSystemService(TelephonyManager::class.java)
+        val line1 = runCatching {
+            @Suppress("DEPRECATION")
+            telephonyManager?.line1Number
+        }.getOrNull()?.trim().orEmpty()
+        return line1.takeIf { it.isNotBlank() }
+    }
+
+    private fun hasAndroidPermission(permission: String): Boolean {
+        return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun toggleEncryption(menuItem: MenuItem) {
@@ -2977,6 +3128,10 @@ class ThreadActivity : SimpleActivity() {
         private const val PREFETCH_THRESHOLD = 45
         private const val THREAD_SYNC_COOLDOWN_MS = 30_000L
         private const val THREAD_INITIAL_LOAD_LIMIT = 200
+        private const val PREFS_NAME = "Prefs"
+        private const val WALLET_SELECTED_FEDERATION_ID = "wallet_selected_federation_id"
+        private const val WALLET_LAST_ONCHAIN_ADDRESS = "wallet_last_onchain_address"
+        private const val WALLET_LAST_LIGHTNING_ADDRESS = "wallet_last_lightning_address"
         private val threadSyncTimes = ConcurrentHashMap<Long, Long>()
     }
 }

@@ -1,0 +1,5 @@
+v0.6.0
+- Reduced remaining asymmetric mesh message delay by preferring only responsive active links for fast-path delivery.
+- Improved mesh call stability after invoice/message traffic by avoiding stale cached call link IDs.
+- Switched Fedimint to a source-built web runtime and fixed generated-runtime compatibility issues.
+- Added recurring LNURL support and improved reusable Lightning address handling in the wallet UI.
