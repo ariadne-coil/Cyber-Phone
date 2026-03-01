@@ -42,7 +42,7 @@ zxingCore = "3.5.4"
 zxingEmbedded = "4.3.0"
 concentus = "6c2328dc19"
 junit = "4.13.2"
-robolectric = "4.12.2"
+robolectric = "4.16.1"
 ldkNode = "0.7.0"
 #build
 app-build-compileSDKVersion = "36"
