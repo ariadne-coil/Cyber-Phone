@@ -447,7 +447,15 @@ dd {
 }
 
 .demo-shot {
+  display: grid;
+  place-items: center;
   padding: 10px;
+}
+
+.demo-shot img {
+  width: min(100%, 168px);
+  height: auto;
+  border-radius: 18px;
 }
 
 .demo-copy {
