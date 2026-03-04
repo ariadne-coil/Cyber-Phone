@@ -6,7 +6,7 @@
   <title>Cyber Phone</title>
   <meta
     name="description"
-    content="Cyber Phone is a privacy-first communications stack for calls, messaging, mesh networking, and optional Bitcoin tools."
+    content="Cyber Phone fuses calling, SMS, mesh fallback, and Bitcoin tools into one local-first Android client."
   >
   <meta name="theme-color" content="#0f172a">
   <link rel="stylesheet" href="styles.css">
@@ -30,20 +30,22 @@
     <main>
       <section class="hero panel reveal">
         <div class="hero-copy">
-          <p class="eyebrow">Sovereign communications for real devices</p>
-          <h1>Calls, messages, mesh routing, and self-custody in one hardened client.</h1>
+          <p class="eyebrow">Private communications without product sprawl</p>
+          <h1>The phone app that keeps working when ordinary apps stop.</h1>
           <p class="lede">
-            Cyber Phone replaces the stock dialer and SMS app with a privacy-first interface,
-            optional peer-to-peer mesh transport, and optional Bitcoin tooling. The design goal
-            is local-first operation with user-controlled network paths.
+            Cyber Phone is not just another messenger. It replaces the stock dialer and SMS app,
+            adds optional device-to-device mesh transport, and embeds Bitcoin tools directly into
+            the same contact and thread workflows you already use. No ad stack. No mandatory cloud
+            account. No need to juggle separate apps for calling, messaging, fallback networking,
+            and value transfer.
           </p>
           <div class="hero-actions">
             <a class="button primary" href="https://github.com/ariadne-coil/Cyber-Phone/releases/latest">Get latest release</a>
             <a class="button secondary" href="privacy-policy/">Read privacy policy</a>
           </div>
           <div class="signal-row">
+            <span class="signal-chip">Dialer + SMS + mesh + wallet</span>
             <span class="signal-chip">No ad SDKs</span>
-            <span class="signal-chip">Optional mesh transport</span>
             <span class="signal-chip">Signed releases</span>
             <span class="signal-chip">AGPL-3.0-only</span>
           </div>
@@ -69,31 +71,34 @@
       <section id="stack" class="section reveal">
         <div class="section-header">
           <p class="eyebrow">Core stack</p>
-          <h2>Built for private everyday use, not just demos.</h2>
+          <h2>Four normally separate products, fused into one operational tool.</h2>
         </div>
         <div class="card-grid">
           <article class="panel feature-card">
             <p class="feature-kicker">Communications</p>
-            <h3>Dialer + SMS/MMS replacement</h3>
+            <h3>A real phone replacement, not a sidecar app</h3>
             <p>
-              Handles calls, SMS, MMS, thread management, caller flows, and contact-linked messaging
-              without handing the core experience off to third-party services.
+              Cyber Phone handles the daily essentials: calls, SMS, MMS, thread management, caller
+              actions, and contact-linked messaging. It is meant to be the app you actually live in,
+              not a niche overlay that only works for one protocol.
             </p>
           </article>
           <article class="panel feature-card">
             <p class="feature-kicker">Mesh</p>
-            <h3>Direct device paths when infrastructure is weak</h3>
+            <h3>Infrastructure fallback built into the message path</h3>
             <p>
-              Optional mesh messaging and calling can use nearby radios and relay routing to keep
-              communication moving when normal paths are degraded or unavailable.
+              When ordinary connectivity gets weak, optional mesh messaging and calling can switch to
+              nearby radios and relay routing. That makes Cyber Phone unusual: the fallback path is
+              part of the product, not an afterthought bolted on through a separate app.
             </p>
           </article>
           <article class="panel feature-card">
             <p class="feature-kicker">Identity</p>
-            <h3>Portable contact and sharing primitives</h3>
+            <h3>Contacts become action hubs</h3>
             <p>
-              QR and vCard flows are designed around practical exchange: contact data, wallet
-              details, and cryptographic identifiers where available.
+              Contacts are not just address-book entries. They can become launch points for calls,
+              messages, payment requests, QR exchange, and shareable identity data, so fewer tasks
+              require bouncing between disconnected screens.
             </p>
           </article>
         </div>
@@ -102,37 +107,39 @@
       <section id="network" class="section split reveal">
         <div class="panel narrative-card">
           <p class="eyebrow">Network posture</p>
-          <h2>One client, multiple trust models.</h2>
+          <h2>Designed to degrade gracefully, not fail abruptly.</h2>
           <p>
-            Cyber Phone is not locked into a single network story. Core phone and local data paths
-            can stay on-device. Mesh features operate as a separate transport layer. Wallet features
-            can reach external Bitcoin and federation infrastructure when the user enables them.
+            Most communication apps assume one backend and one happy path. Cyber Phone does not. The
+            core dialer and message state can remain device-local. Mesh transport can activate only
+            when you want it. Wallet features only reach external Bitcoin infrastructure when you
+            explicitly use them.
           </p>
           <p>
-            That separation matters. It keeps permissions, transport behavior, and data exposure tied
-            to the feature the user actually wants, instead of forcing a monolithic cloud dependency.
+            That separation is what makes the app resilient. It keeps permissions, routing behavior,
+            and data exposure tied to the feature you selected instead of forcing every task through
+            the same monolithic cloud dependency.
           </p>
         </div>
         <div class="panel rail-card">
           <div class="rail-step">
             <span class="rail-index">01</span>
             <div>
-              <h3>Local state</h3>
-              <p>Contacts, call history, thread metadata, and app configuration remain device-bound unless the user exports them.</p>
+              <h3>Default path</h3>
+              <p>Contacts, call history, thread metadata, and app configuration stay device-bound unless you choose to export or share them.</p>
             </div>
           </div>
           <div class="rail-step">
             <span class="rail-index">02</span>
             <div>
-              <h3>Mesh state</h3>
-              <p>Nearby discovery and relay routing only activate when mesh features are enabled and permissioned.</p>
+              <h3>Resilient path</h3>
+              <p>Nearby discovery and relay routing only activate when mesh is enabled, giving you an alternate transport instead of a hard outage.</p>
             </div>
           </div>
           <div class="rail-step">
             <span class="rail-index">03</span>
             <div>
-              <h3>Wallet state</h3>
-              <p>On-chain and Lightning operations talk to the required remote systems, but remain optional and explicitly user-driven.</p>
+              <h3>Value path</h3>
+              <p>On-chain and Lightning operations can reach the required remote systems, but only when you invoke those payment features yourself.</p>
             </div>
           </div>
         </div>
@@ -141,20 +148,20 @@
       <section id="wallet" class="section reveal">
         <div class="section-header">
           <p class="eyebrow">Bitcoin features</p>
-          <h2>Optional self-custody tools, integrated with the communications layer.</h2>
+          <h2>Payments live where the conversation already is.</h2>
         </div>
         <div class="wallet-grid">
           <div class="panel wallet-card">
             <h3>On-chain</h3>
-            <p>Receive and send from the integrated wallet flow, with address sharing built into the wider contact surface.</p>
+            <p>Send and receive from the integrated wallet flow, with address sharing built into the same contact surface used for calls and texts.</p>
           </div>
           <div class="panel wallet-card">
             <h3>Lightning</h3>
-            <p>Supports Lightning send flows and recurring LNURL-style addressing where supported by selected services.</p>
+            <p>Lightning send flows and recurring LNURL-style addressing fit into the same UI, so payments do not require a separate app or mental model.</p>
           </div>
           <div class="panel wallet-card">
             <h3>Federated paths</h3>
-            <p>Fedimint support is source-built in the app and remains optional for users who choose federation-backed workflows.</p>
+            <p>Fedimint support is compiled from pinned source and remains optional, giving power users federation-backed workflows without forcing them on everyone else.</p>
           </div>
         </div>
       </section>
@@ -162,7 +169,7 @@
       <section class="section reveal">
         <div class="section-header">
           <p class="eyebrow">Feature demos</p>
-          <h2>Actual interface, not mockups.</h2>
+          <h2>Real workflows people actually use.</h2>
         </div>
         <div class="demo-grid">
           <article class="panel demo-card">
@@ -174,8 +181,8 @@
             </div>
             <div class="demo-copy">
               <p class="feature-kicker">Wallet</p>
-              <h3>Integrated Bitcoin panel</h3>
-              <p>On-chain and Lightning flows are exposed directly inside the app instead of being split into a separate wallet shell.</p>
+              <h3>Bitcoin where the thread already lives</h3>
+              <p>On-chain and Lightning controls are exposed directly inside Cyber Phone instead of being split into a separate wallet shell.</p>
             </div>
           </article>
           <article class="panel demo-card">
@@ -187,8 +194,8 @@
             </div>
             <div class="demo-copy">
               <p class="feature-kicker">Actions</p>
-              <h3>Contact-centric command surface</h3>
-              <p>Communication and payment actions stay attached to the contact entry, reducing navigation overhead.</p>
+              <h3>One contact, multiple outcomes</h3>
+              <p>Call, message, request payment, set wallet details, and edit identity from one action surface instead of hunting through nested menus.</p>
             </div>
           </article>
           <article class="panel demo-card">
@@ -200,8 +207,8 @@
             </div>
             <div class="demo-copy">
               <p class="feature-kicker">Messaging</p>
-              <h3>Inline thread workflow + iMessage-compatible reactions</h3>
-              <p>Thread views keep call, payment, and message composition controls in the same screen for faster execution.</p>
+              <h3>Inline threads + iMessage-compatible reactions</h3>
+              <p>Thread views keep call, payment, and composition controls together while preserving familiar reaction behavior for modern message workflows.</p>
             </div>
           </article>
         </div>
@@ -211,7 +218,7 @@
         <div class="cta-band panel">
           <div>
             <p class="eyebrow">Operational links</p>
-            <h2>Release channel, source code, and legal surface.</h2>
+            <h2>Inspect it, install it, or audit it.</h2>
           </div>
           <div class="cta-actions">
             <a class="button primary" href="https://github.com/ariadne-coil/Cyber-Phone/releases/latest">Releases</a>
@@ -223,7 +230,7 @@
     </main>
 
     <footer class="footer">
-      <p>Cyber Phone. Built for resilient, user-controlled communications.</p>
+      <p>Cyber Phone turns the stock phone app into a resilient, user-controlled communications hub.</p>
       <div class="footer-links">
         <a href="privacy-policy/">Privacy policy</a>
         <a href="https://github.com/ariadne-coil/Cyber-Phone/issues">Issue tracker</a>
