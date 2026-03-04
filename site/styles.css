@@ -209,12 +209,12 @@ h3 {
 
 h1 {
   font-size: clamp(2.8rem, 7vw, 5.4rem);
-  max-width: 10ch;
+  text-wrap: balance;
 }
 
 h2 {
   font-size: clamp(2rem, 4.6vw, 3.4rem);
-  max-width: 14ch;
+  text-wrap: balance;
 }
 
 h3 {

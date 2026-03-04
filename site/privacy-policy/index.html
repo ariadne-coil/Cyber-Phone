@@ -15,7 +15,9 @@
   <div class="site-shell legal-shell">
     <header class="topbar">
       <a class="brand" href="../" aria-label="Cyber Phone home">
-        <span class="brand-mark">CP</span>
+        <span class="brand-mark" aria-hidden="true">
+          <img src="../assets/app-icon.webp" alt="">
+        </span>
         <span class="brand-text">Cyber Phone</span>
       </a>
       <nav class="nav">
@@ -64,6 +66,8 @@
         <ul>
           <li>Standard calling and SMS/MMS use the Android telephony stack and your mobile carrier.</li>
           <li>Mesh features can exchange data directly with nearby devices and, where enabled, route traffic through other participating devices.</li>
+          <li>Optional AI spam filtering can download model files used for local spam classification. After download, that model runs on your device rather than requiring every spam check to be sent to a remote service.</li>
+          <li>Optional YACB reputation features can download reputation data and, when you use reputation-sharing features, send YACB reputation requests or shared signals needed for those checks.</li>
           <li>Wallet features can contact blockchain, Lightning, or federation infrastructure needed to complete user-requested payment operations.</li>
           <li>Opening external links from the app (for example project pages) sends you to the chosen external service.</li>
         </ul>
