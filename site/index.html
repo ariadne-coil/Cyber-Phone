@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cyber Phone</title>
+  <meta
+    name="description"
+    content="Cyber Phone is a privacy-first communications stack for calls, messaging, mesh networking, and optional Bitcoin tools."
+  >
+  <meta name="theme-color" content="#0f172a">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="home">
+  <div class="site-shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Cyber Phone home">
+        <span class="brand-mark">CP</span>
+        <span class="brand-text">Cyber Phone</span>
+      </a>
+      <nav class="nav">
+        <a href="#stack">Stack</a>
+        <a href="#network">Network</a>
+        <a href="#wallet">Wallet</a>
+        <a href="privacy-policy/">Privacy</a>
+      </nav>
+      <a class="button ghost" href="https://github.com/ariadne-coil/Cyber-Phone">Source</a>
+    </header>
+
+    <main>
+      <section class="hero panel reveal">
+        <div class="hero-copy">
+          <p class="eyebrow">Sovereign communications for real devices</p>
+          <h1>Calls, messages, mesh routing, and self-custody in one hardened client.</h1>
+          <p class="lede">
+            Cyber Phone replaces the stock dialer and SMS app with a privacy-first interface,
+            optional peer-to-peer mesh transport, and optional Bitcoin tooling. The design goal
+            is local-first operation with user-controlled network paths.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="https://github.com/ariadne-coil/Cyber-Phone/releases/latest">Get latest release</a>
+            <a class="button secondary" href="privacy-policy/">Read privacy policy</a>
+          </div>
+          <div class="signal-row">
+            <span class="signal-chip">No ad SDKs</span>
+            <span class="signal-chip">Optional mesh transport</span>
+            <span class="signal-chip">Signed releases</span>
+            <span class="signal-chip">AGPL-3.0-only</span>
+          </div>
+        </div>
+        <div class="hero-card">
+          <div class="status-card">
+            <p class="status-label">System profile</p>
+            <dl class="status-grid">
+              <div>
+                <dt>Mode</dt>
+                <dd>Local-first</dd>
+              </div>
+              <div>
+                <dt>Transport</dt>
+                <dd>SMS, calls, mesh</dd>
+              </div>
+              <div>
+                <dt>Payments</dt>
+                <dd>On-chain + Lightning</dd>
+              </div>
+              <div>
+                <dt>Topology</dt>
+                <dd>User-selected</dd>
+              </div>
+            </dl>
+            <div class="mesh-map" aria-hidden="true">
+              <span class="node a"></span>
+              <span class="node b"></span>
+              <span class="node c"></span>
+              <span class="node d"></span>
+              <span class="beam one"></span>
+              <span class="beam two"></span>
+              <span class="beam three"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="stack" class="section reveal">
+        <div class="section-header">
+          <p class="eyebrow">Core stack</p>
+          <h2>Built for private everyday use, not just demos.</h2>
+        </div>
+        <div class="card-grid">
+          <article class="panel feature-card">
+            <p class="feature-kicker">Communications</p>
+            <h3>Dialer + SMS/MMS replacement</h3>
+            <p>
+              Handles calls, SMS, MMS, thread management, caller flows, and contact-linked messaging
+              without handing the core experience off to third-party services.
+            </p>
+          </article>
+          <article class="panel feature-card">
+            <p class="feature-kicker">Mesh</p>
+            <h3>Direct device paths when infrastructure is weak</h3>
+            <p>
+              Optional mesh messaging and calling can use nearby radios and relay routing to keep
+              communication moving when normal paths are degraded or unavailable.
+            </p>
+          </article>
+          <article class="panel feature-card">
+            <p class="feature-kicker">Identity</p>
+            <h3>Portable contact and sharing primitives</h3>
+            <p>
+              QR and vCard flows are designed around practical exchange: contact data, wallet
+              details, and cryptographic identifiers where available.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="network" class="section split reveal">
+        <div class="panel narrative-card">
+          <p class="eyebrow">Network posture</p>
+          <h2>One client, multiple trust models.</h2>
+          <p>
+            Cyber Phone is not locked into a single network story. Core phone and local data paths
+            can stay on-device. Mesh features operate as a separate transport layer. Wallet features
+            can reach external Bitcoin and federation infrastructure when the user enables them.
+          </p>
+          <p>
+            That separation matters. It keeps permissions, transport behavior, and data exposure tied
+            to the feature the user actually wants, instead of forcing a monolithic cloud dependency.
+          </p>
+        </div>
+        <div class="panel rail-card">
+          <div class="rail-step">
+            <span class="rail-index">01</span>
+            <div>
+              <h3>Local state</h3>
+              <p>Contacts, call history, thread metadata, and app configuration remain device-bound unless the user exports them.</p>
+            </div>
+          </div>
+          <div class="rail-step">
+            <span class="rail-index">02</span>
+            <div>
+              <h3>Mesh state</h3>
+              <p>Nearby discovery and relay routing only activate when mesh features are enabled and permissioned.</p>
+            </div>
+          </div>
+          <div class="rail-step">
+            <span class="rail-index">03</span>
+            <div>
+              <h3>Wallet state</h3>
+              <p>On-chain and Lightning operations talk to the required remote systems, but remain optional and explicitly user-driven.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="wallet" class="section reveal">
+        <div class="section-header">
+          <p class="eyebrow">Bitcoin features</p>
+          <h2>Optional self-custody tools, integrated with the communications layer.</h2>
+        </div>
+        <div class="wallet-grid">
+          <div class="panel wallet-card">
+            <h3>On-chain</h3>
+            <p>Receive and send from the integrated wallet flow, with address sharing built into the wider contact surface.</p>
+          </div>
+          <div class="panel wallet-card">
+            <h3>Lightning</h3>
+            <p>Supports Lightning send flows and recurring LNURL-style addressing where supported by selected services.</p>
+          </div>
+          <div class="panel wallet-card">
+            <h3>Federated paths</h3>
+            <p>Fedimint support is source-built in the app and remains optional for users who choose federation-backed workflows.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section reveal">
+        <div class="cta-band panel">
+          <div>
+            <p class="eyebrow">Operational links</p>
+            <h2>Release channel, source code, and legal surface.</h2>
+          </div>
+          <div class="cta-actions">
+            <a class="button primary" href="https://github.com/ariadne-coil/Cyber-Phone/releases/latest">Releases</a>
+            <a class="button ghost" href="https://github.com/ariadne-coil/Cyber-Phone">Repository</a>
+            <a class="button secondary" href="privacy-policy/">Privacy policy</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Cyber Phone. Built for resilient, user-controlled communications.</p>
+      <div class="footer-links">
+        <a href="privacy-policy/">Privacy policy</a>
+        <a href="https://github.com/ariadne-coil/Cyber-Phone/issues">Issue tracker</a>
+        <a href="https://ariadnecyber.substack.com">Substack</a>
+      </div>
+    </footer>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

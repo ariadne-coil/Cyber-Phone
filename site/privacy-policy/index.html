@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cyber Phone Privacy Policy</title>
+  <meta
+    name="description"
+    content="Cyber Phone privacy policy describing data handling, permissions, optional network features, and user controls."
+  >
+  <meta name="theme-color" content="#0f172a">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body data-page="privacy">
+  <div class="site-shell legal-shell">
+    <header class="topbar">
+      <a class="brand" href="../" aria-label="Cyber Phone home">
+        <span class="brand-mark">CP</span>
+        <span class="brand-text">Cyber Phone</span>
+      </a>
+      <nav class="nav">
+        <a href="../">Home</a>
+        <a href="./" aria-current="page">Privacy</a>
+      </nav>
+      <a class="button ghost" href="https://github.com/ariadne-coil/Cyber-Phone">Source</a>
+    </header>
+
+    <main>
+      <section class="legal-hero panel reveal">
+        <p class="eyebrow">Effective date</p>
+        <h1>Privacy Policy</h1>
+        <p class="lede">Effective March 4, 2026</p>
+        <p>
+          This policy describes how Cyber Phone handles information when you use the app. Cyber
+          Phone is designed to keep core communications data on the device unless you explicitly use
+          a feature that requires network communication or export data yourself.
+        </p>
+      </section>
+
+      <section class="legal-content panel reveal">
+        <h2>1. Who this policy covers</h2>
+        <p>
+          This policy applies to the Cyber Phone Android application published from the Cyber Phone
+          project repository and related official release channels.
+        </p>
+
+        <h2>2. Data stored on your device</h2>
+        <p>Depending on which features you enable, Cyber Phone may store the following locally on your device:</p>
+        <ul>
+          <li>contacts and contact-linked metadata</li>
+          <li>call history and call-related state</li>
+          <li>SMS, MMS, and local message thread metadata</li>
+          <li>mesh messaging and mesh calling state</li>
+          <li>wallet settings, addresses, invoices, and transaction-related metadata</li>
+          <li>app preferences, feature toggles, and diagnostics shown to you inside the app</li>
+        </ul>
+        <p>
+          This local data is used to provide the app’s core functionality. It is not uploaded by default
+          simply because it exists on your device.
+        </p>
+
+        <h2>3. Data sent over networks</h2>
+        <p>Cyber Phone can communicate over networks only when required by the feature you use.</p>
+        <ul>
+          <li>Standard calling and SMS/MMS use the Android telephony stack and your mobile carrier.</li>
+          <li>Mesh features can exchange data directly with nearby devices and, where enabled, route traffic through other participating devices.</li>
+          <li>Wallet features can contact blockchain, Lightning, or federation infrastructure needed to complete user-requested payment operations.</li>
+          <li>Opening external links from the app (for example project pages) sends you to the chosen external service.</li>
+        </ul>
+        <p>
+          When a remote service is contacted, that service may receive information such as your IP address,
+          request timestamps, and request payloads needed to complete the operation. Those network disclosures
+          are a function of the selected service and the feature you invoked.
+        </p>
+
+        <h2>4. Permissions</h2>
+        <p>Cyber Phone may request permissions that correspond directly to its feature set, including:</p>
+        <ul>
+          <li>contacts</li>
+          <li>phone and call-related permissions</li>
+          <li>SMS and MMS permissions</li>
+          <li>microphone and camera permissions</li>
+          <li>Bluetooth, nearby device, Wi-Fi, and location-related permissions for mesh discovery and connectivity</li>
+          <li>notification permissions</li>
+        </ul>
+        <p>
+          Permissions are used to provide the feature that depends on them. If you deny a permission,
+          the related feature may be limited or unavailable.
+        </p>
+
+        <h2>5. Analytics, advertising, and sale of data</h2>
+        <p>
+          Cyber Phone is not designed around advertising networks and does not intentionally include third-party
+          advertising SDKs. The project also does not intentionally include third-party analytics SDKs for behavioral tracking.
+        </p>
+        <p>
+          Cyber Phone does not sell your personal data.
+        </p>
+
+        <h2>6. Optional wallet and federation features</h2>
+        <p>
+          Wallet features are optional. If you use them, Cyber Phone may communicate with external systems required
+          for on-chain or Lightning activity, including user-selected or app-configured services such as federation
+          endpoints, explorers, or payment infrastructure.
+        </p>
+        <p>
+          Those services operate independently and may have their own privacy practices. You should review the privacy
+          and operational assumptions of any external payment or federation service you choose to use.
+        </p>
+
+        <h2>7. Data retention and deletion</h2>
+        <p>
+          Data stored by Cyber Phone generally remains on your device until you delete it, clear app storage,
+          uninstall the app, or overwrite it through normal use. If you export, back up, or share data yourself,
+          that copy is controlled by the destination you choose.
+        </p>
+
+        <h2>8. Security</h2>
+        <p>
+          Cyber Phone is built with a local-first posture and attempts to limit unnecessary external data flows.
+          No mobile app can guarantee perfect security. You remain responsible for device security, operating system
+          integrity, and the trustworthiness of any remote service you choose to use.
+        </p>
+
+        <h2>9. Children</h2>
+        <p>
+          Cyber Phone is not specifically directed to children. If you are responsible for a child using the app,
+          you are responsible for supervising how communication, network, and wallet features are used.
+        </p>
+
+        <h2>10. Changes to this policy</h2>
+        <p>
+          This policy may be updated as the app changes. When it is updated, the effective date at the top of this
+          page will be revised.
+        </p>
+
+        <h2>11. Contact</h2>
+        <p>
+          For privacy-related questions about Cyber Phone, use the project issue tracker:
+          <a href="https://github.com/ariadne-coil/Cyber-Phone/issues">https://github.com/ariadne-coil/Cyber-Phone/issues</a>
+        </p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>This page is the canonical public privacy policy for Cyber Phone releases.</p>
+      <div class="footer-links">
+        <a href="../">Home</a>
+        <a href="https://github.com/ariadne-coil/Cyber-Phone">Repository</a>
+      </div>
+    </footer>
+  </div>
+  <script src="../app.js"></script>
+</body>
+</html>
