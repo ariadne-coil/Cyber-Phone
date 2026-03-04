@@ -15,7 +15,9 @@
   <div class="site-shell">
     <header class="topbar">
       <a class="brand" href="./" aria-label="Cyber Phone home">
-        <span class="brand-mark">CP</span>
+        <span class="brand-mark" aria-hidden="true">
+          <img src="assets/app-icon.webp" alt="">
+        </span>
         <span class="brand-text">Cyber Phone</span>
       </a>
       <nav class="nav">
@@ -60,9 +62,9 @@
               >
             </div>
             <div class="hero-shot-meta">
-              <span class="signal-chip">Thread list</span>
-              <span class="signal-chip">Search-first</span>
-              <span class="signal-chip">Bottom-nav stack</span>
+              <a class="hero-nav-chip" href="#stack">Calls &amp; SMS</a>
+              <a class="hero-nav-chip" href="#network">Mesh fallback</a>
+              <a class="hero-nav-chip" href="#wallet">Bitcoin tools</a>
             </div>
           </div>
         </div>
@@ -219,40 +221,64 @@
           <p class="eyebrow">Detailed feature set</p>
           <h2>What makes Cyber Phone different from a normal dialer or messenger.</h2>
         </div>
-        <div class="detail-grid">
-          <article class="panel detail-card">
-            <h3>End-to-end encryption aware</h3>
-            <p>Secure channel flows can use cryptographic identity and public-key exchange so sensitive conversations and high-trust actions are not limited to plain SMS semantics.</p>
-          </article>
-          <article class="panel detail-card">
-            <h3>Intelligent spam filtering</h3>
-            <p>Spam controls and thread filtering help keep unsolicited traffic out of the way without forcing your core messaging workflow into a separate app.</p>
-          </article>
-          <article class="panel detail-card">
-            <h3>Payments over SMS and mesh</h3>
-            <p>Payment requests, wallet details, invoices, and contact-linked money flows can travel through the same messaging surfaces you already use, including resilient mesh paths where available.</p>
-          </article>
-          <article class="panel detail-card">
-            <h3>Adaptive mesh transport</h3>
-            <p>Wi-Fi Direct, Bluetooth LE, and Wi-Fi Aware discovery modes can be combined with routing controls so nearby devices become fallback communications infrastructure.</p>
-          </article>
-          <article class="panel detail-card">
-            <h3>QR and vCard identity sharing</h3>
-            <p>Contacts can be shared as visual QR handoffs or portable vCards, with room for wallet and cryptographic identity details instead of just a name and number.</p>
-          </article>
-          <article class="panel detail-card">
-            <h3>Modern thread behavior</h3>
-            <p>Cyber Phone keeps inline thread actions, message composition, and iMessage-compatible reactions together so the app feels current while staying interoperable.</p>
-          </article>
-          <article class="panel detail-card">
-            <h3>Integrated Bitcoin stack</h3>
-            <p>On-chain, Lightning, LNURL-style addressing, and optional Fedimint federation support live in the same product instead of requiring a second wallet app and a second trust surface.</p>
-          </article>
-          <article class="panel detail-card">
-            <h3>Auditable release model</h3>
-            <p>Signed releases, open source code, and a hardened dependency posture make the app inspectable. You can audit what it is, how it builds, and what it ships.</p>
-          </article>
-        </div>
+        <ul class="detail-list" aria-label="Cyber Phone feature checklist">
+          <li class="panel detail-item">
+            <span class="detail-check" aria-hidden="true">✓</span>
+            <div class="detail-body">
+              <h3>End-to-end encryption aware</h3>
+              <p>Secure channel flows can use cryptographic identity and public-key exchange so sensitive conversations and high-trust actions are not limited to plain SMS semantics.</p>
+            </div>
+          </li>
+          <li class="panel detail-item">
+            <span class="detail-check" aria-hidden="true">✓</span>
+            <div class="detail-body">
+              <h3>Intelligent spam filtering</h3>
+              <p>Spam controls and thread filtering help keep unsolicited traffic out of the way without forcing your core messaging workflow into a separate app.</p>
+            </div>
+          </li>
+          <li class="panel detail-item">
+            <span class="detail-check" aria-hidden="true">✓</span>
+            <div class="detail-body">
+              <h3>Payments over SMS and mesh</h3>
+              <p>Payment requests, wallet details, invoices, and contact-linked money flows can travel through the same messaging surfaces you already use, including resilient mesh paths where available.</p>
+            </div>
+          </li>
+          <li class="panel detail-item">
+            <span class="detail-check" aria-hidden="true">✓</span>
+            <div class="detail-body">
+              <h3>Adaptive mesh transport</h3>
+              <p>Wi-Fi Direct, Bluetooth LE, and Wi-Fi Aware discovery modes can be combined with routing controls so nearby devices become fallback communications infrastructure.</p>
+            </div>
+          </li>
+          <li class="panel detail-item">
+            <span class="detail-check" aria-hidden="true">✓</span>
+            <div class="detail-body">
+              <h3>QR and vCard identity sharing</h3>
+              <p>Contacts can be shared as visual QR handoffs or portable vCards, with room for wallet and cryptographic identity details instead of just a name and number.</p>
+            </div>
+          </li>
+          <li class="panel detail-item">
+            <span class="detail-check" aria-hidden="true">✓</span>
+            <div class="detail-body">
+              <h3>Modern thread behavior</h3>
+              <p>Cyber Phone keeps inline thread actions, message composition, and iMessage-compatible reactions together so the app feels current while staying interoperable.</p>
+            </div>
+          </li>
+          <li class="panel detail-item">
+            <span class="detail-check" aria-hidden="true">✓</span>
+            <div class="detail-body">
+              <h3>Integrated Bitcoin stack</h3>
+              <p>On-chain, Lightning, LNURL-style addressing, and optional Fedimint federation support live in the same product instead of requiring a second wallet app and a second trust surface.</p>
+            </div>
+          </li>
+          <li class="panel detail-item">
+            <span class="detail-check" aria-hidden="true">✓</span>
+            <div class="detail-body">
+              <h3>Auditable release model</h3>
+              <p>Signed releases, open source code, and a hardened dependency posture make the app inspectable. You can audit what it is, how it builds, and what it ships.</p>
+            </div>
+          </li>
+        </ul>
       </section>
 
       <section class="section reveal">
