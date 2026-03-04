@@ -71,6 +71,14 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/small_margin"
                     android:text="@string/about_substack_link" />
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/about_privacy_policy_link"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/small_margin"
+                    android:text="@string/about_privacy_policy_label" />
             </LinearLayout>
 
             <LinearLayout

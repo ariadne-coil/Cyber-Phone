@@ -383,6 +383,8 @@
     <string name="about_version_format">Version %1$s</string>
     <string name="about_repo_link">https://github.com/ariadne-coil/Cyber-Phone</string>
     <string name="about_substack_link">https://ariadnecyber.substack.com</string>
+    <string name="about_privacy_policy_label">Privacy policy</string>
+    <string name="about_privacy_policy_link">https://ariadne-coil.github.io/Cyber-Phone/privacy-policy/</string>
     <string name="about_open_link_failed">Could not open link.</string>
     <string name="about_ariadne_name">Ariadne Cyber</string>
     <string name="about_features_title">Key features</string>

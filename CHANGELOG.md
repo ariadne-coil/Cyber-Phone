@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.6.1 (2026-03-04)
+- Privacy/compliance: added a direct in-app link to the published Cyber Phone privacy policy from the About screen.
+- Release/docs: published the Cyber Phone website and privacy-policy pages on GitHub Pages for store and release metadata use.
+- Dependency maintenance: refreshed libphonenumber metadata components and the Fastlane/Robolectric toolchain used around release and test workflows.
+
 ## v0.6.0 (2026-02-28)
 - Mesh reliability: rolled back the regressive small-message dual-path send behavior and replaced it with an active-link-only fast path plus safer direct-packet fallback, substantially reducing the remaining one-way delay/loss pattern.
 - Mesh link health: added responsive-link checks for message fast-path routing so stale one-sided links stop hijacking text delivery after invoice/call activity.

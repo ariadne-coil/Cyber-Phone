@@ -22,6 +22,7 @@ class CyberAboutActivity : SimpleActivity() {
         binding.aboutVersion.text = getString(R.string.about_version_format, BuildConfig.VERSION_NAME)
         binding.aboutRepoLink.setOnClickListener { openExternalLink(getString(R.string.about_repo_link)) }
         binding.aboutSubstackLink.setOnClickListener { openExternalLink(getString(R.string.about_substack_link)) }
+        binding.aboutPrivacyPolicyLink.setOnClickListener { openExternalLink(getString(R.string.about_privacy_policy_link)) }
         updateTextColors(binding.aboutHolder)
     }
 

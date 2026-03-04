@@ -1,0 +1,4 @@
+v0.6.1
+- Added an in-app privacy policy link in the About screen.
+- Published the Cyber Phone website and privacy policy pages for store metadata use.
+- Refreshed libphonenumber metadata and release/test support dependencies.
