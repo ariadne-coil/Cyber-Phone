@@ -409,6 +409,7 @@ dd {
 
 .demo-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
 }
 
 .feature-card,
@@ -443,29 +444,40 @@ dd {
 
 .demo-card {
   display: grid;
-  gap: 16px;
+  gap: 12px;
+  padding: 14px;
 }
 
 .demo-shot {
   display: grid;
   place-items: center;
-  padding: 10px;
+  padding: 8px;
 }
 
 .demo-shot img {
-  width: min(100%, 168px);
+  width: min(100%, 104px);
   height: auto;
-  border-radius: 18px;
+  border-radius: 14px;
 }
 
 .demo-copy {
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 
 .demo-copy h3,
 .demo-copy p {
   margin: 0;
+}
+
+.demo-copy h3 {
+  font-size: clamp(0.84rem, 1.25vw, 1rem);
+  line-height: 1.18;
+}
+
+.demo-copy p {
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .split {
@@ -573,8 +585,7 @@ dd {
   .hero,
   .split,
   .card-grid,
-  .wallet-grid,
-  .demo-grid {
+  .wallet-grid {
     grid-template-columns: 1fr;
   }
 
