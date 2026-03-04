@@ -271,6 +271,43 @@ dd {
   text-transform: uppercase;
 }
 
+.screenshot-hero-card {
+  display: grid;
+  gap: 16px;
+}
+
+.hero-shot-frame,
+.demo-shot {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(136, 204, 255, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0)),
+    rgba(3, 12, 24, 0.92);
+}
+
+.hero-shot-frame {
+  margin-left: auto;
+  width: min(100%, 320px);
+  padding: 10px;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.28);
+}
+
+.hero-shot-frame img,
+.demo-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 18px;
+}
+
+.hero-shot-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .status-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -356,7 +393,8 @@ dd {
 }
 
 .card-grid,
-.wallet-grid {
+.wallet-grid,
+.demo-grid {
   display: grid;
   gap: 18px;
 }
@@ -369,8 +407,13 @@ dd {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.demo-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .feature-card,
 .wallet-card,
+.demo-card,
 .narrative-card,
 .rail-card,
 .cta-band,
@@ -390,11 +433,31 @@ dd {
 
 .feature-card p:last-child,
 .wallet-card p,
+.demo-card p,
 .narrative-card p,
 .rail-step p,
 .cta-band p:last-child {
   margin-bottom: 0;
   color: var(--muted);
+}
+
+.demo-card {
+  display: grid;
+  gap: 16px;
+}
+
+.demo-shot {
+  padding: 10px;
+}
+
+.demo-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.demo-copy h3,
+.demo-copy p {
+  margin: 0;
 }
 
 .split {
@@ -502,7 +565,8 @@ dd {
   .hero,
   .split,
   .card-grid,
-  .wallet-grid {
+  .wallet-grid,
+  .demo-grid {
     grid-template-columns: 1fr;
   }
 
