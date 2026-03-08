@@ -25,7 +25,7 @@ commons-compress = "1.28.0"
 mmslib = "1.0.0"
 indicator-fast-scroll = "4524cd0b61"
 #Gradle
-gradlePlugins-agp = "9.0.1"
+gradlePlugins-agp = "9.1.0"
 #Helpers
 ez-vcard = "0.12.2"
 #Other
