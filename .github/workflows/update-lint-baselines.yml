@@ -40,7 +40,7 @@ jobs:
             :messages:detektBaseline
 
       - name: Create pull request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: ci/update-lint-baselines
           commit-message: "chore(ci): update lint and detekt baselines"
