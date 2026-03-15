@@ -1,6 +1,6 @@
 [versions]
 #jetbrains
-geocoderVersion = "3.25"
+geocoderVersion = "3.26"
 carrierVersion = "2.25"
 kotlin = "2.3.10"
 kotlinxSerializationJson = "1.10.0"
