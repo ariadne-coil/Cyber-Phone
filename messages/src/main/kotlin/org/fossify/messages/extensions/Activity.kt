@@ -32,6 +32,9 @@ import org.fossify.mesh.lxmf.LxmfAddress
 import java.io.File
 import java.util.Locale
 
+private const val PHONE_DIALER_ACTIVITY = "org.fossify.phone.activities.DialerActivity"
+private const val PHONE_DIALPAD_ACTIVITY = "org.fossify.phone.activities.DialpadActivity"
+
 fun BaseSimpleActivity.dialNumber(phoneNumber: String, callback: (() -> Unit)? = null) {
     hideKeyboard()
 
@@ -83,8 +86,10 @@ fun BaseSimpleActivity.dialNumber(phoneNumber: String, callback: (() -> Unit)? =
     }
 
     handlePermission(PERMISSION_CALL_PHONE) {
+        val className = if (it) PHONE_DIALER_ACTIVITY else PHONE_DIALPAD_ACTIVITY
         val action = if (it) Intent.ACTION_CALL else Intent.ACTION_DIAL
         Intent(action).apply {
+            setClassName(packageName, className)
             data = Uri.fromParts("tel", phoneNumber, null)
 
             try {

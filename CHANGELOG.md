@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.6.2 (2026-03-31)
+- Calling: fixed PSTN call launches that could fail with a generic "no valid app found" error by routing dial and call actions through Cyber Phone's own internal activities.
+- Messages integration: aligned the thread call button with the same explicit internal dialer path so calls started from conversations resolve reliably.
+- Android/Play readiness: removed the unused `FOREGROUND_SERVICE_DATA_SYNC` declaration while keeping the mesh connected-device foreground service path intact.
+- Toolchain: merged the latest Android Gradle Plugin `9.1.0` and Gradle `9.4.0` updates into the release baseline.
+
 ## v0.6.1 (2026-03-04)
 - Privacy/compliance: added a direct in-app link to the published Cyber Phone privacy policy from the About screen.
 - Release/docs: published the Cyber Phone website and privacy-policy pages on GitHub Pages for store and release metadata use.

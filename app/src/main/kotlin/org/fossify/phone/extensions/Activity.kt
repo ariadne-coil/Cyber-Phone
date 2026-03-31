@@ -2,6 +2,7 @@ package org.fossify.phone.extensions
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.provider.ContactsContract
@@ -14,18 +15,20 @@ import org.fossify.commons.activities.BaseSimpleActivity
 import org.fossify.commons.dialogs.CallConfirmationDialog
 import org.fossify.commons.dialogs.PermissionRequiredDialog
 import org.fossify.commons.extensions.canUseFullScreenIntent
+import org.fossify.commons.extensions.hasPermission
 import org.fossify.commons.extensions.initiateCall
 import org.fossify.commons.extensions.isDefaultDialer
 import org.fossify.commons.extensions.isPackageInstalled
 import org.fossify.commons.extensions.launchActivityIntent
-import org.fossify.commons.extensions.launchCallIntent
 import org.fossify.commons.extensions.launchViewContactIntent
 import org.fossify.commons.extensions.openFullScreenIntentSettings
 import org.fossify.commons.extensions.openNotificationSettings
+import org.fossify.commons.extensions.showErrorToast
 import org.fossify.commons.extensions.telecomManager
 import org.fossify.commons.extensions.toast
 import org.fossify.commons.helpers.CONTACT_ID
 import org.fossify.commons.helpers.IS_PRIVATE
+import org.fossify.commons.helpers.PERMISSION_CALL_PHONE
 import org.fossify.commons.helpers.PERMISSION_READ_PHONE_STATE
 import org.fossify.commons.helpers.PERMISSION_WRITE_CONTACTS
 import org.fossify.commons.helpers.SimpleContactsHelper
@@ -36,11 +39,40 @@ import org.fossify.mesh.MeshConfig
 import org.fossify.mesh.MeshMode
 import org.fossify.mesh.lxmf.LxmfAddress
 import org.fossify.phone.BuildConfig
+import org.fossify.phone.activities.DialpadActivity
 import org.fossify.phone.activities.DialerActivity
 import org.fossify.phone.activities.SimpleActivity
 import org.fossify.phone.dialogs.SelectSIMDialog
 import org.fossify.phone.mesh.voip.MeshVoipCallActivity
 import org.fossify.phone.wallet.WalletContactHelper
+
+private fun BaseSimpleActivity.launchInternalPstnCallIntent(
+    recipient: String,
+    handle: PhoneAccountHandle? = null
+) {
+    val intent = if (hasPermission(PERMISSION_CALL_PHONE)) {
+        Intent(this, DialerActivity::class.java).apply {
+            action = Intent.ACTION_CALL
+            data = Uri.fromParts("tel", recipient, null)
+            if (handle != null) {
+                putExtra(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle)
+            }
+        }
+    } else {
+        Intent(this, DialpadActivity::class.java).apply {
+            action = Intent.ACTION_DIAL
+            data = Uri.fromParts("tel", recipient, null)
+        }
+    }
+
+    try {
+        startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
+        toast(R.string.no_app_found)
+    } catch (e: Exception) {
+        showErrorToast(e)
+    }
+}
 
 fun SimpleActivity.startCallIntent(
     recipient: String,
@@ -69,10 +101,10 @@ fun SimpleActivity.startCallIntent(
             phoneNumber = recipient,
             forceSimSelector = forceSimSelector
         ) { handle ->
-            launchCallIntent(recipient, handle)
+            launchInternalPstnCallIntent(recipient, handle)
         }
     } else {
-        launchCallIntent(recipient, null)
+        launchInternalPstnCallIntent(recipient, null)
     }
 }
 
@@ -120,10 +152,10 @@ fun SimpleActivity.startCallWithConfirmationCheck(contact: Contact) {
             activity = this,
             callee = contact.getNameToDisplay()
         ) {
-            initiateCall(contact) { launchCallIntent(it) }
+            initiateCall(contact) { launchInternalPstnCallIntent(it) }
         }
     } else {
-        initiateCall(contact) { launchCallIntent(it) }
+        initiateCall(contact) { launchInternalPstnCallIntent(it) }
     }
 }
 
@@ -146,7 +178,7 @@ fun BaseSimpleActivity.callContactWithSim(
         val handle = getAvailableSIMCardLabels()
             .sortedBy { it.id }
             .getOrNull(wantedSimIndex)?.handle
-        launchCallIntent(recipient, handle)
+        launchInternalPstnCallIntent(recipient, handle)
     }
 }
 

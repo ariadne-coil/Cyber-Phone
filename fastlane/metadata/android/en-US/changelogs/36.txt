@@ -1,0 +1,6 @@
+v0.6.2
+
+- Fixed PSTN call launches that could fail with a "no valid app found" error.
+- Fixed thread call actions to resolve through Cyber Phone's own dialer path.
+- Removed the unused FOREGROUND_SERVICE_DATA_SYNC declaration.
+- Merged the latest AGP 9.1.0 and Gradle 9.4.0 toolchain updates.
