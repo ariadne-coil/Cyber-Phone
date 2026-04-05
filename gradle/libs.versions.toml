@@ -30,7 +30,7 @@ gradlePlugins-agp = "9.1.0"
 ez-vcard = "0.12.2"
 #Other
 autofitTextView = "0.2.1"
-libphonenumberVersion = "9.0.26"
+libphonenumberVersion = "9.0.27"
 libphonenumberinfo = "c77bdd2b69"
 tfLiteTaskTextVersion = "0.4.4"
 okhttp = "5.3.2"
