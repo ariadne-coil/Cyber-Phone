@@ -86,7 +86,7 @@ dependencies {
     implementation(libs.zxing.core)
     implementation(libs.zxing.embedded)
     implementation(libs.libphonenumber)
-    implementation(libs.tfLiteTaskText)
+    implementation(libs.mediapipe.tasks.text)
     detektPlugins(libs.compose.detekt)
     testImplementation(libs.junit)
 }

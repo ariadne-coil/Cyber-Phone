@@ -25,14 +25,14 @@ commons-compress = "1.28.0"
 mmslib = "1.0.0"
 indicator-fast-scroll = "4524cd0b61"
 #Gradle
-gradlePlugins-agp = "9.1.0"
+gradlePlugins-agp = "9.2.0"
 #Helpers
 ez-vcard = "0.12.2"
 #Other
 autofitTextView = "0.2.1"
 libphonenumberVersion = "9.0.26"
 libphonenumberinfo = "c77bdd2b69"
-tfLiteTaskTextVersion = "0.4.4"
+mediapipeTasksTextVersion = "0.10.26.1"
 okhttp = "5.3.2"
 slf4j = "1.7.36"
 work = "2.11.1"
@@ -81,7 +81,7 @@ ez-vcard = { module = "com.googlecode.ez-vcard:ez-vcard", version.ref = "ez-vcar
 autofit-text-view = { module = "me.grantland:autofittextview", version.ref = "autofitTextView" }
 libphonenumber = { module = "com.googlecode.libphonenumber:libphonenumber", version.ref = "libphonenumberVersion" }
 libphonenumberinfo = { module = "com.gitlab.xynngh:LibPhoneNumberInfo", version.ref = "libphonenumberinfo" }
-tfLiteTaskText = { module = "org.tensorflow:tensorflow-lite-task-text", version.ref = "tfLiteTaskTextVersion" }
+mediapipe-tasks-text = { module = "com.google.mediapipe:tasks-text", version.ref = "mediapipeTasksTextVersion" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 slf4j-android = { module = "org.slf4j:slf4j-android", version.ref = "slf4j" }
 work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }

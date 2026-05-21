@@ -1,0 +1,5 @@
+v0.6.4
+
+- Reintegrated the Bitcoin, Lightning, and Fedimint wallet features on top of the accepted Phone + SMS + mesh build.
+- Preserved reviewer-safe onboarding: default Phone first, default SMS second, then runtime permissions.
+- Restored wallet contact actions, wallet message flows, Fedimint runtime assets, and wallet background refresh jobs.

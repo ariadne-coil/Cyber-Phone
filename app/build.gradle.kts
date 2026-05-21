@@ -87,6 +87,14 @@ val generateFedimintWebRuntime by tasks.registering(Exec::class) {
     group = "build"
     description = "Builds the Fedimint Web runtime from pinned source into generated Android assets."
     doNotTrackState("Fedimint runtime generation depends on external toolchain state and submodule contents.")
+    notCompatibleWithConfigurationCache("Fedimint runtime generation depends on external toolchain state and submodule contents.")
+    onlyIf {
+        val hasSourceCheckout = fedimintSourceRoot.listFiles()?.isNotEmpty() == true
+        if (!hasSourceCheckout) {
+            logger.lifecycle("Fedimint source checkout is not populated; using checked-in Android assets.")
+        }
+        hasSourceCheckout
+    }
 
     val outputDir = fedimintGeneratedAssetDir.get().asFile
     val targetDir = fedimintRustTargetDir.get().asFile
@@ -124,6 +132,9 @@ android {
         // Deterministic versioning for reproducible release builds.
         versionName = project.property("VERSION_NAME").toString()
         versionCode = project.property("VERSION_CODE").toString().toInt()
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
     }
 
     signingConfigs {

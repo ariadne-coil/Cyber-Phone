@@ -65,6 +65,9 @@ class MainActivity : SimpleActivity() {
     private var storedFontSize = 0
     private var storedStartNameWithSurname = false
     private var mainHolderBehavior: CoordinatorLayout.Behavior<*>? = null
+    private var fragmentsInitialized = false
+    private var defaultPhonePromptAttempted = false
+    private var defaultSmsPromptAttempted = false
     var cachedContacts = ArrayList<Contact>()
     private val setDefaultSmsLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -97,40 +100,15 @@ class MainActivity : SimpleActivity() {
         EventBus.getDefault().register(this)
         launchedDialer = savedInstanceState?.getBoolean(OPEN_DIAL_PAD_AT_LAUNCH) ?: false
 
-        if (isDefaultDialer()) {
-            checkContactPermissions()
-
-            if (!config.wasOverlaySnackbarConfirmed && !Settings.canDrawOverlays(this)) {
-                val snackbar = Snackbar.make(
-                    binding.mainHolder,
-                    R.string.allow_displaying_over_other_apps,
-                    Snackbar.LENGTH_INDEFINITE
-                ).setAction(R.string.ok) {
-                    config.wasOverlaySnackbarConfirmed = true
-                    startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
-                }
-
-                snackbar.setBackgroundTint(getProperBackgroundColor().darkenColor())
-                snackbar.setTextColor(getProperTextColor())
-                snackbar.setActionTextColor(getProperTextColor())
-                snackbar.show()
-            }
-
-            handleFullScreenNotificationsPermission { granted ->
-                if (!granted) {
-                    toast(org.fossify.commons.R.string.notifications_disabled)
-                }
-            }
-        } else {
-            launchSetDefaultDialerIntent()
-        }
-
         if (isQPlus() && (config.blockUnknownNumbers || config.blockHiddenNumbers)) {
             setDefaultCallerIdApp()
         }
 
         setupTabs()
         Contact.sorting = config.sorting
+        requestDefaultPhoneRoleThenSensitivePermissions(
+            defaultPromptAlreadyShown = intent.getBooleanExtra(SplashActivity.EXTRA_DEFAULT_DIALER_PROMPT_SHOWN, false)
+        )
     }
 
     override fun onResume() {
@@ -182,6 +160,10 @@ class MainActivity : SimpleActivity() {
         Handler(Looper.getMainLooper()).postDelayed({
             getRecentsFragment()?.refreshItems()
         }, 2000)
+
+        Handler(Looper.getMainLooper()).postDelayed({
+            continueDefaultHandlerSetupAfterRoleReturn()
+        }, 500)
     }
 
     override fun onPause() {
@@ -199,7 +181,7 @@ class MainActivity : SimpleActivity() {
         }
         // we don't really care about the result, the app can work without being the default Dialer too
         if (requestCode == REQUEST_CODE_SET_DEFAULT_DIALER) {
-            checkContactPermissions()
+            requestDefaultPhoneRoleThenSensitivePermissions(defaultPromptAlreadyShown = true)
         } else if (requestCode == REQUEST_CODE_SET_DEFAULT_CALLER_ID && resultCode != Activity.RESULT_OK) {
             toast(R.string.must_make_default_caller_id_app, length = Toast.LENGTH_LONG)
             baseConfig.blockUnknownNumbers = false
@@ -311,8 +293,164 @@ class MainActivity : SimpleActivity() {
     }
 
     private fun checkContactPermissions() {
-        handlePermission(PERMISSION_READ_CONTACTS) {
+        handlePermissionAfterDefaultHandlerRoles(PERMISSION_READ_CONTACTS) {
             initFragments()
+        }
+    }
+
+    private fun requestDefaultPhoneRoleThenSensitivePermissions(defaultPromptAlreadyShown: Boolean = false) {
+        if (isDefaultPhoneRoleHeld()) {
+            requestDefaultSmsRoleThenSensitivePermissions()
+            return
+        }
+
+        if (defaultPromptAlreadyShown) {
+            handleDefaultPhoneSetupIncomplete()
+            return
+        }
+
+        defaultPhonePromptAttempted = true
+        requestDefaultDialerRoleIfNeeded { isDefault ->
+            if (isDefault) {
+                requestDefaultSmsRoleThenSensitivePermissions()
+            } else {
+                handleDefaultPhoneSetupIncomplete()
+            }
+        }
+    }
+
+    private fun requestDefaultSmsRoleThenSensitivePermissions(defaultPromptAlreadyShown: Boolean = false) {
+        if (isDefaultSmsRoleHeld()) {
+            requestSensitiveRuntimePermissionsForDefaultHandlers {
+                handleDefaultHandlersSetupComplete()
+            }
+            return
+        }
+
+        if (defaultPromptAlreadyShown) {
+            handleDefaultSmsSetupIncomplete()
+            return
+        }
+
+        defaultSmsPromptAttempted = true
+        requestDefaultSmsRoleIfNeeded { isDefault ->
+            if (isDefault) {
+                requestSensitiveRuntimePermissionsForDefaultHandlers {
+                    handleDefaultHandlersSetupComplete()
+                }
+            } else {
+                handleDefaultSmsSetupIncomplete()
+            }
+        }
+    }
+
+    private fun continueDefaultHandlerSetupAfterRoleReturn() {
+        if (isFinishing || isDestroyed || fragmentsInitialized) {
+            return
+        }
+
+        if (isDefaultPhoneRoleHeld() && !isDefaultSmsRoleHeld() && !defaultSmsPromptAttempted) {
+            requestDefaultSmsRoleThenSensitivePermissions()
+        } else if (isDefaultPhoneRoleHeld() && isDefaultSmsRoleHeld()) {
+            requestSensitiveRuntimePermissionsForDefaultHandlers {
+                handleDefaultHandlersSetupComplete()
+            }
+        } else if (!isDefaultPhoneRoleHeld() && !defaultPhonePromptAttempted) {
+            requestDefaultPhoneRoleThenSensitivePermissions()
+        }
+    }
+
+    private fun requestSensitiveRuntimePermissionsForDefaultHandlers(onComplete: () -> Unit) {
+        requestCallLogRuntimePermissionsForDefaultDialer {
+            requestSmsRuntimePermissionsForDefaultSms {
+                onComplete()
+            }
+        }
+    }
+
+    private fun requestCallLogRuntimePermissionsForDefaultDialer(onComplete: () -> Unit) {
+        handlePermissionAfterDefaultHandlerRoles(PERMISSION_READ_CALL_LOG) {
+            handlePermissionAfterDefaultHandlerRoles(PERMISSION_WRITE_CALL_LOG) {
+                onComplete()
+            }
+        }
+    }
+
+    private fun requestSmsRuntimePermissionsForDefaultSms(onComplete: () -> Unit) {
+        handlePermissionAfterDefaultHandlerRoles(PERMISSION_READ_SMS) {
+            handlePermissionAfterDefaultHandlerRoles(PERMISSION_SEND_SMS) {
+                onComplete()
+            }
+        }
+    }
+
+    private fun handleDefaultHandlersSetupComplete() {
+        checkContactPermissions()
+        showOverlayPermissionSnackbarIfNeeded()
+        handleFullScreenNotificationsPermission { granted ->
+            if (!granted) {
+                toast(org.fossify.commons.R.string.notifications_disabled)
+            }
+        }
+    }
+
+    private fun handleDefaultPhoneSetupIncomplete() {
+        initFragments()
+        showDefaultPhoneSnackbar()
+    }
+
+    private fun handleDefaultSmsSetupIncomplete() {
+        initFragments()
+        showDefaultSmsSnackbar()
+    }
+
+    private fun showDefaultPhoneSnackbar() {
+        Snackbar.make(
+            binding.mainHolder,
+            R.string.default_phone_app_prompt,
+            Snackbar.LENGTH_INDEFINITE
+        ).setAction(R.string.ok) {
+            requestDefaultPhoneRoleThenSensitivePermissions()
+        }.apply {
+            setBackgroundTint(getProperBackgroundColor().darkenColor())
+            setTextColor(getProperTextColor())
+            setActionTextColor(getProperTextColor())
+            show()
+        }
+    }
+
+    private fun showDefaultSmsSnackbar() {
+        Snackbar.make(
+            binding.mainHolder,
+            R.string.default_sms_app_prompt,
+            Snackbar.LENGTH_INDEFINITE
+        ).setAction(R.string.ok) {
+            requestDefaultSmsRoleThenSensitivePermissions()
+        }.apply {
+            setBackgroundTint(getProperBackgroundColor().darkenColor())
+            setTextColor(getProperTextColor())
+            setActionTextColor(getProperTextColor())
+            show()
+        }
+    }
+
+    private fun showOverlayPermissionSnackbarIfNeeded() {
+        if (config.wasOverlaySnackbarConfirmed || Settings.canDrawOverlays(this)) {
+            return
+        }
+
+        Snackbar.make(
+            binding.mainHolder,
+            R.string.allow_displaying_over_other_apps,
+            Snackbar.LENGTH_INDEFINITE
+        ).setAction(R.string.ok) {
+            config.wasOverlaySnackbarConfirmed = true
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
+        }.apply {
+            setBackgroundTint(getProperBackgroundColor().darkenColor())
+            setTextColor(getProperTextColor())
+            setActionTextColor(getProperTextColor())
+            show()
         }
     }
 
@@ -382,6 +520,11 @@ class MainActivity : SimpleActivity() {
     }
 
     private fun initFragments() {
+        if (fragmentsInitialized) {
+            return
+        }
+        fragmentsInitialized = true
+
         binding.viewPager.offscreenPageLimit = 2
         binding.viewPager.addOnPageChangeListener(object : ViewPager.OnPageChangeListener {
             override fun onPageScrollStateChanged(state: Int) {}

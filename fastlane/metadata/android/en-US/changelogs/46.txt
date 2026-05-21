@@ -1,0 +1,5 @@
+v0.6.3
+
+- Restored mesh messaging, mesh calling, import/export, settings, and privacy features on top of the approved Phone + SMS build.
+- Preserved the reviewer-safe onboarding order: default Phone first, default SMS second, then runtime permissions.
+- Removed unrelated experimental payment screens, protocol handlers, dependencies, and resources from this release.
