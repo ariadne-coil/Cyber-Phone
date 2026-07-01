@@ -4,13 +4,69 @@
   <CurrentIssues>
     <ID>ComplexCondition:Activity.kt$contact.rawId &gt; 1000000 &amp;&amp; contact.contactId &gt; 1000000 &amp;&amp; contact.rawId == contact.contactId &amp;&amp; (isPackageInstalled(simpleContacts) || isPackageInstalled(simpleContactsDebug))</ID>
     <ID>ComplexCondition:DialpadActivity.kt$DialpadActivity$(intent.action == Intent.ACTION_DIAL || intent.action == Intent.ACTION_VIEW) &amp;&amp; intent.data != null &amp;&amp; intent.dataString?.contains("tel:") == true</ID>
+    <ID>ComplexCondition:FedimintWalletManager.kt$FedimintWalletManager$text.contains("wallet not open") || text.contains("not initialized") || text.contains("client is not initialized") || (text.contains("runtimeerror") &amp;&amp; (text.contains("unreachable") || text.contains("incompatible")))</ID>
+    <ID>ComplexCondition:LdkWalletManager.kt$LdkWalletManager$allowFeerateRecovery &amp;&amp; jitErr != null &amp;&amp; jitErr.isLikelyFeerateFailure() &amp;&amp; recoverFromFeerateFailureBlocking("create invoice")</ID>
+    <ID>ComplexCondition:LdkWalletManager.kt$LdkWalletManager$classLower.contains("feerateestimationupdatefailed") || classLower.contains("feerateestimationupdatetimeout") || msgLower.contains("feerateestimationupdatefailed") || msgLower.contains("feerateestimationupdatetimeout") || (msgLower.contains("feerate") &amp;&amp; (msgLower.contains("update") || msgLower.contains("estimate"))) || ((msgLower.contains("fee rate") || msgLower.contains("fee rates")) &amp;&amp; (msgLower.contains("fetch") || msgLower.contains("update") || msgLower.contains("estimate") || msgLower.contains("unavailable") || msgLower.contains("failed")))</ID>
+    <ID>ComplexCondition:LdkWalletManager.kt$LdkWalletManager$classLower.contains("insufficientfunds") || msgLower.contains("insufficientfunds") || (msgLower.contains("insufficient") &amp;&amp; msgLower.contains("fund"))</ID>
+    <ID>ComplexCondition:LdkWalletManager.kt$LdkWalletManager$classLower.contains("liquiditysourceunavailable") || msgLower.contains("liquiditysourceunavailable") || (msgLower.contains("liquidity source") &amp;&amp; msgLower.contains("unavailable"))</ID>
+    <ID>ComplexCondition:MeshLinkActivity.kt$MeshLinkActivity$scheme == "mesh" || scheme == "lxm" || scheme == "lxmf" || scheme == "meshaddr1"</ID>
+    <ID>ComplexCondition:WalletFragment.kt$WalletFragment$isFm &amp;&amp; !isLnurlDestination &amp;&amp; (!isBolt11Destination || fixedDestinationInvoiceSats == null)</ID>
+    <ID>ComplexCondition:WalletPayActivity.kt$WalletPayActivity$!isLnurlDestination &amp;&amp; !isBolt11 &amp;&amp; (amountSats == null || amountSats &lt;= 0L)</ID>
+    <ID>ComplexCondition:WalletPayActivity.kt$WalletPayActivity$!ok &amp;&amp; pendingMessage == null &amp;&amp; allowFedimintFallback &amp;&amp; tryFedimintFallback</ID>
+    <ID>ComplexCondition:WalletPayActivity.kt$WalletPayActivity$isBolt11 &amp;&amp; fixedInvoiceSats == null &amp;&amp; (amountSats == null || amountSats &lt;= 0L)</ID>
+    <ID>ComplexCondition:WalletPayActivity.kt$WalletPayActivity$isFm &amp;&amp; !isLnurlDestination &amp;&amp; (!isBolt11 || fixedInvoiceSats == null)</ID>
     <ID>CyclomaticComplexMethod:CallActivity.kt$CallActivity$@SuppressLint("ClickableViewAccessibility") private fun handleSwipe()</ID>
+    <ID>CyclomaticComplexMethod:CallActivity.kt$CallActivity$private fun updateCallerIdEnrichment(number: String)</ID>
+    <ID>CyclomaticComplexMethod:CallContactHelper.kt$fun getCallContact(context: Context, call: Call?, callback: (CallContact) -&gt; Unit)</ID>
     <ID>CyclomaticComplexMethod:CallManager.kt$CallManager.Companion$fun getPhoneState(): PhoneState</ID>
+    <ID>CyclomaticComplexMethod:ContactActions.kt$fun SimpleActivity.showContactActionsDialog(contact: Contact)</ID>
+    <ID>CyclomaticComplexMethod:ContactActions.kt$private fun Contact.pickBestAddressForMessaging(): String?</ID>
+    <ID>CyclomaticComplexMethod:ContactActions.kt$private fun Contact.pickBestPhoneNumberForCall(): String?</ID>
     <ID>CyclomaticComplexMethod:ContactsAdapter.kt$ContactsAdapter$@SuppressLint("ClickableViewAccessibility") private fun setupView(binding: ItemViewBinding, contact: Contact, holder: ViewHolder)</ID>
+    <ID>CyclomaticComplexMethod:CustomizationUiPatcher.kt$CustomizationUiPatcher$private fun detectSystemFonts(): List&lt;SystemFontChoice&gt;</ID>
+    <ID>CyclomaticComplexMethod:FederationDirectoryManager.kt$FederationDirectoryManager$fun loadDirectory(context: Context): FederationDirectory?</ID>
+    <ID>CyclomaticComplexMethod:FederationDirectoryManager.kt$FederationDirectoryManager$fun refreshBlocking(context: Context): Boolean</ID>
+    <ID>CyclomaticComplexMethod:FederationDirectoryManager.kt$FederationDirectoryManager$private fun mergeDirectories(primary: FederationDirectory?, fallback: FederationDirectory?): FederationDirectory?</ID>
+    <ID>CyclomaticComplexMethod:FedimintWalletManager.kt$FedimintWalletManager$fun createOnchainDepositAddressBlocking( context: Context, federation: FederationEntry, ): String?</ID>
+    <ID>CyclomaticComplexMethod:FedimintWalletManager.kt$FedimintWalletManager$fun ensureStartedBlocking(context: Context, federation: FederationEntry): Boolean</ID>
+    <ID>CyclomaticComplexMethod:FedimintWalletManager.kt$FedimintWalletManager$fun rawClientRpcBlocking( context: Context, module: Any?, method: String, payload: JSONObject = JSONObject(), timeoutMs: Long = RAW_RPC_TIMEOUT_MS, ): JSONObject?</ID>
+    <ID>CyclomaticComplexMethod:FedimintWalletManager.kt$FedimintWalletManager$fun spendEcashBlocking( context: Context, federation: FederationEntry, amountSats: Long, tryCancelAfterSecs: Int = 86400, ): EcashSpendResult?</ID>
+    <ID>CyclomaticComplexMethod:LdkWalletManager.kt$LdkWalletManager$@Throws(BuildException::class, NodeException::class) private fun startInternal( context: Context, federation: FederationEntry, forceRebuild: Boolean = false, preferredEsploraOverride: String? = null, )</ID>
+    <ID>CyclomaticComplexMethod:LdkWalletManager.kt$LdkWalletManager$fun awaitIncomingLightningInvoiceStatusBlocking( invoiceStr: String, timeoutMs: Long = LIGHTNING_RECEIVE_AWAIT_TIMEOUT_MS, pollMs: Long = LIGHTNING_RECEIVE_AWAIT_POLL_MS, failOnTimeout: Boolean = false, ): PaymentStatus?</ID>
+    <ID>CyclomaticComplexMethod:LdkWalletManager.kt$LdkWalletManager$fun bootstrapOutboundLiquidityBlocking( context: Context, requiredSats: Long, timeoutMs: Long = LIQUIDITY_BOOTSTRAP_TIMEOUT_MS, ): LiquidityBootstrapResult</ID>
+    <ID>CyclomaticComplexMethod:LdkWalletManager.kt$LdkWalletManager$fun bootstrapOutboundLiquidityViaGatewayHintsBlocking( context: Context, gatewayNodeIds: List&lt;String&gt;, requiredSats: Long, network: String? = null, forceOpenOnRouteFailure: Boolean = false, timeoutMs: Long = LIQUIDITY_BOOTSTRAP_TIMEOUT_MS, ): LiquidityBootstrapResult</ID>
+    <ID>CyclomaticComplexMethod:LdkWalletManager.kt$LdkWalletManager$fun convertLightningToOnchainByClosingChannelsBlocking(requiredOnchainSats: Long): LightningToOnchainConvertResult</ID>
+    <ID>CyclomaticComplexMethod:LdkWalletManager.kt$LdkWalletManager$private fun createBolt11InvoiceInternal( amountSats: Long?, memo: String, expirySeconds: Int, preferJitChannel: Boolean, allowFeerateRecovery: Boolean, ): String?</ID>
+    <ID>CyclomaticComplexMethod:LdkWalletManager.kt$LdkWalletManager$private fun inspectPendingGatewayReference( n: Node, reference: String, requiredSats: Long, ): PendingGatewayReferenceStatus</ID>
+    <ID>CyclomaticComplexMethod:LdkWalletManager.kt$LdkWalletManager$private fun listBalancesInternal(allowFeerateRecovery: Boolean): BalanceDetails?</ID>
+    <ID>CyclomaticComplexMethod:LdkWalletManager.kt$LdkWalletManager$private fun mapKnownWalletErrorSummary(className: String, message: String): String?</ID>
+    <ID>CyclomaticComplexMethod:LnurlPayManager.kt$LnurlPayManager$fun resolveInvoiceBlocking( rawDestination: String, amountSats: Long?, ): ResolveResult</ID>
+    <ID>CyclomaticComplexMethod:MeshAudioEngine.kt$MeshAudioEngine$private fun startCapture()</ID>
+    <ID>CyclomaticComplexMethod:MeshVoipCallActivity.kt$MeshVoipCallActivity$@SuppressLint("ClickableViewAccessibility") private fun handleSwipe()</ID>
+    <ID>CyclomaticComplexMethod:MessagesFragment.kt$MessagesFragment$private fun getNewConversations(cachedConversations: ArrayList&lt;Conversation&gt;)</ID>
     <ID>CyclomaticComplexMethod:RecentCallsAdapter.kt$RecentCallsAdapter$private fun showPopupMenu(view: View, call: RecentCall)</ID>
     <ID>CyclomaticComplexMethod:RecentCallsAdapter.kt$RecentCallsAdapter.RecentCallViewHolder$fun bind(call: RecentCall)</ID>
     <ID>CyclomaticComplexMethod:RecentCallsAdapter.kt$RecentCallsDiffCallback$override fun areContentsTheSame(oldItem: CallLogItem, newItem: CallLogItem): Boolean</ID>
     <ID>CyclomaticComplexMethod:RecentsHelper.kt$RecentsHelper$@SuppressLint("NewApi") private fun getRecents( contacts: List&lt;Contact&gt;, selection: String? = null, selectionParams: Array&lt;String&gt;? = null, ): List&lt;RecentCall&gt;</ID>
+    <ID>CyclomaticComplexMethod:WalletBackupCrypto.kt$WalletBackupCrypto$fun parseEnvelope(jsonText: String): Envelope?</ID>
+    <ID>CyclomaticComplexMethod:WalletContactHelper.kt$WalletContactHelper$private fun getWalletDestinationsFromPhones(context: Context, idColumn: String, idValue: String): WalletDestinations</ID>
+    <ID>CyclomaticComplexMethod:WalletFederationTopupManager.kt$WalletFederationTopupManager$fun recoverMainnetLightningPaymentBlocking( context: Context, sourceFederation: FederationEntry, invoice: String, amountSats: Long?, ): MainnetLightningRecoveryResult</ID>
+    <ID>CyclomaticComplexMethod:WalletFederationTopupManager.kt$WalletFederationTopupManager$fun topupFromMainnetBlocking( context: Context, quote: TopupQuote, ): TopupResult</ID>
+    <ID>CyclomaticComplexMethod:WalletFederationTopupManager.kt$WalletFederationTopupManager$private fun retryMainnetLightningPayment( context: Context, invoice: String, amountSats: Long?, attempts: Int, syncBeforeAttempt: Boolean, ): MainnetLightningRecoveryResult</ID>
+    <ID>CyclomaticComplexMethod:WalletFragment.kt$WalletFragment$override fun setupFragment()</ID>
+    <ID>CyclomaticComplexMethod:WalletFragment.kt$WalletFragment$private fun createEncryptedBackupNow(uri: Uri, selected: FederationEntry, passphrase: CharArray)</ID>
+    <ID>CyclomaticComplexMethod:WalletFragment.kt$WalletFragment$private fun extractWalletBackupZip(zip: ZipInputStream, federationId: String)</ID>
+    <ID>CyclomaticComplexMethod:WalletFragment.kt$WalletFragment$private fun redeemLnurlWithdraw(destination: String, requestedAmountSats: Long?)</ID>
+    <ID>CyclomaticComplexMethod:WalletFragment.kt$WalletFragment$private fun refreshAll(force: Boolean, callback: (() -&gt; Unit)? = null)</ID>
+    <ID>CyclomaticComplexMethod:WalletFragment.kt$WalletFragment$private fun renderStatic(rate: Double? = ExchangeRateManager.getCachedUsdRate(context))</ID>
+    <ID>CyclomaticComplexMethod:WalletFragment.kt$WalletFragment$private fun restoreEncryptedBackupNow( envelope: WalletBackupCrypto.Envelope, passphrase: CharArray, )</ID>
+    <ID>CyclomaticComplexMethod:WalletFragment.kt$WalletFragment$private fun runAdvancedConvertOnchainToLightning( selected: FederationEntry, amountSats: Long, )</ID>
+    <ID>CyclomaticComplexMethod:WalletFragment.kt$WalletFragment$private fun sendPayment(destination: String, amountSats: Long?)</ID>
+    <ID>CyclomaticComplexMethod:WalletFragment.kt$WalletFragment$private fun showCreateInvoiceDialog()</ID>
+    <ID>CyclomaticComplexMethod:WalletFragment.kt$WalletFragment$private fun withdrawFromSelectedFederation(amountSats: Long)</ID>
+    <ID>CyclomaticComplexMethod:WalletPayActivity.kt$WalletPayActivity$private fun performPayment( selected: FederationEntry, destination: String, amountSats: Long?, allowTopupPrompt: Boolean, )</ID>
+    <ID>CyclomaticComplexMethod:WalletPayActivity.kt$WalletPayActivity$private fun startPayment()</ID>
+    <ID>CyclomaticComplexMethod:YacbSiaManager.kt$YacbSiaManager$@Keep fun submitRating(number: String, rating: Rating)</ID>
     <ID>DestructuringDeclarationWithTooManyEntries:CallActivity.kt$CallActivity$val (name, _, number, numberLabel) = callContact!!</ID>
     <ID>EmptyCatchBlock:CallActivity.kt$CallActivity${ }</ID>
     <ID>EmptyFunctionBlock:ConferenceCallsAdapter.kt$ConferenceCallsAdapter${}</ID>
@@ -19,20 +75,56 @@
     <ID>EmptyFunctionBlock:RecentCallsAdapter.kt$RecentCallsAdapter${}</ID>
     <ID>EmptyFunctionBlock:SpeedDialAdapter.kt$SpeedDialAdapter${}</ID>
     <ID>LargeClass:CallActivity.kt$CallActivity : SimpleActivity</ID>
+    <ID>LargeClass:FederationDirectoryManager.kt$FederationDirectoryManager</ID>
+    <ID>LargeClass:FedimintWalletManager.kt$FedimintWalletManager</ID>
+    <ID>LargeClass:LdkWalletManager.kt$LdkWalletManager</ID>
+    <ID>LargeClass:MainActivity.kt$MainActivity : SimpleActivity</ID>
+    <ID>LargeClass:MeshVoipCallActivity.kt$MeshVoipCallActivity : SimpleActivityListener</ID>
+    <ID>LargeClass:MessagesFragment.kt$MessagesFragment : MyViewPagerFragment</ID>
+    <ID>LargeClass:SettingsActivity.kt$SettingsActivity : SimpleActivity</ID>
+    <ID>LargeClass:WalletFederationTopupManager.kt$WalletFederationTopupManager</ID>
+    <ID>LargeClass:WalletFragment.kt$WalletFragment : MyViewPagerFragmentRefreshItemsListener</ID>
+    <ID>LargeClass:WalletPayActivity.kt$WalletPayActivity : SimpleActivity</ID>
     <ID>LongMethod:CallActivity.kt$CallActivity$@SuppressLint("ClickableViewAccessibility") private fun handleSwipe()</ID>
+    <ID>LongMethod:LdkWalletManager.kt$LdkWalletManager$fun bootstrapOutboundLiquidityBlocking( context: Context, requiredSats: Long, timeoutMs: Long = LIQUIDITY_BOOTSTRAP_TIMEOUT_MS, ): LiquidityBootstrapResult</ID>
+    <ID>LongMethod:LdkWalletManager.kt$LdkWalletManager$fun bootstrapOutboundLiquidityViaGatewayHintsBlocking( context: Context, gatewayNodeIds: List&lt;String&gt;, requiredSats: Long, network: String? = null, forceOpenOnRouteFailure: Boolean = false, timeoutMs: Long = LIQUIDITY_BOOTSTRAP_TIMEOUT_MS, ): LiquidityBootstrapResult</ID>
+    <ID>LongMethod:LdkWalletManager.kt$LdkWalletManager$private fun createBolt11InvoiceInternal( amountSats: Long?, memo: String, expirySeconds: Int, preferJitChannel: Boolean, allowFeerateRecovery: Boolean, ): String?</ID>
+    <ID>LongMethod:MeshVoipCallActivity.kt$MeshVoipCallActivity$@SuppressLint("ClickableViewAccessibility") private fun handleSwipe()</ID>
     <ID>LongMethod:RecentCallsAdapter.kt$RecentCallsAdapter.RecentCallViewHolder$fun bind(call: RecentCall)</ID>
     <ID>LongMethod:RecentsHelper.kt$RecentsHelper$@SuppressLint("NewApi") private fun getRecents( contacts: List&lt;Contact&gt;, selection: String? = null, selectionParams: Array&lt;String&gt;? = null, ): List&lt;RecentCall&gt;</ID>
+    <ID>LongMethod:WalletFederationTopupManager.kt$WalletFederationTopupManager$fun recoverMainnetLightningPaymentBlocking( context: Context, sourceFederation: FederationEntry, invoice: String, amountSats: Long?, ): MainnetLightningRecoveryResult</ID>
+    <ID>LongMethod:WalletFederationTopupManager.kt$WalletFederationTopupManager$fun topupFromMainnetBlocking( context: Context, quote: TopupQuote, ): TopupResult</ID>
+    <ID>LongMethod:WalletFragment.kt$WalletFragment$override fun setupFragment()</ID>
+    <ID>LongMethod:WalletFragment.kt$WalletFragment$private fun redeemLnurlWithdraw(destination: String, requestedAmountSats: Long?)</ID>
+    <ID>LongMethod:WalletFragment.kt$WalletFragment$private fun refreshAll(force: Boolean, callback: (() -&gt; Unit)? = null)</ID>
+    <ID>LongMethod:WalletFragment.kt$WalletFragment$private fun sendPayment(destination: String, amountSats: Long?)</ID>
+    <ID>LongMethod:WalletFragment.kt$WalletFragment$private fun withdrawFromSelectedFederation(amountSats: Long)</ID>
+    <ID>LongMethod:WalletPayActivity.kt$WalletPayActivity$private fun performPayment( selected: FederationEntry, destination: String, amountSats: Long?, allowTopupPrompt: Boolean, )</ID>
+    <ID>LoopWithTooManyJumpStatements:FederationDirectoryManager.kt$FederationDirectoryManager$for</ID>
+    <ID>LoopWithTooManyJumpStatements:FederationDirectoryManager.kt$FederationDirectoryManager$while</ID>
+    <ID>LoopWithTooManyJumpStatements:FedimintWalletManager.kt$FedimintWalletManager$for</ID>
+    <ID>LoopWithTooManyJumpStatements:LdkWalletManager.kt$LdkWalletManager$for</ID>
+    <ID>LoopWithTooManyJumpStatements:LdkWalletManager.kt$LdkWalletManager$while</ID>
+    <ID>LoopWithTooManyJumpStatements:MeshAudioEngine.kt$MeshAudioEngine$while</ID>
+    <ID>LoopWithTooManyJumpStatements:WalletFederationTopupManager.kt$WalletFederationTopupManager$for</ID>
+    <ID>LoopWithTooManyJumpStatements:WalletFragment.kt$WalletFragment$for</ID>
+    <ID>LoopWithTooManyJumpStatements:WalletFragment.kt$WalletFragment$while</ID>
     <ID>MagicNumber:Activity.kt$1000000</ID>
     <ID>MagicNumber:CallActivity.kt$CallActivity$0.10f</ID>
     <ID>MagicNumber:CallActivity.kt$CallActivity$0.2f</ID>
     <ID>MagicNumber:CallActivity.kt$CallActivity$0.5f</ID>
     <ID>MagicNumber:CallActivity.kt$CallActivity$200L</ID>
     <ID>MagicNumber:CallActivity.kt$CallActivity$250L</ID>
+    <ID>MagicNumber:CallActivity.kt$CallActivity$3</ID>
     <ID>MagicNumber:CallActivity.kt$CallActivity$3000</ID>
     <ID>MagicNumber:CallActivity.kt$CallActivity$5</ID>
     <ID>MagicNumber:CallActivity.kt$CallActivity$50f</ID>
     <ID>MagicNumber:CallActivity.kt$CallActivity$60</ID>
+    <ID>MagicNumber:CallService.kt$CallService$4</ID>
     <ID>MagicNumber:Config.kt$Config$9</ID>
+    <ID>MagicNumber:ContactActions.kt$1_000_000</ID>
+    <ID>MagicNumber:Context.kt$6</ID>
+    <ID>MagicNumber:CustomizationUiPatcher.kt$CustomizationUiPatcher$3</ID>
     <ID>MagicNumber:DialpadActivity.kt$DialpadActivity$3</ID>
     <ID>MagicNumber:DialpadActivity.kt$DialpadActivity$4</ID>
     <ID>MagicNumber:DialpadActivity.kt$DialpadActivity$5</ID>
@@ -40,12 +132,206 @@
     <ID>MagicNumber:DialpadActivity.kt$DialpadActivity$7</ID>
     <ID>MagicNumber:DialpadActivity.kt$DialpadActivity$8</ID>
     <ID>MagicNumber:DialpadActivity.kt$DialpadActivity$9</ID>
+    <ID>MagicNumber:ExchangeRateManager.kt$ExchangeRateManager$10</ID>
+    <ID>MagicNumber:ExchangeRateManager.kt$ExchangeRateManager$20</ID>
+    <ID>MagicNumber:FederationAdapter.kt$FederationAdapter$0.92f</ID>
+    <ID>MagicNumber:FederationDirectoryManager.kt$FederationDirectoryManager$10</ID>
+    <ID>MagicNumber:FederationDirectoryManager.kt$FederationDirectoryManager$12</ID>
+    <ID>MagicNumber:FederationDirectoryManager.kt$FederationDirectoryManager$120</ID>
+    <ID>MagicNumber:FederationDirectoryManager.kt$FederationDirectoryManager$20</ID>
+    <ID>MagicNumber:FederationDirectoryManager.kt$FederationDirectoryManager$24L</ID>
+    <ID>MagicNumber:FederationDirectoryManager.kt$FederationDirectoryManager$3</ID>
+    <ID>MagicNumber:FederationDirectoryManager.kt$FederationDirectoryManager$300</ID>
+    <ID>MagicNumber:FederationDirectoryManager.kt$FederationDirectoryManager$35</ID>
+    <ID>MagicNumber:FederationDirectoryManager.kt$FederationDirectoryManager$40</ID>
+    <ID>MagicNumber:FederationDirectoryManager.kt$FederationDirectoryManager$60</ID>
+    <ID>MagicNumber:FederationDirectoryManager.kt$FederationDirectoryManager$60L</ID>
+    <ID>MagicNumber:FederationDirectoryManager.kt$FederationDirectoryManager$7L</ID>
+    <ID>MagicNumber:FederationDirectoryManager.kt$FederationDirectoryManager$8</ID>
+    <ID>MagicNumber:FedimintWalletManager.kt$FedimintWalletManager$2_000L</ID>
+    <ID>MagicNumber:FedimintWalletManager.kt$FedimintWalletManager$300</ID>
+    <ID>MagicNumber:FedimintWalletManager.kt$FedimintWalletManager$50</ID>
+    <ID>MagicNumber:FedimintWebEngine.kt$FedimintWebEngine$120L</ID>
+    <ID>MagicNumber:FedimintWebEngine.kt$FedimintWebEngine$15_000L</ID>
+    <ID>MagicNumber:FedimintWebEngine.kt$FedimintWebEngine$1_200L</ID>
+    <ID>MagicNumber:FedimintWebEngine.kt$FedimintWebEngine$200L</ID>
+    <ID>MagicNumber:FedimintWebEngine.kt$FedimintWebEngine$300L</ID>
+    <ID>MagicNumber:FedimintWebEngine.kt$FedimintWebEngine$5</ID>
+    <ID>MagicNumber:FedimintWebEngine.kt$FedimintWebEngine$500L</ID>
+    <ID>MagicNumber:LdkWalletManager.kt$LdkWalletManager$10L</ID>
+    <ID>MagicNumber:LdkWalletManager.kt$LdkWalletManager$10_000</ID>
+    <ID>MagicNumber:LdkWalletManager.kt$LdkWalletManager$10_000L</ID>
+    <ID>MagicNumber:LdkWalletManager.kt$LdkWalletManager$15_000L</ID>
+    <ID>MagicNumber:LdkWalletManager.kt$LdkWalletManager$1_000_000L</ID>
+    <ID>MagicNumber:LdkWalletManager.kt$LdkWalletManager$250L</ID>
+    <ID>MagicNumber:LdkWalletManager.kt$LdkWalletManager$3</ID>
+    <ID>MagicNumber:LdkWalletManager.kt$LdkWalletManager$35L</ID>
+    <ID>MagicNumber:LdkWalletManager.kt$LdkWalletManager$3_000L</ID>
+    <ID>MagicNumber:LdkWalletManager.kt$LdkWalletManager$4</ID>
+    <ID>MagicNumber:LdkWalletManager.kt$LdkWalletManager$500L</ID>
+    <ID>MagicNumber:LdkWalletManager.kt$LdkWalletManager$500_000L</ID>
+    <ID>MagicNumber:LdkWalletManager.kt$LdkWalletManager$50L</ID>
+    <ID>MagicNumber:LdkWalletManager.kt$LdkWalletManager$5_000L</ID>
+    <ID>MagicNumber:LdkWalletManager.kt$LdkWalletManager$6</ID>
+    <ID>MagicNumber:LdkWalletManager.kt$LdkWalletManager$65535</ID>
+    <ID>MagicNumber:LnurlPayManager.kt$LnurlPayManager$0x1ea119fa</ID>
+    <ID>MagicNumber:LnurlPayManager.kt$LnurlPayManager$0x1ffffff</ID>
+    <ID>MagicNumber:LnurlPayManager.kt$LnurlPayManager$0x26508e6d</ID>
+    <ID>MagicNumber:LnurlPayManager.kt$LnurlPayManager$0x2a1462b3</ID>
+    <ID>MagicNumber:LnurlPayManager.kt$LnurlPayManager$0x3b6a57b2</ID>
+    <ID>MagicNumber:LnurlPayManager.kt$LnurlPayManager$0x3d4233dd</ID>
+    <ID>MagicNumber:LnurlPayManager.kt$LnurlPayManager$10</ID>
+    <ID>MagicNumber:LnurlPayManager.kt$LnurlPayManager$128</ID>
+    <ID>MagicNumber:LnurlPayManager.kt$LnurlPayManager$15</ID>
+    <ID>MagicNumber:LnurlPayManager.kt$LnurlPayManager$20</ID>
+    <ID>MagicNumber:LnurlPayManager.kt$LnurlPayManager$25</ID>
+    <ID>MagicNumber:LnurlPayManager.kt$LnurlPayManager$31</ID>
+    <ID>MagicNumber:LnurlPayManager.kt$LnurlPayManager$5</ID>
+    <ID>MagicNumber:LnurlPayManager.kt$LnurlPayManager$6</ID>
+    <ID>MagicNumber:LnurlPayManager.kt$LnurlPayManager$7</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$100L</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$2000</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$500</ID>
+    <ID>MagicNumber:MeshAddressDialog.kt$MeshAddressDialog$0.4f</ID>
+    <ID>MagicNumber:MeshAddressDialog.kt$MeshAddressDialog$1_000_000</ID>
+    <ID>MagicNumber:MeshAudioEngine.kt$MeshAudioEngine$15</ID>
+    <ID>MagicNumber:MeshAudioEngine.kt$MeshAudioEngine$150</ID>
+    <ID>MagicNumber:MeshAudioEngine.kt$MeshAudioEngine$4000</ID>
+    <ID>MagicNumber:MeshAudioEngine.kt$MeshAudioEngine$5</ID>
+    <ID>MagicNumber:MeshAudioEngine.kt$MeshAudioEngine$50</ID>
+    <ID>MagicNumber:MeshAudioEngine.kt$MeshAudioEngine$8</ID>
+    <ID>MagicNumber:MeshLinkActivity.kt$MeshLinkActivity$1024</ID>
+    <ID>MagicNumber:MeshLinkActivity.kt$MeshLinkActivity$8</ID>
+    <ID>MagicNumber:MeshVoipCallActivity.kt$MeshVoipCallActivity$0.10f</ID>
+    <ID>MagicNumber:MeshVoipCallActivity.kt$MeshVoipCallActivity$0.2f</ID>
+    <ID>MagicNumber:MeshVoipCallActivity.kt$MeshVoipCallActivity$0.5f</ID>
+    <ID>MagicNumber:MeshVoipCallActivity.kt$MeshVoipCallActivity$1500L</ID>
+    <ID>MagicNumber:MeshVoipCallActivity.kt$MeshVoipCallActivity$200L</ID>
+    <ID>MagicNumber:MeshVoipCallActivity.kt$MeshVoipCallActivity$50f</ID>
+    <ID>MagicNumber:MeshVoipCallActivity.kt$MeshVoipCallActivity$5_000L</ID>
+    <ID>MagicNumber:MeshVoipCallActivity.kt$MeshVoipCallActivity$60</ID>
+    <ID>MagicNumber:MeshVoipCallActivity.kt$MeshVoipCallActivity$800L</ID>
+    <ID>MagicNumber:MeshVoipCallActivity.kt$MeshVoipCallActivity.&lt;no name provided&gt;$15</ID>
+    <ID>MagicNumber:MeshVoipCallActivity.kt$MeshVoipCallActivity.&lt;no name provided&gt;$2000L</ID>
+    <ID>MagicNumber:MeshVoipCallActivity.kt$MeshVoipCallActivity.&lt;no name provided&gt;$4_000L</ID>
+    <ID>MagicNumber:MeshVoipCallHandler.kt$MeshVoipCallHandler$16</ID>
+    <ID>MagicNumber:MeshVoipCallHandler.kt$MeshVoipCallHandler$8</ID>
+    <ID>MagicNumber:MessagesFragment.kt$MessagesFragment$30</ID>
     <ID>MagicNumber:RecentCallsAdapter.kt$RecentCallsAdapter$0.6f</ID>
     <ID>MagicNumber:RecentCallsAdapter.kt$RecentCallsAdapter.RecentCallDateViewHolder$0.76f</ID>
     <ID>MagicNumber:RecentCallsAdapter.kt$RecentCallsAdapter.RecentCallViewHolder$0.8f</ID>
     <ID>MagicNumber:RecentsHelper.kt$RecentsHelper$30</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$0x1ea119fa</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$0x1ffffff</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$0x26508e6d</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$0x2a1462b3</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$0x3b6a57b2</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$0x3d4233dd</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$10</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$128</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$15</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$16</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$20</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$25</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$31</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$32</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$4</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$5</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$6</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$64</ID>
+    <ID>MagicNumber:RecurringLnurlManager.kt$RecurringLnurlManager$7</ID>
+    <ID>MagicNumber:SettingsActivity.kt$SettingsActivity$0.4f</ID>
+    <ID>MagicNumber:SettingsActivity.kt$SettingsActivity$1024</ID>
+    <ID>MagicNumber:SettingsActivity.kt$SettingsActivity$16</ID>
+    <ID>MagicNumber:SettingsActivity.kt$SettingsActivity$3</ID>
+    <ID>MagicNumber:SettingsActivity.kt$SettingsActivity$4</ID>
+    <ID>MagicNumber:SettingsActivity.kt$SettingsActivity$5</ID>
+    <ID>MagicNumber:SettingsActivity.kt$SettingsActivity$6</ID>
+    <ID>MagicNumber:SettingsActivity.kt$SettingsActivity$7</ID>
+    <ID>MagicNumber:WalletBackupCrypto.kt$WalletBackupCrypto$0xFF</ID>
+    <ID>MagicNumber:WalletBackupCrypto.kt$WalletBackupCrypto$16</ID>
+    <ID>MagicNumber:WalletBackupCrypto.kt$WalletBackupCrypto$24</ID>
+    <ID>MagicNumber:WalletBackupCrypto.kt$WalletBackupCrypto$512</ID>
+    <ID>MagicNumber:WalletBackupCrypto.kt$WalletBackupCrypto$8</ID>
+    <ID>MagicNumber:WalletEcashCancelWorker.kt$WalletEcashCancelWorker$3</ID>
+    <ID>MagicNumber:WalletFederationTopupManager.kt$WalletFederationTopupManager$10L</ID>
+    <ID>MagicNumber:WalletFederationTopupManager.kt$WalletFederationTopupManager$1_200L</ID>
+    <ID>MagicNumber:WalletFederationTopupManager.kt$WalletFederationTopupManager$200L</ID>
+    <ID>MagicNumber:WalletFederationTopupManager.kt$WalletFederationTopupManager$300L</ID>
+    <ID>MagicNumber:WalletFederationTopupManager.kt$WalletFederationTopupManager$5_000L</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$0.05f</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$0.16f</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$0.1f</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$0.24f</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$0.28f</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$0.35f</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$0.68f</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$0.75f</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$0.8f</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$100_000_000.0</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$1024</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$1024L</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$10f</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$120</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$15L</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$16</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$16L</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$16f</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$24</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$24L</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$3</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$30L</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$30_000L</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$350L</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$450L</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$5</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$6</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$60</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$60L</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$70_000L</ID>
+    <ID>MagicNumber:WalletFragment.kt$WalletFragment$8</ID>
+    <ID>MagicNumber:WalletPayActivity.kt$WalletPayActivity$0.06f</ID>
+    <ID>MagicNumber:WalletPayActivity.kt$WalletPayActivity$0.14f</ID>
+    <ID>MagicNumber:WalletPayActivity.kt$WalletPayActivity$0.28f</ID>
+    <ID>MagicNumber:WalletPayActivity.kt$WalletPayActivity$0.2f</ID>
+    <ID>MagicNumber:WalletPayActivity.kt$WalletPayActivity$0.62f</ID>
+    <ID>MagicNumber:WalletPayActivity.kt$WalletPayActivity$0.72f</ID>
+    <ID>MagicNumber:WalletPaymentsAdapter.kt$WalletPaymentsAdapter$9_999_999_999L</ID>
+    <ID>MagicNumber:WalletPolicy.kt$WalletPolicy$100_000_000.0</ID>
+    <ID>MagicNumber:WalletRedeemTokenActivity.kt$WalletRedeemTokenActivity$0.06f</ID>
+    <ID>MagicNumber:WalletRedeemTokenActivity.kt$WalletRedeemTokenActivity$0.14f</ID>
+    <ID>MagicNumber:WalletRedeemTokenActivity.kt$WalletRedeemTokenActivity$0.2f</ID>
+    <ID>MagicNumber:WalletRedeemTokenActivity.kt$WalletRedeemTokenActivity$0.72f</ID>
+    <ID>MagicNumber:WalletRespondRequestActivity.kt$WalletRespondRequestActivity$0.06f</ID>
+    <ID>MagicNumber:WalletRespondRequestActivity.kt$WalletRespondRequestActivity$0.14f</ID>
+    <ID>MagicNumber:WalletRespondRequestActivity.kt$WalletRespondRequestActivity$0.2f</ID>
+    <ID>MagicNumber:WalletRespondRequestActivity.kt$WalletRespondRequestActivity$0.55f</ID>
+    <ID>MagicNumber:WalletRespondRequestActivity.kt$WalletRespondRequestActivity$0.72f</ID>
+    <ID>MagicNumber:WalletRespondRequestActivity.kt$WalletRespondRequestActivity$0.9f</ID>
+    <ID>MagicNumber:WalletSendTokenActivity.kt$WalletSendTokenActivity$0.06f</ID>
+    <ID>MagicNumber:WalletSendTokenActivity.kt$WalletSendTokenActivity$0.14f</ID>
+    <ID>MagicNumber:WalletSendTokenActivity.kt$WalletSendTokenActivity$0.28f</ID>
+    <ID>MagicNumber:WalletSendTokenActivity.kt$WalletSendTokenActivity$0.2f</ID>
+    <ID>MagicNumber:WalletSendTokenActivity.kt$WalletSendTokenActivity$0.62f</ID>
+    <ID>MagicNumber:WalletSendTokenActivity.kt$WalletSendTokenActivity$0.72f</ID>
+    <ID>MagicNumber:WalletSendTokenActivity.kt$WalletSendTokenActivity$10</ID>
+    <ID>MagicNumber:WalletSendTokenActivity.kt$WalletSendTokenActivity$24</ID>
+    <ID>MagicNumber:WalletSendTokenActivity.kt$WalletSendTokenActivity$60</ID>
+    <ID>MagicNumber:WalletStoragePaths.kt$WalletStoragePaths$16</ID>
+    <ID>MagicNumber:WalletStoragePaths.kt$WalletStoragePaths$4</ID>
+    <ID>MagicNumber:WalletUiDialogs.kt$WalletUiDialogs$0.06f</ID>
+    <ID>MagicNumber:WalletUiDialogs.kt$WalletUiDialogs$0.14f</ID>
+    <ID>MagicNumber:WalletUiDialogs.kt$WalletUiDialogs$0.28f</ID>
+    <ID>MagicNumber:WalletUiDialogs.kt$WalletUiDialogs$0.2f</ID>
+    <ID>MagicNumber:WalletUiDialogs.kt$WalletUiDialogs$0.55f</ID>
+    <ID>MagicNumber:WalletUiDialogs.kt$WalletUiDialogs$0.62f</ID>
+    <ID>MagicNumber:WalletUiDialogs.kt$WalletUiDialogs$0.72f</ID>
+    <ID>MagicNumber:WalletUiDialogs.kt$WalletUiDialogs$0.85f</ID>
+    <ID>MagicNumber:WalletUiDialogs.kt$WalletUiDialogs$0.8f</ID>
+    <ID>MagicNumber:WalletUiDialogs.kt$WalletUiDialogs$24</ID>
+    <ID>MagicNumber:WalletUiDialogs.kt$WalletUiDialogs$28</ID>
+    <ID>MagicNumber:WalletUiDialogs.kt$WalletUiDialogs$64</ID>
+    <ID>MagicNumber:YacbSiaManager.kt$YacbSiaManager.&lt;no name provided&gt;$5</ID>
     <ID>MaxLineLength:AudioRoute.kt$AudioRoute$WIRED_OR_EARPIECE : AudioRoute</ID>
     <ID>MaxLineLength:CallActivity.kt$CallActivity$SimpleListItem(id = it.route, textRes = it.stringRes, imageRes = it.iconRes, selected = it == callAudioRoute)</ID>
     <ID>MaxLineLength:CallActivity.kt$CallActivity$animate().withStartAction { beVisible() }.setInterpolator(OvershootInterpolator()).scaleX(1f).alpha(alpha).duration = 250L</ID>
@@ -69,21 +355,52 @@
     <ID>MaxLineLength:ChangeSortingDialog.kt$ChangeSortingDialog$if</ID>
     <ID>MaxLineLength:ConferenceActivity.kt$ConferenceActivity$conferenceList.adapter = ConferenceCallsAdapter(this@ConferenceActivity, conferenceList, ArrayList(CallManager.getConferenceCalls())) {}</ID>
     <ID>MaxLineLength:ConferenceCallsAdapter.kt$ConferenceCallsAdapter$itemConferenceCallName.text = callContact.name.ifEmpty { itemView.context.getString(R.string.unknown_caller) }</ID>
-    <ID>MaxLineLength:Config.kt$Config$set(wasOverlaySnackbarConfirmed) = prefs.edit().putBoolean(WAS_OVERLAY_SNACKBAR_CONFIRMED, wasOverlaySnackbarConfirmed).apply()</ID>
+    <ID>MaxLineLength:Config.kt$Config$set(wasOverlaySnackbarConfirmed) = prefs.edit { putBoolean(WAS_OVERLAY_SNACKBAR_CONFIRMED, wasOverlaySnackbarConfirmed) }</ID>
+    <ID>MaxLineLength:ContactActions.kt$WalletContactHelper.upsertWalletLightningDestination(this@handleWalletSetAddress, rawId, lightning)</ID>
+    <ID>MaxLineLength:ContactActions.kt$WalletContactHelper.upsertWalletOnchainDestination(this@handleWalletSetAddress, rawId, onchain)</ID>
+    <ID>MaxLineLength:ContactActions.kt$val err = if (isFm) FedimintWalletManager.getLastErrorMessage() else LdkWalletManager.getLastErrorMessage()</ID>
+    <ID>MaxLineLength:ContactActions.kt$val isPrivateContact = contact.rawId &gt; 1_000_000 &amp;&amp; contact.contactId &gt; 1_000_000 &amp;&amp; contact.rawId == contact.contactId</ID>
+    <ID>MaxLineLength:ContactActions.kt$val primaryNonMesh = phoneNumbers.firstOrNull { it.isPrimary &amp;&amp; !isMesh(it) &amp;&amp; !isWallet(it) &amp;&amp; normalizedValue(it).isNotBlank() }</ID>
+    <ID>MaxLineLength:ContactActions.kt$val walletEditLabel = if (hasWallet) R.string.contact_action_edit_wallet_address else R.string.contact_action_set_wallet_address</ID>
     <ID>MaxLineLength:ContactsAdapter.kt$ContactsAdapter$SimpleContactsHelper(root.context).loadContactImage(contact.photoUri, itemContactImage, contact.getNameToDisplay())</ID>
     <ID>MaxLineLength:ContactsAdapter.kt$ContactsAdapter$findItem(R.id.cab_remove_default_sim).isVisible = isOneItemSelected &amp;&amp; (activity.config.getCustomSIM(selectedNumber) ?: "") != ""</ID>
+    <ID>MaxLineLength:ContactsAdapter.kt$ContactsAdapter$private</ID>
     <ID>MaxLineLength:ContactsAdapter.kt$ContactsAdapter.Binding.ItemContact$override</ID>
     <ID>MaxLineLength:ContactsAdapter.kt$ContactsAdapter.Binding.ItemContact$return ItemContactBindingAdapter(ItemContactWithoutNumberBinding.inflate(layoutInflater, viewGroup, attachToRoot))</ID>
     <ID>MaxLineLength:ContactsAdapter.kt$ContactsAdapter.Binding.ItemContactGrid$override</ID>
     <ID>MaxLineLength:ContactsAdapter.kt$ContactsAdapter.Binding.ItemContactGrid$return ItemContactGridBindingAdapter(ItemContactWithoutNumberGridBinding.inflate(layoutInflater, viewGroup, attachToRoot))</ID>
     <ID>MaxLineLength:ContactsFragment.kt$ContactsFragment$!getProperText(nameToDisplay, shouldNormalize).startsWith(fixedText, true) &amp;&amp; !nameToDisplay.contains(fixedText, true)</ID>
     <ID>MaxLineLength:ContactsFragment.kt$ContactsFragment$class</ID>
+    <ID>MaxLineLength:CustomizationUiPatcher.kt$CustomizationUiPatcher$activity.findViewById&lt;View&gt;(org.fossify.commons.R.id.customization_app_icon_color_holder)?.visibility = View.GONE</ID>
+    <ID>MaxLineLength:CyberAboutActivity.kt$CyberAboutActivity$binding.aboutPrivacyPolicyLink.setOnClickListener { openExternalLink(getString(R.string.about_privacy_policy_link)) }</ID>
     <ID>MaxLineLength:ExportCallHistoryDialog.kt$ExportCallHistoryDialog$activity.getAlertDialogBuilder().setPositiveButton(R.string.ok, null).setNegativeButton(R.string.cancel, null)</ID>
     <ID>MaxLineLength:FavoritesFragment.kt$FavoritesFragment$(binding.fragmentList.layoutManager as? MyGridLayoutManager)?.spanCount = context!!.config.contactsGridColumnCount</ID>
     <ID>MaxLineLength:FavoritesFragment.kt$FavoritesFragment$class</ID>
+    <ID>MaxLineLength:FederationDirectoryManager.kt$FederationDirectoryManager$invite = "fed11qgqpv9rhwden5te0vekjucm5wf3zu6t09amhxtcpqys2ajnveq8lc5ct6t25kztgrahdhxjptsmzujhjlc74upqnwqr05ggd78dhm"</ID>
+    <ID>MaxLineLength:FederationDirectoryManager.kt$FederationDirectoryManager$invite = "fed11qgqzc2nhwden5te0vejkg6tdd9h8gepwvejkg6tdd9h8garhduhx6at5d9h8jmn9wshxxmmd9uqqzgxg6s3evnr6m9zdxr6hxkdkukexpcs3mn7mj3g5pc5dfh63l4tj6g9zk4er"</ID>
+    <ID>MaxLineLength:FederationDirectoryManager.kt$FederationDirectoryManager$invite = "fed11qgqzygrhwden5te0v9cxjtnzd96xxmmfdec8y6twvd5hqmr9wvhxuet59upqzg9jzp5vsn6mzt9ylhun70jy85aa0sn7sepdp4fw5tjdeehah0hfmufvlqem"</ID>
+    <ID>MaxLineLength:FederationDirectoryManager.kt$FederationDirectoryManager$network = if (name.contains("testnet", ignoreCase = true) || name.contains("signet", ignoreCase = true)) "testnet" else "bitcoin"</ID>
+    <ID>MaxLineLength:FederationDirectoryManager.kt$FederationDirectoryManager$private</ID>
+    <ID>MaxLineLength:FederationDirectoryManager.kt$FederationDirectoryManager$val</ID>
+    <ID>MaxLineLength:FederationDirectoryManager.kt$FederationDirectoryManager$val websiteLooksFedimint = website.contains("fedimint") || website.contains("fedibtc.com") || website.contains("fedi")</ID>
+    <ID>MaxLineLength:FedimintWebEngine.kt$FedimintWebEngine$"(function(){ return !!(globalThis.__cyber_fedimint &amp;&amp; typeof globalThis.__cyber_fedimint.request === 'function'); })();"</ID>
+    <ID>MaxLineLength:FedimintWebEngine.kt$FedimintWebEngine$"Fedimint engine not ready (timeout) calling $method [webView=$hasWebView,isReady=$isReady,probeStarted=$initProbeStarted]"</ID>
+    <ID>MaxLineLength:FedimintWebEngine.kt$FedimintWebEngine$"globalThis.__cyber_fedimint &amp;&amp; globalThis.__cyber_fedimint.request(${JSONObject.quote(request.toString())});"</ID>
     <ID>MaxLineLength:FilterContactSourcesAdapter.kt$FilterContactSourcesAdapter.ViewHolder$filterContactSourceCheckbox.setColors(activity.getProperTextColor(), activity.getProperPrimaryColor(), activity.getProperBackgroundColor())</ID>
     <ID>MaxLineLength:FilterContactSourcesDialog.kt$FilterContactSourcesDialog$binding.filterContactSourcesList.adapter = FilterContactSourcesAdapter(activity, contactSourcesWithCount, selectedSources)</ID>
     <ID>MaxLineLength:FilterContactSourcesDialog.kt$FilterContactSourcesDialog$val selectedContactSources = (binding.filterContactSourcesList.adapter as FilterContactSourcesAdapter).getSelectedContactSources()</ID>
+    <ID>MaxLineLength:LdkWalletManager.kt$LdkWalletManager$!candidate.isUsable &amp;&amp; confirmationsRequired != null &amp;&amp; confirmations != null &amp;&amp; confirmations &lt; confirmationsRequired</ID>
+    <ID>MaxLineLength:LdkWalletManager.kt$LdkWalletManager$!candidate.isUsable &amp;&amp; confirmationsRequired != null &amp;&amp; confirmations != null &amp;&amp; confirmations &lt; confirmationsRequired -&gt; true</ID>
+    <ID>MaxLineLength:LdkWalletManager.kt$LdkWalletManager$!expectedUserChannelId.isNullOrBlank() -&gt; channel.userChannelId.equals(expectedUserChannelId, ignoreCase = true)</ID>
+    <ID>MaxLineLength:LdkWalletManager.kt$LdkWalletManager$?:</ID>
+    <ID>MaxLineLength:LdkWalletManager.kt$LdkWalletManager$if</ID>
+    <ID>MaxLineLength:LdkWalletManager.kt$LdkWalletManager$private const val MEMPOOL_MAINNET_CONNECTIVITY_RANKING = "https://mempool.space/api/v1/lightning/nodes/rankings/connectivity"</ID>
+    <ID>MaxLineLength:LdkWalletManager.kt$LdkWalletManager$private const val MEMPOOL_SIGNET_CONNECTIVITY_RANKING = "https://mempool.space/signet/api/v1/lightning/nodes/rankings/connectivity"</ID>
+    <ID>MaxLineLength:LdkWalletManager.kt$LdkWalletManager$private const val MEMPOOL_TESTNET_CONNECTIVITY_RANKING = "https://mempool.space/testnet/api/v1/lightning/nodes/rankings/connectivity"</ID>
+    <ID>MaxLineLength:LdkWalletManager.kt$LdkWalletManager$val msg = "Gateway hints were found, but no reachable public Lightning peers were available for channel bootstrap."</ID>
+    <ID>MaxLineLength:LdkWalletManager.kt$LdkWalletManager$val msg = "Not enough on-chain balance to bootstrap Lightning liquidity. Need at least ${required} sats, available ${affordable} sats."</ID>
+    <ID>MaxLineLength:LdkWalletManager.kt$LdkWalletManager$val msg = "On-chain balance is too low to bootstrap a Lightning channel. Need at least ${LIQUIDITY_BOOTSTRAP_MIN_AFFORDABLE_CHANNEL_SATS} sats available for channel funding."</ID>
+    <ID>MaxLineLength:LdkWalletManager.kt$LdkWalletManager$val msg = lastError?.toOneLineSummary() ?: "Could not determine channel funding amount for liquidity bootstrap."</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$(drawable as LayerDrawable).findDrawableByLayerId(R.id.shortcut_dialpad_background).applyColorFilter(appIconColor)</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$TAB_LAST_USED -&gt; if (config.lastUsedViewPagerPage &lt; binding.mainTabsHolder.tabCount) config.lastUsedViewPagerPage else 0</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$findItem(R.id.column_count).isVisible = currentFragment == getFavoritesFragment() &amp;&amp; config.viewType == VIEW_TYPE_GRID</ID>
@@ -91,6 +408,14 @@
     <ID>MaxLineLength:MainActivity.kt$MainActivity$private fun getInactiveTabIndexes(activeIndex: Int)</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$val confirmationText = "${getString(R.string.clear_history_confirmation)}\n\n${getString(R.string.cannot_be_undone)}"</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$val dialpadIcon = resources.getColoredDrawableWithColor(R.drawable.ic_dialpad_vector, properPrimaryColor.getContrastColor())</ID>
+    <ID>MaxLineLength:MeshVoipCallActivity.kt$MeshVoipCallActivity$powerManager.newWakeLock(PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK, "org.fossify.phone:mesh_wake_lock")</ID>
+    <ID>MaxLineLength:MeshVoipCallActivity.kt$MeshVoipCallActivity$private</ID>
+    <ID>MaxLineLength:MeshVoipCallActivity.kt$MeshVoipCallActivity$startArrowAnimation(callLeftArrow, initialLeftArrowX, initialLeftArrowScaleX, initialLeftArrowScaleY, leftArrowTranslation)</ID>
+    <ID>MaxLineLength:MeshVoipCallActivity.kt$MeshVoipCallActivity$startArrowAnimation(callRightArrow, initialRightArrowX, initialRightArrowScaleX, initialRightArrowScaleY, rightArrowTranslation)</ID>
+    <ID>MaxLineLength:MeshVoipCallActivity.kt$MeshVoipCallActivity$val (nameFromContacts, photoUri) = MeshContactHelper.getContactNameAndPhotoForMeshAddress(this@MeshVoipCallActivity, meshAddr)</ID>
+    <ID>MaxLineLength:MeshVoipCallActivity.kt$MeshVoipCallActivity$val device = audioManager.availableCommunicationDevices.firstOrNull { isBluetoothCommDeviceType(it.type) }</ID>
+    <ID>MaxLineLength:MeshVoipCallActivity.kt$MeshVoipCallActivity$val wakeLock = powerManager.newWakeLock(PowerManager.FULL_WAKE_LOCK, "org.fossify.phone:mesh_full_wake_lock")</ID>
+    <ID>MaxLineLength:MeshVoipCallHandler.kt$MeshVoipCallHandler$private</ID>
     <ID>MaxLineLength:MyViewPagerFragment.kt$MyViewPagerFragment$abstract</ID>
     <ID>MaxLineLength:MyViewPagerFragment.kt$MyViewPagerFragment$setupColors(activity.getProperTextColor(), activity.getProperPrimaryColor(), activity.getProperPrimaryColor())</ID>
     <ID>MaxLineLength:RecentCallsAdapter.kt$RecentCallsAdapter$findItem(R.id.cab_remove_default_sim).isVisible = (activity.config.getCustomSIM(selectedNumber) ?: "") != "" &amp;&amp; !call.isUnknownNumber</ID>
@@ -111,40 +436,196 @@
     <ID>MaxLineLength:RecentsHelper.kt$RecentsHelper$contacts.firstOrNull { it.contactId == contactIdWithMultipleNumbers }?.phoneNumbers?.firstOrNull { it.value == number }</ID>
     <ID>MaxLineLength:RecentsHelper.kt$RecentsHelper$if</ID>
     <ID>MaxLineLength:RecentsHelper.kt$RecentsHelper$specificType = context.getPhoneNumberTypeText(specificPhoneNumber.type, specificPhoneNumber.label)</ID>
+    <ID>MaxLineLength:RecurringLnurlManager.kt$RecurringLnurlManager$val</ID>
     <ID>MaxLineLength:SelectContactDialog.kt$SelectContactDialog$class</ID>
     <ID>MaxLineLength:SelectContactDialog.kt$SelectContactDialog$private</ID>
     <ID>MaxLineLength:SelectContactDialog.kt$SelectContactDialog$selectContactList.adapter</ID>
     <ID>MaxLineLength:SelectSIMDialog.kt$SelectSIMDialog$binding.selectSimRadioGroup.addView(radioButton, RadioGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))</ID>
     <ID>MaxLineLength:SettingsActivity.kt$SettingsActivity$private</ID>
     <ID>MaxLineLength:SettingsActivity.kt$SettingsActivity$settingsUseEnglishHolder.beVisibleIf((config.wasUseEnglishToggled || Locale.getDefault().language != "en") &amp;&amp; !isTiramisuPlus())</ID>
+    <ID>MaxLineLength:SettingsActivity.kt$SettingsActivity$url = "https://storage.googleapis.com/mediapipe-models/text_classifier/average_word_classifier/float32/latest/average_word_classifier.tflite"</ID>
+    <ID>MaxLineLength:SettingsActivity.kt$SettingsActivity$url = "https://storage.googleapis.com/mediapipe-models/text_classifier/bert_classifier/float32/latest/bert_classifier.tflite"</ID>
     <ID>MaxLineLength:SpeedDialAdapter.kt$SpeedDialAdapter$private fun getSelectedItems()</ID>
+    <ID>MaxLineLength:WalletContactHelper.kt$WalletContactHelper$"${ContactsContract.Data.RAW_CONTACT_ID}=? AND ${ContactsContract.Data.MIMETYPE}=? AND ${ContactsContract.CommonDataKinds.Phone.TYPE}=? AND ${ContactsContract.CommonDataKinds.Phone.LABEL}=?"</ID>
+    <ID>MaxLineLength:WalletContactHelper.kt$WalletContactHelper$private</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$FedimintWalletManager.createBolt11InvoiceBlocking(context, selected, sats, memo, expirySeconds = expiry)</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$binding.walletBalanceLnValue.text = context.getString(R.string.wallet_sats_value, formatSats(total.toULong()))</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$binding.walletBalanceLnValue.text = context.getString(R.string.wallet_sats_value, formatSats(totalLightning))</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$binding.walletBalanceOnchainValue.text = context.getString(R.string.wallet_sats_value, formatSats(spendableOnchain))</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$binding.walletMyLightningAddressValue.text = lightningAddress.ifBlank { context.getString(R.string.wallet_not_generated_yet) }</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$context.config.setWalletLastInvoiceCreatedMsForFederation(selected.id, System.currentTimeMillis())</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$context.config.setWalletLastOnchainAddressCreatedMsForFederation(selected.id, System.currentTimeMillis())</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$host.toast(host.getString(R.string.wallet_mint_failed, host.getString(R.string.wallet_federation_topup_unavailable)))</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$host.toast(host.getString(R.string.wallet_restore_failed, host.getString(R.string.wallet_backup_invalid_format)))</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$host.toast(host.getString(R.string.wallet_status_error, err.ifBlank { host.getString(R.string.wallet_unknown_error) }))</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$if</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$private</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$userErrorMessage = host.getString(R.string.wallet_fedimint_variable_invoice_requires_mainnet)</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$val</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$val address = selected?.let { context.config.getWalletLastOnchainAddressForFederation(it.id) }.orEmpty().trim()</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$val backendError = if (isFm) FedimintWalletManager.getLastErrorMessage() else LdkWalletManager.getLastErrorMessage()</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$val err = LdkWalletManager.getLastErrorMessage().orEmpty().ifBlank { host.getString(R.string.wallet_unknown_error) }</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$val fixedDestinationInvoiceSats = if (isBolt11Destination) parseFixedInvoiceSats(normalizedDestination) else null</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$val fmStarted = FedimintWalletManager.ensureStartedBlocking(context, effectiveFederation)</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$val lightningAddress = selected?.let { context.config.getWalletLastLightningAddressForFederation(it.id) }.orEmpty().trim()</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$val ok = FedimintWalletManager.payBolt11InvoiceBlocking(context, effectiveFederation, effectiveDestination)</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$val shouldRefreshInvoice = invoice.isBlank() || invoiceCreatedMs &lt;= 0L || (now - invoiceCreatedMs) &gt; invoiceMaxAgeMs</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$when</ID>
+    <ID>MaxLineLength:WalletFragment.kt$WalletFragment$}</ID>
+    <ID>MaxLineLength:WalletLiquidityProviderSettingsActivity.kt$WalletLiquidityProviderSettingsActivity$val name = config.walletLiquidityCustomName.trim().ifBlank { getString(R.string.wallet_liquidity_custom_default_name) }</ID>
+    <ID>MaxLineLength:WalletLiquidityProviderSettingsActivity.kt$WalletLiquidityProviderSettingsActivity$val selectedFederation = FederationDirectoryManager.getSelectedFederation(this@WalletLiquidityProviderSettingsActivity)</ID>
+    <ID>MaxLineLength:WalletPayActivity.kt$WalletPayActivity$binding.walletPayError.text = getString(R.string.wallet_send_failed, resolved.errorMessage)</ID>
+    <ID>MaxLineLength:WalletPayActivity.kt$WalletPayActivity$if</ID>
+    <ID>MaxLineLength:WalletPayActivity.kt$WalletPayActivity$ok = isBolt11 &amp;&amp; FedimintWalletManager.payBolt11InvoiceBlocking(this, selected, effectiveDestination)</ID>
+    <ID>MaxLineLength:WalletPayActivity.kt$WalletPayActivity$val</ID>
+    <ID>MaxLineLength:WalletPayActivity.kt$WalletPayActivity$when</ID>
+    <ID>MaxLineLength:WalletRedeemTokenActivity.kt$WalletRedeemTokenActivity$binding.walletRedeemTokenError.text = getString(R.string.wallet_redeem_token_federation_hint, federationHint)</ID>
+    <ID>MaxLineLength:WalletSendTokenActivity.kt$WalletSendTokenActivity$if (secureChannel) R.string.wallet_send_token_channel_secure else R.string.wallet_send_token_channel_insecure</ID>
+    <ID>MaxLineLength:WalletUiDialogs.kt$WalletUiDialogs$activity</ID>
     <ID>NestedBlockDepth:CallActivity.kt$CallActivity$private fun updateOtherPersonsInfo(avatarUri: String?)</ID>
+    <ID>NestedBlockDepth:CallContactAvatarHelper.kt$CallContactAvatarHelper$@SuppressLint("NewApi") fun getCallContactAvatar(callContact: CallContact?): Bitmap?</ID>
     <ID>NestedBlockDepth:ContactsAdapter.kt$ContactsAdapter$@SuppressLint("ClickableViewAccessibility") private fun setupView(binding: ItemViewBinding, contact: Contact, holder: ViewHolder)</ID>
     <ID>NestedBlockDepth:DialerActivity.kt$DialerActivity$override fun onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?)</ID>
-    <ID>NestedBlockDepth:MainActivity.kt$MainActivity$private fun getDefaultTab(): Int</ID>
+    <ID>NestedBlockDepth:FederationDirectoryManager.kt$FederationDirectoryManager$fun refreshBlocking(context: Context): Boolean</ID>
+    <ID>NestedBlockDepth:FedimintWalletManager.kt$FedimintWalletManager$fun createOnchainDepositAddressBlocking( context: Context, federation: FederationEntry, ): String?</ID>
+    <ID>NestedBlockDepth:FedimintWalletManager.kt$FedimintWalletManager$private fun extractOnchainAddress(result: JSONObject): String?</ID>
+    <ID>NestedBlockDepth:FedimintWalletManager.kt$FedimintWalletManager$private fun parseBalanceMsats(value: Any?, hint: String): Long?</ID>
+    <ID>NestedBlockDepth:LdkWalletManager.kt$LdkWalletManager$@Throws(BuildException::class, NodeException::class) private fun startInternal( context: Context, federation: FederationEntry, forceRebuild: Boolean = false, preferredEsploraOverride: String? = null, )</ID>
+    <ID>NestedBlockDepth:LdkWalletManager.kt$LdkWalletManager$fun bootstrapOutboundLiquidityBlocking( context: Context, requiredSats: Long, timeoutMs: Long = LIQUIDITY_BOOTSTRAP_TIMEOUT_MS, ): LiquidityBootstrapResult</ID>
+    <ID>NestedBlockDepth:LdkWalletManager.kt$LdkWalletManager$fun bootstrapOutboundLiquidityViaGatewayHintsBlocking( context: Context, gatewayNodeIds: List&lt;String&gt;, requiredSats: Long, network: String? = null, forceOpenOnRouteFailure: Boolean = false, timeoutMs: Long = LIQUIDITY_BOOTSTRAP_TIMEOUT_MS, ): LiquidityBootstrapResult</ID>
+    <ID>NestedBlockDepth:LdkWalletManager.kt$LdkWalletManager$private fun createBolt11InvoiceInternal( amountSats: Long?, memo: String, expirySeconds: Int, preferJitChannel: Boolean, allowFeerateRecovery: Boolean, ): String?</ID>
+    <ID>NestedBlockDepth:LnurlPayManager.kt$LnurlPayManager$fun submitWithdrawInvoiceBlocking( request: WithdrawRequest, amountSats: Long, invoice: String, ): WithdrawSubmitResult</ID>
+    <ID>NestedBlockDepth:MeshLinkActivity.kt$MeshLinkActivity$private fun readTextFromUri(uri: Uri): String?</ID>
     <ID>NestedBlockDepth:RecentsHelper.kt$RecentsHelper$@SuppressLint("NewApi") private fun getRecents( contacts: List&lt;Contact&gt;, selection: String? = null, selectionParams: Array&lt;String&gt;? = null, ): List&lt;RecentCall&gt;</ID>
-    <ID>NewLineAtEndOfFile:RecentCallsAdapter.kt$org.fossify.phone.adapters.RecentCallsAdapter.kt</ID>
+    <ID>NestedBlockDepth:WalletContactHelper.kt$WalletContactHelper$private fun getWalletDestinationsFromPhones(context: Context, idColumn: String, idValue: String): WalletDestinations</ID>
+    <ID>NestedBlockDepth:WalletFederationTopupManager.kt$WalletFederationTopupManager$fun recoverMainnetLightningPaymentBlocking( context: Context, sourceFederation: FederationEntry, invoice: String, amountSats: Long?, ): MainnetLightningRecoveryResult</ID>
+    <ID>NestedBlockDepth:WalletFederationTopupManager.kt$WalletFederationTopupManager$fun topupFromMainnetBlocking( context: Context, quote: TopupQuote, ): TopupResult</ID>
+    <ID>NestedBlockDepth:YacbSiaManager.kt$YacbSiaManager$@Keep fun submitRating(number: String, rating: Rating)</ID>
+    <ID>ReturnCount:FederationDirectoryManager.kt$FederationDirectoryManager$private fun decodeDirectory(raw: String): FederationDirectory?</ID>
+    <ID>ReturnCount:FedimintWalletManager.kt$FedimintWalletManager$fun ensureStartedBlocking(context: Context, federation: FederationEntry): Boolean</ID>
+    <ID>ReturnCount:FedimintWalletManager.kt$FedimintWalletManager$fun payBolt11InvoiceBlocking(context: Context, federation: FederationEntry, invoice: String): Boolean</ID>
+    <ID>ReturnCount:FedimintWalletManager.kt$FedimintWalletManager$fun spendEcashBlocking( context: Context, federation: FederationEntry, amountSats: Long, tryCancelAfterSecs: Int = 86400, ): EcashSpendResult?</ID>
+    <ID>ReturnCount:FedimintWalletManager.kt$FedimintWalletManager$private fun extractOnchainAddress(result: JSONObject): String?</ID>
+    <ID>ReturnCount:FedimintWebEngine.kt$FedimintWebEngine$private fun waitUntilReady(timeoutMs: Long): Boolean</ID>
+    <ID>ReturnCount:LdkWalletManager.kt$LdkWalletManager$fun awaitIncomingLightningInvoiceStatusBlocking( invoiceStr: String, timeoutMs: Long = LIGHTNING_RECEIVE_AWAIT_TIMEOUT_MS, pollMs: Long = LIGHTNING_RECEIVE_AWAIT_POLL_MS, failOnTimeout: Boolean = false, ): PaymentStatus?</ID>
+    <ID>ReturnCount:LdkWalletManager.kt$LdkWalletManager$fun awaitOutgoingLightningPaymentStatusBlocking( paymentId: String, timeoutMs: Long = LIGHTNING_SEND_AWAIT_TIMEOUT_MS, pollMs: Long = LIGHTNING_SEND_AWAIT_POLL_MS, ): PaymentStatus?</ID>
+    <ID>ReturnCount:LdkWalletManager.kt$LdkWalletManager$fun bootstrapOutboundLiquidityBlocking( context: Context, requiredSats: Long, timeoutMs: Long = LIQUIDITY_BOOTSTRAP_TIMEOUT_MS, ): LiquidityBootstrapResult</ID>
+    <ID>ReturnCount:LdkWalletManager.kt$LdkWalletManager$fun bootstrapOutboundLiquidityViaGatewayHintsBlocking( context: Context, gatewayNodeIds: List&lt;String&gt;, requiredSats: Long, network: String? = null, forceOpenOnRouteFailure: Boolean = false, timeoutMs: Long = LIQUIDITY_BOOTSTRAP_TIMEOUT_MS, ): LiquidityBootstrapResult</ID>
+    <ID>ReturnCount:LdkWalletManager.kt$LdkWalletManager$fun convertLightningToOnchainByClosingChannelsBlocking(requiredOnchainSats: Long): LightningToOnchainConvertResult</ID>
+    <ID>ReturnCount:LdkWalletManager.kt$LdkWalletManager$fun payBolt11Invoice(invoiceStr: String, amountSats: Long? = null): String?</ID>
+    <ID>ReturnCount:LdkWalletManager.kt$LdkWalletManager$private fun buildLightningToOnchainClosePlan( n: Node, requiredOnchainSats: Long, ): Pair&lt;LightningToOnchainPlan, List&lt;ClosableChannel&gt;&gt;?</ID>
+    <ID>ReturnCount:LdkWalletManager.kt$LdkWalletManager$private fun createBolt11InvoiceInternal( amountSats: Long?, memo: String, expirySeconds: Int, preferJitChannel: Boolean, allowFeerateRecovery: Boolean, ): String?</ID>
+    <ID>ReturnCount:LdkWalletManager.kt$LdkWalletManager$private fun inspectPendingGatewayReference( n: Node, reference: String, requiredSats: Long, ): PendingGatewayReferenceStatus</ID>
+    <ID>ReturnCount:LdkWalletManager.kt$LdkWalletManager$private fun listBalancesInternal(allowFeerateRecovery: Boolean): BalanceDetails?</ID>
+    <ID>ReturnCount:LdkWalletManager.kt$LdkWalletManager$private fun mapKnownWalletErrorSummary(className: String, message: String): String?</ID>
+    <ID>ReturnCount:LdkWalletManager.kt$LdkWalletManager$private fun recoverFromFeerateFailureBlocking( operation: String, allowRunningNodeRebuild: Boolean = false, ): Boolean</ID>
+    <ID>ReturnCount:LdkWalletManager.kt$LdkWalletManager$private fun resolveBootstrapChannelFundingSats(n: Node, requiredSats: Long): Long?</ID>
+    <ID>ReturnCount:LnurlPayManager.kt$LnurlPayManager$fun resolveInvoiceBlocking( rawDestination: String, amountSats: Long?, ): ResolveResult</ID>
+    <ID>ReturnCount:LnurlPayManager.kt$LnurlPayManager$fun resolveWithdrawRequestBlocking(rawDestination: String): WithdrawResolveResult</ID>
+    <ID>ReturnCount:LnurlPayManager.kt$LnurlPayManager$fun submitWithdrawInvoiceBlocking( request: WithdrawRequest, amountSats: Long, invoice: String, ): WithdrawSubmitResult</ID>
+    <ID>ReturnCount:LnurlPayManager.kt$LnurlPayManager$private fun decodeLnurlBech32(raw: String): String?</ID>
+    <ID>ReturnCount:LnurlPayManager.kt$LnurlPayManager$private fun destinationToInitialUrl(destination: String): String?</ID>
+    <ID>ReturnCount:LnurlPayManager.kt$LnurlPayManager$private fun destinationToInitialWithdrawUrl(destination: String): String?</ID>
+    <ID>ReturnCount:MeshLinkActivity.kt$MeshLinkActivity$private fun extractPayload(src: Intent?): String?</ID>
+    <ID>ReturnCount:RecurringLnurlManager.kt$RecurringLnurlManager$fun registerLnurlPaycodeBlocking( context: Context, federation: FederationEntry, rotateRootKey: Boolean = false, ): RegistrationResult</ID>
+    <ID>ReturnCount:RecurringLnurlManager.kt$RecurringLnurlManager$private fun decodeLnurlBech32(raw: String): String?</ID>
+    <ID>ReturnCount:RecurringLnurlManager.kt$RecurringLnurlManager$private fun parseApiFailureMessage(body: String, statusCode: Int): String</ID>
+    <ID>ReturnCount:WalletBackupCrypto.kt$WalletBackupCrypto$fun parseEnvelope(jsonText: String): Envelope?</ID>
+    <ID>ReturnCount:WalletContactHelper.kt$WalletContactHelper$private fun looksLikePreferredLightningDestination(value: String): Boolean</ID>
+    <ID>ReturnCount:WalletFederationTopupManager.kt$WalletFederationTopupManager$fun recoverMainnetLightningPaymentBlocking( context: Context, sourceFederation: FederationEntry, invoice: String, amountSats: Long?, ): MainnetLightningRecoveryResult</ID>
+    <ID>ReturnCount:WalletFederationTopupManager.kt$WalletFederationTopupManager$fun topupFromMainnetBlocking( context: Context, quote: TopupQuote, ): TopupResult</ID>
+    <ID>ReturnCount:WalletFragment.kt$WalletFragment$private fun isValidLightningAddress(value: String): Boolean</ID>
+    <ID>ReturnCount:WalletFragment.kt$WalletFragment$private fun loadLdkBalancesWithRecovery(selectedFederation: FederationEntry): org.lightningdevkit.ldknode.BalanceDetails?</ID>
+    <ID>ReturnCount:WalletPayActivity.kt$WalletPayActivity$private fun startPayment()</ID>
+    <ID>ReturnCount:WalletPayActivity.kt$WalletPayActivity$private fun validateRequestResponse( selectedFederation: FederationEntry, destination: String, fixedInvoiceSats: Long?, ): String?</ID>
+    <ID>ReturnCount:WalletSendTokenActivity.kt$WalletSendTokenActivity$private fun startSendToken()</ID>
+    <ID>ReturnCount:YacbBlockingEngine.kt$YacbBlockingEngine$fun evaluateCall(number: String?, callback: (BlockDecision) -&gt; Unit)</ID>
+    <ID>SpreadOperator:MessagesFragment.kt$MessagesFragment$(*currentMessages.toTypedArray())</ID>
     <ID>SwallowedException:CallActivity.kt$CallActivity$e: Exception</ID>
     <ID>SwallowedException:CallContactHelper.kt$e: NullPointerException</ID>
     <ID>SwallowedException:FastScrollerView.kt$e: IndexOutOfBoundsException</ID>
+    <ID>ThrowingExceptionsWithoutMessageOrCause:SimpleActivity.kt$SimpleActivity$Throwable()</ID>
+    <ID>ThrowsCount:LdkWalletManager.kt$LdkWalletManager$@Throws(BuildException::class, NodeException::class) private fun startInternal( context: Context, federation: FederationEntry, forceRebuild: Boolean = false, preferredEsploraOverride: String? = null, )</ID>
+    <ID>ThrowsCount:LdkWalletManager.kt$LdkWalletManager$private fun payExpectedLiquidityOrderPayment(node: Node, order: Lsps1OrderStatus): String?</ID>
+    <ID>ThrowsCount:WalletFragment.kt$WalletFragment$private fun createEncryptedBackupNow(uri: Uri, selected: FederationEntry, passphrase: CharArray)</ID>
+    <ID>ThrowsCount:WalletFragment.kt$WalletFragment$private fun extractWalletBackupZip(zip: ZipInputStream, federationId: String)</ID>
+    <ID>ThrowsCount:WalletFragment.kt$WalletFragment$private fun restoreEncryptedBackupNow( envelope: WalletBackupCrypto.Envelope, passphrase: CharArray, )</ID>
+    <ID>TooGenericExceptionCaught:Activity.kt$e: Exception</ID>
     <ID>TooGenericExceptionCaught:CallActivity.kt$CallActivity$e: Exception</ID>
     <ID>TooGenericExceptionCaught:CallContactHelper.kt$e: NullPointerException</ID>
+    <ID>TooGenericExceptionCaught:CallService.kt$CallService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:DiagnosticsLogger.kt$DiagnosticsLogger$e: Exception</ID>
     <ID>TooGenericExceptionCaught:DialerActivity.kt$DialerActivity$e: Exception</ID>
     <ID>TooGenericExceptionCaught:FastScrollerView.kt$e: IndexOutOfBoundsException</ID>
+    <ID>TooGenericExceptionCaught:FedimintWalletManager.kt$FedimintWalletManager$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:FedimintWebEngine.kt$FedimintWebEngine$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:LdkWalletManager.kt$LdkWalletManager$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:MeshCallController.kt$MeshCallController$e: Exception</ID>
     <ID>TooGenericExceptionCaught:SettingsActivity.kt$SettingsActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:WalletFragment.kt$WalletFragment$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:WalletPayActivity.kt$WalletPayActivity$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:YacbSiaManager.kt$YacbSiaManager$e: Throwable</ID>
+    <ID>TooGenericExceptionCaught:YacbSiaManager.kt$YacbSiaManager$t: Throwable</ID>
+    <ID>TooManyFunctions:Activity.kt$org.fossify.phone.extensions.Activity.kt</ID>
     <ID>TooManyFunctions:CallActivity.kt$CallActivity : SimpleActivity</ID>
     <ID>TooManyFunctions:CallManager.kt$CallManager$Companion</ID>
     <ID>TooManyFunctions:ConferenceCallsAdapter.kt$ConferenceCallsAdapter : MyRecyclerViewAdapter</ID>
+    <ID>TooManyFunctions:Config.kt$Config : BaseConfig</ID>
+    <ID>TooManyFunctions:ContactActions.kt$org.fossify.phone.extensions.ContactActions.kt</ID>
     <ID>TooManyFunctions:ContactsAdapter.kt$ContactsAdapter : MyRecyclerViewAdapterItemTouchHelperContractMyZoomListener</ID>
+    <ID>TooManyFunctions:CustomizationUiPatcher.kt$CustomizationUiPatcher</ID>
     <ID>TooManyFunctions:DialpadActivity.kt$DialpadActivity : SimpleActivity</ID>
     <ID>TooManyFunctions:FavoritesFragment.kt$FavoritesFragment : MyViewPagerFragmentRefreshItemsListener</ID>
+    <ID>TooManyFunctions:FederationDirectoryManager.kt$FederationDirectoryManager</ID>
+    <ID>TooManyFunctions:FedimintWalletManager.kt$FedimintWalletManager</ID>
+    <ID>TooManyFunctions:FedimintWebEngine.kt$FedimintWebEngine</ID>
+    <ID>TooManyFunctions:LdkWalletManager.kt$LdkWalletManager</ID>
+    <ID>TooManyFunctions:LnurlPayManager.kt$LnurlPayManager</ID>
     <ID>TooManyFunctions:MainActivity.kt$MainActivity : SimpleActivity</ID>
+    <ID>TooManyFunctions:MeshCallController.kt$MeshCallController : Listener</ID>
+    <ID>TooManyFunctions:MeshVoipCallActivity.kt$MeshVoipCallActivity : SimpleActivityListener</ID>
+    <ID>TooManyFunctions:MeshVoipCallHandler.kt$MeshVoipCallHandler : Listener</ID>
+    <ID>TooManyFunctions:MessagesFragment.kt$MessagesFragment : MyViewPagerFragment</ID>
     <ID>TooManyFunctions:RecentCallsAdapter.kt$RecentCallsAdapter : MyRecyclerViewListAdapter</ID>
     <ID>TooManyFunctions:RecentsFragment.kt$RecentsFragment : MyViewPagerFragmentRefreshItemsListener</ID>
+    <ID>TooManyFunctions:RecurringLnurlManager.kt$RecurringLnurlManager</ID>
     <ID>TooManyFunctions:SettingsActivity.kt$SettingsActivity : SimpleActivity</ID>
+    <ID>TooManyFunctions:SimpleActivity.kt$SimpleActivity : MessagesSimpleActivity</ID>
     <ID>TooManyFunctions:SpeedDialAdapter.kt$SpeedDialAdapter : MyRecyclerViewAdapter</ID>
+    <ID>TooManyFunctions:WalletBackupCrypto.kt$WalletBackupCrypto</ID>
+    <ID>TooManyFunctions:WalletContactHelper.kt$WalletContactHelper</ID>
+    <ID>TooManyFunctions:WalletFederationTopupManager.kt$WalletFederationTopupManager</ID>
+    <ID>TooManyFunctions:WalletFragment.kt$WalletFragment : MyViewPagerFragmentRefreshItemsListener</ID>
+    <ID>TooManyFunctions:WalletLiquidityProviderSettingsActivity.kt$WalletLiquidityProviderSettingsActivity : SimpleActivity</ID>
+    <ID>TooManyFunctions:WalletPayActivity.kt$WalletPayActivity : SimpleActivity</ID>
+    <ID>TooManyFunctions:WalletSendTokenActivity.kt$WalletSendTokenActivity : SimpleActivity</ID>
+    <ID>TooManyFunctions:WalletUiDialogs.kt$WalletUiDialogs</ID>
+    <ID>TooManyFunctions:YacbSiaManager.kt$YacbSiaManager</ID>
     <ID>UnusedParameter:CallActivity.kt$CallActivity$view: View</ID>
+    <ID>UnusedParameter:LdkWalletManager.kt$LdkWalletManager$context: Context</ID>
+    <ID>UnusedParameter:LdkWalletManager.kt$LdkWalletManager$timeoutMs: Long = LIQUIDITY_BOOTSTRAP_TIMEOUT_MS</ID>
     <ID>UnusedParameter:MainActivity.kt$MainActivity$event: Events.RefreshCallLog</ID>
+    <ID>UnusedPrivateMember:MainActivity.kt$MainActivity$private fun selectTab(tabType: Int)</ID>
+    <ID>UnusedPrivateMember:MessagesFragment.kt$MessagesFragment$private fun fastRenderConversations(conversations: ArrayList&lt;Conversation&gt;, cached: Boolean)</ID>
+    <ID>UnusedPrivateMember:MessagesFragment.kt$MessagesFragment$private fun performRenderConversations(conversations: ArrayList&lt;Conversation&gt;, cached: Boolean)</ID>
+    <ID>UnusedPrivateMember:MessagesFragment.kt$MessagesFragment$private fun renderConversations(conversations: ArrayList&lt;Conversation&gt;, cached: Boolean)</ID>
+    <ID>UnusedPrivateProperty:FederationDirectoryManager.kt$FederationDirectoryManager$private const val LIQUIDITY_MODE_AUTO = "auto"</ID>
+    <ID>UnusedPrivateProperty:MeshCallConnection.kt$MeshCallConnection$private val outgoing: Boolean</ID>
+    <ID>UnusedPrivateProperty:MessagesFragment.kt$MessagesFragment$private var pendingCached = false</ID>
+    <ID>UnusedPrivateProperty:MessagesFragment.kt$MessagesFragment$private var pendingConversations: ArrayList&lt;Conversation&gt;? = null</ID>
+    <ID>UnusedPrivateProperty:MessagesFragment.kt$MessagesFragment.Companion$private const val RENDER_DEBOUNCE_MS = 150L</ID>
+    <ID>UseCheckOrError:FedimintWebEngine.kt$FedimintWebEngine$throw IllegalStateException("FedimintWebEngine.callBlocking must not run on the UI thread")</ID>
+    <ID>UseCheckOrError:FedimintWebEngine.kt$FedimintWebEngine$throw IllegalStateException("WebView not initialized")</ID>
+    <ID>UseCheckOrError:LdkWalletManager.kt$LdkWalletManager$throw IllegalStateException("Liquidity order did not provide a valid on-chain address.")</ID>
+    <ID>UseCheckOrError:LdkWalletManager.kt$LdkWalletManager$throw IllegalStateException("Liquidity order returned an invalid on-chain amount.")</ID>
+    <ID>UseCheckOrError:LdkWalletManager.kt$LdkWalletManager$throw IllegalStateException("Node started but is not running")</ID>
+    <ID>UseCheckOrError:MeshAudioEngine.kt$MeshAudioEngine$throw IllegalStateException("AudioRecord initialization failed")</ID>
+    <ID>UseCheckOrError:MeshAudioEngine.kt$MeshAudioEngine$throw IllegalStateException("AudioTrack initialization failed")</ID>
+    <ID>UseCheckOrError:WalletFragment.kt$WalletFragment$throw IllegalStateException("Could not finalize restored wallet files")</ID>
+    <ID>UseCheckOrError:WalletFragment.kt$WalletFragment$throw IllegalStateException("Could not prepare existing wallet for restore")</ID>
+    <ID>UseCheckOrError:WalletFragment.kt$WalletFragment$throw IllegalStateException("Wallet storage parent unavailable")</ID>
+    <ID>UseRequire:LdkWalletManager.kt$LdkWalletManager$throw IllegalArgumentException("Liquidity order amount exceeds maximum transfer limit.")</ID>
+    <ID>UseRequire:WalletBackupCrypto.kt$WalletBackupCrypto$throw IllegalArgumentException("Unsupported wallet backup version: ${envelope.version}")</ID>
     <ID>UtilityClassWithPublicConstructor:CallManager.kt$CallManager</ID>
     <ID>WildcardImport:CallActivity.kt$import org.fossify.commons.extensions.*</ID>
     <ID>WildcardImport:CallActivity.kt$import org.fossify.commons.helpers.*</ID>

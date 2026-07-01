@@ -3,21 +3,56 @@
   <ManuallySuppressedIssues/>
   <CurrentIssues>
     <ID>ComplexCondition:Activity.kt$contact.rawId &gt; 1000000 &amp;&amp; contact.contactId &gt; 1000000 &amp;&amp; contact.rawId == contact.contactId &amp;&amp; (isPackageInstalled(simpleContacts) || isPackageInstalled(simpleContactsDebug))</ID>
+    <ID>ComplexCondition:CyberIdentityQr.kt$CyberIdentityQr$mesh.isNullOrBlank() &amp;&amp; e2e.isNullOrBlank() &amp;&amp; btc.isNullOrBlank() &amp;&amp; ln.isNullOrBlank()</ID>
+    <ID>ComplexCondition:MessageCategorizer.kt$MessageCategorizer$!isKnownContact &amp;&amp; allowSpamChecks &amp;&amp; !isOtp &amp;&amp; context.messagesConfig.aiSpamEnabled</ID>
     <ID>ComplexCondition:NewConversationActivity.kt$NewConversationActivity$contact.phoneNumbers.any { it.normalizedNumber.contains(searchString, true) } || contact.name.contains(searchString, true) || contact.name.contains(searchString.normalizeString(), true) || contact.name.normalizeString().contains(searchString, true)</ID>
+    <ID>ComplexCondition:RnsPacket.kt$RnsPacket.Companion$context == RESOURCE || context == RESOURCE_ADV || context == RESOURCE_REQ || context == RESOURCE_HMU || context == RESOURCE_ICL || context == RESOURCE_RCL || context == KEEPALIVE || context == CACHE_REQUEST</ID>
+    <ID>ComplexCondition:ThreadActivity.kt$ThreadActivity$!isMeshThread() &amp;&amp; participants.size == 1 &amp;&amp; !isSpecialNumber() &amp;&amp; !isRecycleBin</ID>
+    <ID>ComplexCondition:ThreadActivity.kt$ThreadActivity$participants.size != 1 || isSpecialNumber() || isRecycleBin || isMeshThread()</ID>
+    <ID>ComplexCondition:WalletPaymentRequestStateManager.kt$WalletPaymentRequestStateManager$requestId.isBlank() || threadId == 0L || federationId.isBlank() || amountSats &lt;= 0L</ID>
+    <ID>CyclomaticComplexMethod:Activity.kt$fun Activity.launchViewIntent(uri: Uri, mimetype: String, filename: String)</ID>
+    <ID>CyclomaticComplexMethod:Activity.kt$fun BaseSimpleActivity.dialNumber(phoneNumber: String, callback: (() -&gt; Unit)? = null)</ID>
     <ID>CyclomaticComplexMethod:Context.kt$fun Context.getConversations( threadId: Long? = null, privateContacts: ArrayList&lt;SimpleContact&gt; = ArrayList(), ): ArrayList&lt;Conversation&gt;</ID>
+    <ID>CyclomaticComplexMethod:Context.kt$fun Context.getMessages( threadId: Long, dateFrom: Int = -1, includeScheduledMessages: Boolean = true, limit: Int = MESSAGES_LIMIT, ): ArrayList&lt;Message&gt;</ID>
     <ID>CyclomaticComplexMethod:ConversationsAdapter.kt$ConversationsAdapter$override fun actionItemPressed(id: Int)</ID>
+    <ID>CyclomaticComplexMethod:Converters.kt$Converters$private fun phoneNumberFromMap(raw: Map&lt;*, *&gt;): PhoneNumber?</ID>
+    <ID>CyclomaticComplexMethod:CyberIdentityQr.kt$CyberIdentityQr$fun parse(raw: String): CyberIdentityPayload?</ID>
+    <ID>CyclomaticComplexMethod:LxmfRouter.kt$LxmfRouter$private fun handleMessageGetRequest( pathHash: ByteArray, data: Any?, requestedAt: Double, remoteIdentity: RnsIdentity?, linkId: ByteArray ): Any?</ID>
+    <ID>CyclomaticComplexMethod:LxmfStore.kt$LxmfStore$fun backfillMissingConversations(context: Context)</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun getNewConversations(cachedConversations: ArrayList&lt;Conversation&gt;)</ID>
+    <ID>CyclomaticComplexMethod:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$private fun resolveLiquidityProviderName(directoryJson: String, providerId: String): String?</ID>
+    <ID>CyclomaticComplexMethod:MeshCallRouter.kt$MeshCallRouter$private fun handleControlPayload(payload: ByteArray, linkId: ByteArray?)</ID>
+    <ID>CyclomaticComplexMethod:MeshCallRouter.kt$MeshCallRouter$private fun performProbe( context: Context, remoteDeliveryHash: ByteArray, preferredQuality: MeshCallQuality, timeoutMs: Long ): ProbeResult</ID>
+    <ID>CyclomaticComplexMethod:MeshDiscoveryManager.kt$MeshDiscoveryManager$private fun extractMeshAddressToken(text: String): String?</ID>
+    <ID>CyclomaticComplexMethod:MessageCategorizer.kt$MessageCategorizer$fun isBlockedMessage( context: Context, address: String, body: String, isKnownContact: Boolean ): Boolean</ID>
     <ID>CyclomaticComplexMethod:MessagesImporter.kt$MessagesImporter$private fun InputStream.importXml()</ID>
+    <ID>CyclomaticComplexMethod:Messaging.kt$@Suppress("DEPRECATION") fun Context.sendMessageCompat( text: String, addresses: List&lt;String&gt;, subId: Int?, attachments: List&lt;Attachment&gt;, messageId: Long? = null )</ID>
+    <ID>CyclomaticComplexMethod:MmsReceiver.kt$MmsReceiver$private fun handleMmsMessage( context: Context, mms: Message, size: Int, address: String )</ID>
     <ID>CyclomaticComplexMethod:NotificationHelper.kt$NotificationHelper$@SuppressLint("NewApi") fun showMessageNotification( messageId: Long, address: String, body: String, threadId: Long, bitmap: Bitmap?, sender: String?, alertOnlyOnce: Boolean = false )</ID>
+    <ID>CyclomaticComplexMethod:RnsLinkResourceManager.kt$RnsLinkResourceManager$private fun maybeTrim(now: Long = System.currentTimeMillis())</ID>
+    <ID>CyclomaticComplexMethod:RnsLinkResourceManager.kt$RnsLinkResourceManager$private fun parseAdvertisement(payload: ByteArray): AdvertisementData?</ID>
+    <ID>CyclomaticComplexMethod:RnsNode.kt$RnsNode$private fun handleIncoming(raw: ByteArray, iface: RnsInterface)</ID>
+    <ID>CyclomaticComplexMethod:RnsNode.kt$RnsNode$private fun handleLinkPacket(packet: RnsPacket, iface: RnsInterface)</ID>
+    <ID>CyclomaticComplexMethod:RnsUdpInterface.kt$RnsUdpInterface$override fun start()</ID>
+    <ID>CyclomaticComplexMethod:SmsReceiver.kt$SmsReceiver$private fun handleMessageSync( context: Context, address: String, subject: String, body: String, date: Long, threadId: Long, type: Int = Telephony.Sms.MESSAGE_TYPE_INBOX, subscriptionId: Int, status: Int )</ID>
     <ID>CyclomaticComplexMethod:ThreadActivity.kt$ThreadActivity$@SuppressLint("MissingPermission") private fun getThreadItems(): ArrayList&lt;ThreadItem&gt;</ID>
+    <ID>CyclomaticComplexMethod:ThreadActivity.kt$ThreadActivity$private fun addAttachment(uri: Uri)</ID>
+    <ID>CyclomaticComplexMethod:ThreadActivity.kt$ThreadActivity$private fun handleCommittedContent(uri: Uri, mimeType: String?)</ID>
+    <ID>CyclomaticComplexMethod:ThreadActivity.kt$ThreadActivity$private fun handleMenuItemAction(menuItem: MenuItem): Boolean</ID>
     <ID>CyclomaticComplexMethod:ThreadActivity.kt$ThreadActivity$private fun refreshMenuItems()</ID>
+    <ID>CyclomaticComplexMethod:ThreadActivity.kt$ThreadActivity$private fun sendMessage()</ID>
     <ID>CyclomaticComplexMethod:ThreadActivity.kt$ThreadActivity$private fun setupButtons()</ID>
+    <ID>CyclomaticComplexMethod:ThreadActivity.kt$ThreadActivity$private fun setupCachedMessages(callback: () -&gt; Unit)</ID>
     <ID>CyclomaticComplexMethod:ThreadActivity.kt$ThreadActivity$private fun setupThread(callback: () -&gt; Unit)</ID>
+    <ID>CyclomaticComplexMethod:ThreadAdapter.kt$ThreadAdapter$private fun setupView(holder: ViewHolder, view: View, message: Message)</ID>
+    <ID>CyclomaticComplexMethod:WalletPaymentRequestStateManager.kt$WalletPaymentRequestStateManager$fun validateAndReserveInvoiceResponse( context: Context, requestId: String, threadId: Long, federationId: String, amountSats: Long, invoice: String, ): ValidationResult</ID>
+    <ID>CyclomaticComplexMethod:WalletTokenParser.kt$WalletTokenParser$fun findPayToken(text: String): String?</ID>
     <ID>EmptyCatchBlock:MessagesWriter.kt$MessagesWriter${ }</ID>
     <ID>EmptyFunctionBlock:ArchivedConversationsAdapter.kt$ArchivedConversationsAdapter${}</ID>
     <ID>EmptyFunctionBlock:BaseConversationsAdapter.kt$BaseConversationsAdapter${}</ID>
     <ID>EmptyFunctionBlock:ContactsAdapter.kt$ContactsAdapter${}</ID>
     <ID>EmptyFunctionBlock:ManageBlockedKeywordsAdapter.kt$ManageBlockedKeywordsAdapter${}</ID>
+    <ID>EmptyFunctionBlock:MeshService.kt$MeshService.&lt;no name provided&gt;${}</ID>
     <ID>EmptyFunctionBlock:RecycleBinConversationsAdapter.kt$RecycleBinConversationsAdapter${}</ID>
     <ID>EmptyFunctionBlock:SearchResultsAdapter.kt$SearchResultsAdapter${}</ID>
     <ID>EmptyFunctionBlock:ThreadAdapter.kt$ThreadAdapter${}</ID>
@@ -25,16 +60,34 @@
     <ID>ForbiddenComment:ShortcutHelper.kt$ShortcutHelper$// TODO: verify that thread isn't in recycle bin</ID>
     <ID>ForbiddenComment:SmsStatusDeliveredReceiver.kt$SmsStatusDeliveredReceiver$// TODO: Need to check whether SC still trying to deliver the SMS to destination and will send the report again?</ID>
     <ID>FunctionParameterNaming:Config.kt$Config$SIMId: Int</ID>
+    <ID>LargeClass:LxmfRouter.kt$LxmfRouter</ID>
+    <ID>LargeClass:ManageE2eKeysActivity.kt$ManageE2eKeysActivity : SimpleActivity</ID>
+    <ID>LargeClass:RnsLinkResourceManager.kt$RnsLinkResourceManager</ID>
+    <ID>LargeClass:RnsNode.kt$RnsNode</ID>
     <ID>LargeClass:ThreadActivity.kt$ThreadActivity : SimpleActivity</ID>
+    <ID>LargeClass:ThreadAdapter.kt$ThreadAdapter : MyRecyclerViewListAdapter</ID>
+    <ID>LongMethod:Context.kt$fun Context.getMessages( threadId: Long, dateFrom: Int = -1, includeScheduledMessages: Boolean = true, limit: Int = MESSAGES_LIMIT, ): ArrayList&lt;Message&gt;</ID>
     <ID>LongMethod:NotificationHelper.kt$NotificationHelper$@SuppressLint("NewApi") fun showMessageNotification( messageId: Long, address: String, body: String, threadId: Long, bitmap: Bitmap?, sender: String?, alertOnlyOnce: Boolean = false )</ID>
+    <ID>LongMethod:ThreadAdapter.kt$ThreadAdapter$private fun setupView(holder: ViewHolder, view: View, message: Message)</ID>
+    <ID>LongParameterList:RnsDestination.kt$RnsDestination$( val identity: RnsIdentity?, val direction: Int, val type: Int, val appName: String, val aspects: List&lt;String&gt;, val name: String, val nameHash: ByteArray, val hash: ByteArray )</ID>
+    <ID>LongParameterList:RnsLink.kt$RnsLink$( val owner: RnsDestination, val destination: RnsDestination?, val initiator: Boolean, var mode: Int, private val localX25519Private: ByteArray, private val localX25519Public: ByteArray, private val localSigPublic: ByteArray, private val ownerIdentity: RnsIdentity )</ID>
+    <ID>LoopWithTooManyJumpStatements:MeshContactHelper.kt$MeshContactHelper$while</ID>
     <ID>MagicNumber:Activity.kt$1000000</ID>
+    <ID>MagicNumber:AiSpamModelManager.kt$AiSpamModelManager$15_000</ID>
+    <ID>MagicNumber:AiSpamModelManager.kt$AiSpamModelManager$200</ID>
+    <ID>MagicNumber:AiSpamModelManager.kt$AiSpamModelManager$299</ID>
+    <ID>MagicNumber:AiSpamModelManager.kt$AiSpamModelManager$30_000</ID>
     <ID>MagicNumber:BaseConversationsAdapter.kt$BaseConversationsAdapter$0.7f</ID>
     <ID>MagicNumber:BaseConversationsAdapter.kt$BaseConversationsAdapter$0.8f</ID>
     <ID>MagicNumber:BaseConversationsAdapter.kt$BaseConversationsAdapter$0.9f</ID>
     <ID>MagicNumber:BaseConversationsAdapter.kt$BaseConversationsAdapter$1.2f</ID>
     <ID>MagicNumber:ContactsAdapter.kt$ContactsAdapter$1.2f</ID>
     <ID>MagicNumber:Context.kt$10</ID>
+    <ID>MagicNumber:Context.kt$128</ID>
     <ID>MagicNumber:Context.kt$500L</ID>
+    <ID>MagicNumber:Context.kt$6</ID>
+    <ID>MagicNumber:CyberIdentityQr.kt$CyberIdentityQr$12</ID>
+    <ID>MagicNumber:E2eManager.kt$E2eManager$32</ID>
     <ID>MagicNumber:ImageCompressor.kt$ImageCompressor$0.6f</ID>
     <ID>MagicNumber:ImageCompressor.kt$ImageCompressor$100</ID>
     <ID>MagicNumber:ImageCompressor.kt$ImageCompressor$180f</ID>
@@ -45,7 +98,126 @@
     <ID>MagicNumber:ImageCompressor.kt$ImageCompressor$6</ID>
     <ID>MagicNumber:ImageCompressor.kt$ImageCompressor$8</ID>
     <ID>MagicNumber:ImageCompressor.kt$ImageCompressor$90f</ID>
+    <ID>MagicNumber:LxmfAddress.kt$LxmfAddress$8</ID>
+    <ID>MagicNumber:LxmfMessage.kt$LxmfMessage.Companion$3</ID>
+    <ID>MagicNumber:LxmfMessage.kt$LxmfMessage.Companion$4</ID>
+    <ID>MagicNumber:LxmfRouter.kt$LxmfRouter$1500</ID>
+    <ID>MagicNumber:LxmfRouter.kt$LxmfRouter$16</ID>
+    <ID>MagicNumber:LxmfRouter.kt$LxmfRouter$24</ID>
+    <ID>MagicNumber:LxmfRouter.kt$LxmfRouter$254</ID>
+    <ID>MagicNumber:LxmfRouter.kt$LxmfRouter$3</ID>
+    <ID>MagicNumber:LxmfRouter.kt$LxmfRouter$64</ID>
+    <ID>MagicNumber:LxmfRouter.kt$LxmfRouter$7</ID>
+    <ID>MagicNumber:LxmfRouter.kt$LxmfRouter$8</ID>
+    <ID>MagicNumber:LxmfStamper.kt$LxmfStamper$0xFF</ID>
+    <ID>MagicNumber:LxmfStamper.kt$LxmfStamper$24</ID>
+    <ID>MagicNumber:LxmfStamper.kt$LxmfStamper$256</ID>
+    <ID>MagicNumber:LxmfStamper.kt$LxmfStamper$8</ID>
+    <ID>MagicNumber:LxmfStore.kt$LxmfStore$3</ID>
+    <ID>MagicNumber:LxmfStore.kt$LxmfStore$4</ID>
+    <ID>MagicNumber:LxmfStore.kt$LxmfStore$5</ID>
+    <ID>MagicNumber:LxmfStore.kt$LxmfStore$6</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$30</ID>
+    <ID>MagicNumber:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$1024</ID>
+    <ID>MagicNumber:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$16</ID>
+    <ID>MagicNumber:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$4</ID>
+    <ID>MagicNumber:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$8</ID>
+    <ID>MagicNumber:MeshBleController.kt$MeshBleController$20</ID>
+    <ID>MagicNumber:MeshBleController.kt$MeshBleController$60L</ID>
+    <ID>MagicNumber:MeshBleController.kt$MeshBleController.&lt;no name provided&gt;$0xFFFF</ID>
+    <ID>MagicNumber:MeshBleController.kt$MeshBleController.&lt;no name provided&gt;$120L</ID>
+    <ID>MagicNumber:MeshBleController.kt$MeshBleController.&lt;no name provided&gt;$517</ID>
+    <ID>MagicNumber:MeshBleController.kt$MeshBleController.&lt;no name provided&gt;$65536</ID>
+    <ID>MagicNumber:MeshCallRouter.kt$MeshCallRouter$100</ID>
+    <ID>MagicNumber:MeshCallRouter.kt$MeshCallRouter$200</ID>
+    <ID>MagicNumber:MeshCallRouter.kt$MeshCallRouter$2_000L</ID>
+    <ID>MagicNumber:MeshCallRouter.kt$MeshCallRouter$3</ID>
+    <ID>MagicNumber:MeshCallRouter.kt$MeshCallRouter$4</ID>
+    <ID>MagicNumber:MeshCallRouter.kt$MeshCallRouter$5</ID>
+    <ID>MagicNumber:MeshCallRouter.kt$MeshCallRouter$50</ID>
+    <ID>MagicNumber:MeshCallRouter.kt$MeshCallRouter$750L</ID>
+    <ID>MagicNumber:MeshIdentityStore.kt$MeshIdentityStore$12</ID>
+    <ID>MagicNumber:MeshIdentityStore.kt$MeshIdentityStore$64</ID>
+    <ID>MagicNumber:MeshQrScanActivity.kt$MeshQrScanActivity.&lt;no name provided&gt;$2_000L</ID>
+    <ID>MagicNumber:MeshService.kt$MeshService$32</ID>
+    <ID>MagicNumber:MeshService.kt$MeshService$4</ID>
+    <ID>MagicNumber:MeshWifiAwareController.kt$MeshWifiAwareController$0xFFFF</ID>
+    <ID>MagicNumber:MeshWifiAwareController.kt$MeshWifiAwareController$65536</ID>
+    <ID>MagicNumber:MessageCategorizer.kt$MessageCategorizer$3</ID>
+    <ID>MagicNumber:MessageCategorizer.kt$MessageCategorizer$4</ID>
+    <ID>MagicNumber:Messaging.kt$12</ID>
+    <ID>MagicNumber:Messaging.kt$3</ID>
+    <ID>MagicNumber:Messaging.kt$6</ID>
+    <ID>MagicNumber:NotificationHelper.kt$NotificationHelper$1.8f</ID>
+    <ID>MagicNumber:NotificationHelper.kt$NotificationHelper$100</ID>
+    <ID>MagicNumber:RnsAnnounce.kt$RnsAnnounce.Companion$0xFF</ID>
+    <ID>MagicNumber:RnsAnnounce.kt$RnsAnnounce.Companion$16</ID>
+    <ID>MagicNumber:RnsAnnounce.kt$RnsAnnounce.Companion$4</ID>
+    <ID>MagicNumber:RnsAnnounce.kt$RnsAnnounce.Companion$5</ID>
+    <ID>MagicNumber:RnsAnnounce.kt$RnsAnnounce.Companion$8</ID>
+    <ID>MagicNumber:RnsConstants.kt$RnsConstants$8</ID>
+    <ID>MagicNumber:RnsDestination.kt$RnsDestination.Companion$8</ID>
+    <ID>MagicNumber:RnsHash.kt$RnsHash$8</ID>
+    <ID>MagicNumber:RnsHex.kt$RnsHex$0xFF</ID>
+    <ID>MagicNumber:RnsHex.kt$RnsHex$10</ID>
+    <ID>MagicNumber:RnsHex.kt$RnsHex$4</ID>
+    <ID>MagicNumber:RnsHkdf.kt$RnsHkdf$0xFF</ID>
+    <ID>MagicNumber:RnsHkdf.kt$RnsHkdf$32</ID>
+    <ID>MagicNumber:RnsLink.kt$RnsLink$256</ID>
+    <ID>MagicNumber:RnsLink.kt$RnsLink$3</ID>
+    <ID>MagicNumber:RnsLink.kt$RnsLink$32</ID>
+    <ID>MagicNumber:RnsLink.kt$RnsLink$5</ID>
+    <ID>MagicNumber:RnsLink.kt$RnsLink$60_000L</ID>
+    <ID>MagicNumber:RnsLink.kt$RnsLink$64</ID>
+    <ID>MagicNumber:RnsLink.kt$RnsLink.Companion$0xFF</ID>
+    <ID>MagicNumber:RnsLink.kt$RnsLink.Companion$16</ID>
+    <ID>MagicNumber:RnsLink.kt$RnsLink.Companion$24</ID>
+    <ID>MagicNumber:RnsLink.kt$RnsLink.Companion$4</ID>
+    <ID>MagicNumber:RnsLink.kt$RnsLink.Companion$5</ID>
+    <ID>MagicNumber:RnsLink.kt$RnsLink.Companion$8</ID>
+    <ID>MagicNumber:RnsLinkResourceManager.kt$RnsLinkResourceManager$0x04</ID>
+    <ID>MagicNumber:RnsLinkResourceManager.kt$RnsLinkResourceManager$0x08</ID>
+    <ID>MagicNumber:RnsLinkResourceManager.kt$RnsLinkResourceManager$0x10</ID>
+    <ID>MagicNumber:RnsLinkResourceManager.kt$RnsLinkResourceManager$0x20</ID>
+    <ID>MagicNumber:RnsLinkResourceManager.kt$RnsLinkResourceManager$0xFF</ID>
+    <ID>MagicNumber:RnsLinkResourceManager.kt$RnsLinkResourceManager$11</ID>
+    <ID>MagicNumber:RnsLinkResourceManager.kt$RnsLinkResourceManager.AdvertisementData$0x04</ID>
+    <ID>MagicNumber:RnsLinkResourceManager.kt$RnsLinkResourceManager.AdvertisementData$0x20</ID>
+    <ID>MagicNumber:RnsNode.kt$RnsNode$0xFF</ID>
+    <ID>MagicNumber:RnsNode.kt$RnsNode$24</ID>
+    <ID>MagicNumber:RnsNode.kt$RnsNode$254</ID>
+    <ID>MagicNumber:RnsNode.kt$RnsNode$255</ID>
+    <ID>MagicNumber:RnsNode.kt$RnsNode$32</ID>
+    <ID>MagicNumber:RnsNode.kt$RnsNode$3_000L</ID>
+    <ID>MagicNumber:RnsNode.kt$RnsNode$4</ID>
+    <ID>MagicNumber:RnsNode.kt$RnsNode$5_000L</ID>
+    <ID>MagicNumber:RnsNode.kt$RnsNode$64</ID>
+    <ID>MagicNumber:RnsNode.kt$RnsNode$7</ID>
+    <ID>MagicNumber:RnsNode.kt$RnsNode$8</ID>
+    <ID>MagicNumber:RnsPacket.kt$RnsPacket$0b00000011</ID>
+    <ID>MagicNumber:RnsPacket.kt$RnsPacket$0b00001100</ID>
+    <ID>MagicNumber:RnsPacket.kt$RnsPacket$0b00010000</ID>
+    <ID>MagicNumber:RnsPacket.kt$RnsPacket$0b00100000</ID>
+    <ID>MagicNumber:RnsPacket.kt$RnsPacket$0b01000000</ID>
+    <ID>MagicNumber:RnsPacket.kt$RnsPacket$0xFF</ID>
+    <ID>MagicNumber:RnsPacket.kt$RnsPacket$4</ID>
+    <ID>MagicNumber:RnsPacket.kt$RnsPacket$5</ID>
+    <ID>MagicNumber:RnsPacket.kt$RnsPacket$6</ID>
+    <ID>MagicNumber:RnsPacket.kt$RnsPacket$8</ID>
+    <ID>MagicNumber:RnsPacket.kt$RnsPacket.Companion$0b01000000</ID>
+    <ID>MagicNumber:RnsPacket.kt$RnsPacket.Companion$0xFF</ID>
+    <ID>MagicNumber:RnsPacket.kt$RnsPacket.Companion$6</ID>
+    <ID>MagicNumber:RnsPacket.kt$RnsPacket.Companion$8</ID>
+    <ID>MagicNumber:RnsResource.kt$RnsResourceCodec$0xFF</ID>
+    <ID>MagicNumber:RnsResource.kt$RnsResourceCodec$0xFFFF</ID>
+    <ID>MagicNumber:RnsToken.kt$RnsToken$16</ID>
+    <ID>MagicNumber:RnsToken.kt$RnsToken$32</ID>
+    <ID>MagicNumber:RnsToken.kt$RnsToken$64</ID>
+    <ID>MagicNumber:RnsToken.kt$RnsToken$8</ID>
+    <ID>MagicNumber:RnsUdpInterface.kt$RnsUdpInterface$2048</ID>
+    <ID>MagicNumber:RnsUdpInterface.kt$RnsUdpInterface$32</ID>
+    <ID>MagicNumber:RnsUdpInterface.kt$RnsUdpInterface$5</ID>
+    <ID>MagicNumber:RnsUdpInterface.kt$RnsUdpInterface$60_000L</ID>
     <ID>MagicNumber:ScheduleMessageDialog.kt$ScheduleMessageDialog$23</ID>
     <ID>MagicNumber:ScheduleMessageDialog.kt$ScheduleMessageDialog$5</ID>
     <ID>MagicNumber:ScheduleMessageDialog.kt$ScheduleMessageDialog$59</ID>
@@ -53,6 +225,7 @@
     <ID>MagicNumber:SearchResultsAdapter.kt$SearchResultsAdapter$0.8f</ID>
     <ID>MagicNumber:SearchResultsAdapter.kt$SearchResultsAdapter$0.9f</ID>
     <ID>MagicNumber:SearchResultsAdapter.kt$SearchResultsAdapter$1.2f</ID>
+    <ID>MagicNumber:SensitivePrefs.kt$SensitivePrefs$0xFF</ID>
     <ID>MagicNumber:SettingsActivity.kt$SettingsActivity$3</ID>
     <ID>MagicNumber:SettingsActivity.kt$SettingsActivity$4</ID>
     <ID>MagicNumber:SettingsActivity.kt$SettingsActivity$5</ID>
@@ -66,15 +239,31 @@
     <ID>MagicNumber:SmsStatusDeliveredReceiver.kt$SmsStatusDeliveredReceiver$3</ID>
     <ID>MagicNumber:ThreadActivity.kt$ThreadActivity$0.4f</ID>
     <ID>MagicNumber:ThreadActivity.kt$ThreadActivity$0.9f</ID>
+    <ID>MagicNumber:ThreadActivity.kt$ThreadActivity$12</ID>
     <ID>MagicNumber:ThreadActivity.kt$ThreadActivity$150</ID>
+    <ID>MagicNumber:ThreadActivity.kt$ThreadActivity$18f</ID>
     <ID>MagicNumber:ThreadActivity.kt$ThreadActivity$2</ID>
     <ID>MagicNumber:ThreadActivity.kt$ThreadActivity$30</ID>
     <ID>MagicNumber:ThreadActivity.kt$ThreadActivity$500L</ID>
+    <ID>MagicNumber:ThreadActivity.kt$ThreadActivity$6</ID>
+    <ID>MagicNumber:ThreadAdapter.kt$ThreadAdapter$0.08f</ID>
+    <ID>MagicNumber:ThreadAdapter.kt$ThreadAdapter$0.25f</ID>
+    <ID>MagicNumber:ThreadAdapter.kt$ThreadAdapter$0.2f</ID>
+    <ID>MagicNumber:ThreadAdapter.kt$ThreadAdapter$0.55f</ID>
+    <ID>MagicNumber:ThreadAdapter.kt$ThreadAdapter$0.72f</ID>
+    <ID>MagicNumber:ThreadAdapter.kt$ThreadAdapter$0.88f</ID>
     <ID>MagicNumber:ThreadAdapter.kt$ThreadAdapter$0.8f</ID>
+    <ID>MagicNumber:ThreadAdapter.kt$ThreadAdapter$3</ID>
     <ID>MagicNumber:ThreadAdapter.kt$ThreadAdapter$4</ID>
     <ID>MagicNumber:VCardViewerAdapter.kt$VCardViewerAdapter.VCardContactViewHolder$1.1f</ID>
     <ID>MagicNumber:VCardViewerAdapter.kt$VCardViewerAdapter.VCardPropertyViewHolder$1.1f</ID>
+    <ID>MagicNumber:WalletPaymentRequestStateManager.kt$WalletPaymentRequestStateManager$16</ID>
+    <ID>MagicNumber:WalletPaymentRequestStateManager.kt$WalletPaymentRequestStateManager$4</ID>
+    <ID>MagicNumber:WalletTokenParser.kt$WalletTokenParser$24</ID>
+    <ID>MagicNumber:WalletTokenParser.kt$WalletTokenParser$3</ID>
+    <ID>MagicNumber:WalletTokenParser.kt$WalletTokenParser$4</ID>
     <ID>MatchingDeclarationName:ThreadItems.kt$ThreadItem</ID>
+    <ID>MaxLineLength:Activity.kt$val ext = filename.substringAfterLast('.', "").lowercase(Locale.getDefault()).takeIf { it.matches(Regex("[a-z0-9]{1,8}")) }</ID>
     <ID>MaxLineLength:AddBlockedKeywordDialog.kt$AddBlockedKeywordDialog$class</ID>
     <ID>MaxLineLength:ArchivedConversationsAdapter.kt$ArchivedConversationsAdapter$val conversationsToRemove = currentList.filter { selectedKeys.contains(it.hashCode()) } as ArrayList&lt;Conversation&gt;</ID>
     <ID>MaxLineLength:ArchivedConversationsAdapter.kt$ArchivedConversationsAdapter$val conversationsToUnarchive = currentList.filter { selectedKeys.contains(it.hashCode()) } as ArrayList&lt;Conversation&gt;</ID>
@@ -83,17 +272,43 @@
     <ID>MaxLineLength:AttachmentsAdapter.kt$AttachmentsAdapter$onClick = { activity.launchViewIntent(attachment.uri, attachment.mimetype, attachment.filename) }</ID>
     <ID>MaxLineLength:AttachmentsAdapter.kt$AttachmentsAdapter.&lt;no name provided&gt;$override</ID>
     <ID>MaxLineLength:AutoCompleteTextViewAdapter.kt$AutoCompleteTextViewAdapter$class</ID>
+    <ID>MaxLineLength:AutoCompleteTextViewAdapter.kt$AutoCompleteTextViewAdapter$val</ID>
     <ID>MaxLineLength:Constants.kt$/** Not to be used with real messages persisted in the telephony db. This is for internal use only (e.g. scheduled messages, notification ids etc). */</ID>
     <ID>MaxLineLength:ContactsAdapter.kt$ContactsAdapter$activity: SimpleActivity</ID>
+    <ID>MaxLineLength:Context.kt$val</ID>
+    <ID>MaxLineLength:ConversationDetailsActivity.kt$ConversationDetailsActivity$contact.phoneNumbers.firstOrNull { !LxmfAddress.isMeshAddress(LxmfAddress.normalize(it.normalizedNumber)) }</ID>
     <ID>MaxLineLength:ConversationsDao.kt$ConversationsDao$@Query("SELECT (SELECT body FROM messages LEFT OUTER JOIN recycle_bin_messages ON messages.id = recycle_bin_messages.id WHERE recycle_bin_messages.id IS NOT NULL AND messages.thread_id = conversations.thread_id ORDER BY messages.date DESC LIMIT 1) as new_snippet, * FROM conversations WHERE (SELECT COUNT(*) FROM messages LEFT OUTER JOIN recycle_bin_messages ON messages.id = recycle_bin_messages.id WHERE recycle_bin_messages.id IS NOT NULL AND messages.thread_id = conversations.thread_id) &gt; 0")</ID>
     <ID>MaxLineLength:ConversationsDao.kt$ConversationsDao$@Query("SELECT (SELECT body FROM messages LEFT OUTER JOIN recycle_bin_messages ON messages.id = recycle_bin_messages.id WHERE recycle_bin_messages.id IS NULL AND messages.thread_id = conversations.thread_id ORDER BY messages.date DESC LIMIT 1) as new_snippet, * FROM conversations WHERE archived = 0")</ID>
     <ID>MaxLineLength:ConversationsDao.kt$ConversationsDao$@Query("SELECT (SELECT body FROM messages LEFT OUTER JOIN recycle_bin_messages ON messages.id = recycle_bin_messages.id WHERE recycle_bin_messages.id IS NULL AND messages.thread_id = conversations.thread_id ORDER BY messages.date DESC LIMIT 1) as new_snippet, * FROM conversations WHERE archived = 1")</ID>
     <ID>MaxLineLength:ExportBlockedKeywordsDialog.kt$ExportBlockedKeywordsDialog$exportBlockedKeywordsFilename.setText("${activity.getString(R.string.blocked_keywords)}_${activity.getCurrentFormattedDateTime()}")</ID>
     <ID>MaxLineLength:Gson.kt$private val gsonBuilder = GsonBuilder().registerTypeAdapter(object : TypeToken&lt;Map&lt;String, Any&gt;&gt;() {}.type, MapDeserializerDoubleAsIntFix())</ID>
-    <ID>MaxLineLength:HeadlessSmsSendService.kt$HeadlessSmsSendService$val number = Uri.decode(intent.dataString!!.removePrefix("sms:").removePrefix("smsto:").removePrefix("mms").removePrefix("mmsto:").trim())</ID>
     <ID>MaxLineLength:ImageCompressor.kt$ImageCompressor$fun</ID>
     <ID>MaxLineLength:ImageCompressor.kt$ImageCompressor$private</ID>
     <ID>MaxLineLength:ImageCompressor.kt$ImageCompressor$var imageFile = File(outputDirectory, System.currentTimeMillis().toString().plus(mimeType.getExtensionFromMimeType()))</ID>
+    <ID>MaxLineLength:LxmfMessage.kt$LxmfMessage.Companion$RnsDestination.create(it, RnsDestination.OUT, RnsDestination.SINGLE, LxmfConstants.APP_NAME, listOf("delivery"))</ID>
+    <ID>MaxLineLength:LxmfRouter.kt$LxmfRouter$private</ID>
+    <ID>MaxLineLength:LxmfRouter.kt$LxmfRouter$propagation</ID>
+    <ID>MaxLineLength:LxmfStamper.kt$LxmfStamper$fun</ID>
+    <ID>MaxLineLength:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$ContextCompat.checkSelfPermission(this@ManageE2eKeysActivity, it) != PackageManager.PERMISSION_GRANTED</ID>
+    <ID>MaxLineLength:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$identity.walletLightningDestination?.let { WalletContactHelper.upsertWalletLightningDestination(this, rawId, it) }</ID>
+    <ID>MaxLineLength:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$if</ID>
+    <ID>MaxLineLength:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$java.net.InetAddress.getByAddress(java.nio.ByteBuffer.allocate(4).putInt(broadcastInt).array()).hostAddress</ID>
+    <ID>MaxLineLength:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$java.nio.ByteBuffer.allocate(4).order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(dhcp.ipAddress).array()</ID>
+    <ID>MaxLineLength:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$java.nio.ByteBuffer.allocate(4).order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(dhcp.netmask).array()</ID>
+    <ID>MaxLineLength:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$profileMeshStatusValue.text = "$status\n$diagnostics\nRuntime: $running\nInterfaces: $ifaceNames\n${buildUdpStatus()}\n$bleStatus\n$wifiStatus\n$awareStatus"</ID>
+    <ID>MaxLineLength:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$val ifaceAddr = iface?.interfaceAddresses?.firstOrNull { it.address is java.net.Inet4Address &amp;&amp; it.address == ipAddr }</ID>
+    <ID>MaxLineLength:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$val providerName = resolveLiquidityProviderName(prefs.getString(WALLET_DIRECTORY_JSON, "").orEmpty(), providerId)</ID>
+    <ID>MaxLineLength:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$val running = if (RnsNode.isRunning()) getString(R.string.profile_running) else getString(R.string.profile_stopped)</ID>
+    <ID>MaxLineLength:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$val rxText = if (rx &gt; 0L) android.text.format.DateUtils.getRelativeTimeSpanString(rx).toString() else getString(R.string.profile_unknown)</ID>
+    <ID>MaxLineLength:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$val txText = if (tx &gt; 0L) android.text.format.DateUtils.getRelativeTimeSpanString(tx).toString() else getString(R.string.profile_unknown)</ID>
+    <ID>MaxLineLength:MapDeserializerDoubleAsIntFix.kt$MapDeserializerDoubleAsIntFix$override</ID>
+    <ID>MaxLineLength:MeshContactHelper.kt$MeshContactHelper$"${ContactsContract.Data.RAW_CONTACT_ID}=? AND ${ContactsContract.Data.MIMETYPE}=? AND ${ContactsContract.Data.DATA2}=? AND ${ContactsContract.Data.DATA3}=?"</ID>
+    <ID>MaxLineLength:MeshContactHelper.kt$MeshContactHelper$val selection = "(${ContactsContract.Data.MIMETYPE} = ? OR ${ContactsContract.Data.MIMETYPE} = ?) AND ${ContactsContract.Data.DATA1} = ?"</ID>
+    <ID>MaxLineLength:MeshService.kt$MeshService$if</ID>
+    <ID>MaxLineLength:MeshWifiAwareController.kt$MeshWifiAwareController$if</ID>
+    <ID>MaxLineLength:MeshWifiAwareController.kt$MeshWifiAwareController.&lt;no name provided&gt;$override</ID>
+    <ID>MaxLineLength:MessageCategorizer.kt$MessageCategorizer$Regex("\\b(otp|one[- ]time|verification|verif|code|passcode|pin|security code|login code)\\b", RegexOption.IGNORE_CASE)</ID>
+    <ID>MaxLineLength:MessageCategorizer.kt$MessageCategorizer$runCatching { Class.forName("org.fossify.phone.blocking.YacbSiaManager\$Rating") }.getOrNull()</ID>
     <ID>MaxLineLength:MessagesDao.kt$MessagesDao$@Query("SELECT messages.* FROM messages LEFT OUTER JOIN recycle_bin_messages ON messages.id = recycle_bin_messages.id WHERE recycle_bin_messages.id IS NOT NULL AND recycle_bin_messages.deleted_ts &lt; :timestamp")</ID>
     <ID>MaxLineLength:MessagesDao.kt$MessagesDao$@Query("SELECT messages.* FROM messages LEFT OUTER JOIN recycle_bin_messages ON messages.id = recycle_bin_messages.id WHERE recycle_bin_messages.id IS NOT NULL AND thread_id = :threadId")</ID>
     <ID>MaxLineLength:MessagesDao.kt$MessagesDao$@Query("SELECT messages.* FROM messages LEFT OUTER JOIN recycle_bin_messages ON messages.id = recycle_bin_messages.id WHERE recycle_bin_messages.id IS NOT NULL")</ID>
@@ -116,7 +331,14 @@
     <ID>MaxLineLength:MmsPart.kt$MmsPart$return !(text != null || contentType.lowercase().startsWith("text") || contentType.lowercase() == "application/smil")</ID>
     <ID>MaxLineLength:NewConversationActivity.kt$NewConversationActivity$// READ_CONTACTS permission is not mandatory, but without it we won't be able to show any suggestions during typing</ID>
     <ID>MaxLineLength:RecycleBinConversationsAdapter.kt$RecycleBinConversationsAdapter$val conversationsToRemove = currentList.filter { selectedKeys.contains(it.hashCode()) } as ArrayList&lt;Conversation&gt;</ID>
+    <ID>MaxLineLength:RnsDestination.kt$RnsDestination.Companion$fun</ID>
+    <ID>MaxLineLength:RnsLinkResourceManager.kt$RnsLinkResourceManager$packer.packString("o")</ID>
+    <ID>MaxLineLength:RnsLinkResourceManager.kt$RnsLinkResourceManager$packer.packString("r")</ID>
+    <ID>MaxLineLength:RnsNode.kt$RnsNode$RnsPacket.RESOURCE_ADV</ID>
+    <ID>MaxLineLength:RnsNode.kt$RnsNode$extraForwardAddresses = if (broadcastAddress != "255.255.255.255") listOf("255.255.255.255") else emptyList()</ID>
+    <ID>MaxLineLength:RnsNodeLoopbackTest.kt$RnsNodeLoopbackTest.&lt;no name provided&gt;$val encrypted = link.encryptForPacket(packetType, context, data) ?: return@handleRequest</ID>
     <ID>MaxLineLength:ScheduledMessageReceiver.kt$ScheduledMessageReceiver$context.showErrorToast(e.localizedMessage ?: context.getString(org.fossify.commons.R.string.unknown_error_occurred))</ID>
+    <ID>MaxLineLength:ScheduledMessageReceiver.kt$ScheduledMessageReceiver$val addresses = message.participants.getAddresses().filterNot { org.fossify.mesh.lxmf.LxmfAddress.isMeshLike(it) }</ID>
     <ID>MaxLineLength:ScheduledMessageReceiver.kt$ScheduledMessageReceiver$val wakelock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "simple.messenger:scheduled.message.receiver")</ID>
     <ID>MaxLineLength:SearchResult.kt$SearchResult</ID>
     <ID>MaxLineLength:SearchResultsAdapter.kt$SearchResultsAdapter$SimpleContactsHelper(activity).loadContactImage(searchResult.photoUri, searchResultImage, searchResult.title)</ID>
@@ -125,28 +347,55 @@
     <ID>MaxLineLength:SmsStatusDeliveredReceiver.kt$SmsStatusDeliveredReceiver$// TODO: Need to check whether SC still trying to deliver the SMS to destination and will send the report again?</ID>
     <ID>MaxLineLength:ThreadActivity.kt$ThreadActivity$// check keyboard height just to be sure, 150 seems like a good middle ground between ime and navigation bar</ID>
     <ID>MaxLineLength:ThreadActivity.kt$ThreadActivity$// do not show the date/time above every message, only if the difference between the 2 messages is at least MIN_DATE_TIME_DIFF_SECS,</ID>
+    <ID>MaxLineLength:ThreadActivity.kt$ThreadActivity$LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)</ID>
+    <ID>MaxLineLength:ThreadActivity.kt$ThreadActivity$LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)</ID>
+    <ID>MaxLineLength:ThreadActivity.kt$ThreadActivity$findItem(R.id.share_identity_vcard).isVisible = participants.isNotEmpty() &amp;&amp; !isSpecialNumber() &amp;&amp; !isRecycleBin</ID>
     <ID>MaxLineLength:ThreadActivity.kt$ThreadActivity$if</ID>
     <ID>MaxLineLength:ThreadActivity.kt$ThreadActivity$privateContacts.firstOrNull { it.doesHavePhoneNumber(participant.phoneNumbers.first().normalizedNumber) }</ID>
+    <ID>MaxLineLength:ThreadActivity.kt$ThreadActivity$val displayResult = E2eManager.getDisplayResult(this, message.threadId, message.body, message.date.toLong())</ID>
+    <ID>MaxLineLength:ThreadActivity.kt$ThreadActivity$val isGif = sig == "GIF87a" || sig == "GIF89a" || extFromName == "gif" || explicitMime == "image/gif"</ID>
+    <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$(activity as? ThreadActivity)?.launchWalletRespondToPaymentRequest(req.raw, WALLET_REQUEST_ACTION_APPROVE)</ID>
+    <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$(activity as? ThreadActivity)?.launchWalletRespondToPaymentRequest(req.raw, WALLET_REQUEST_ACTION_DENY)</ID>
     <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$// not sure how we can get UnknownFormatConversionException here, so show the error and hope that someone reports it</ID>
     <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$mimetype.isImageMimeType() || mimetype.isVideoMimeType() -&gt; setupImageView(holder, binding = this, message, attachment)</ID>
     <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$mimetype.isVCardMimeType() -&gt; setupVCardView(holder, threadMessageAttachmentsHolder, message, attachment)</ID>
     <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$private</ID>
+    <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$threadMessagePay.rippleColor = android.content.res.ColorStateList.valueOf(contrast.adjustAlpha(0.2f))</ID>
+    <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$threadMessageRequestApprove.rippleColor = android.content.res.ColorStateList.valueOf(contrast.adjustAlpha(0.2f))</ID>
+    <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$threadMessageRequestDeny.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.TRANSPARENT)</ID>
+    <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$threadMessageRequestDeny.rippleColor = android.content.res.ColorStateList.valueOf(primary.adjustAlpha(0.2f))</ID>
+    <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$threadMessageRequestDeny.strokeColor = android.content.res.ColorStateList.valueOf(primary.adjustAlpha(0.55f))</ID>
+    <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$threadMessageWalletToggle.rippleColor = android.content.res.ColorStateList.valueOf(primary.adjustAlpha(0.2f))</ID>
+    <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$threadMessageWalletToggle.strokeColor = android.content.res.ColorStateList.valueOf(primary.adjustAlpha(0.55f))</ID>
     <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$threadSuccess.setImageResource(if (isDelivered) R.drawable.ic_check_double_vector else org.fossify.commons.R.drawable.ic_check_vector)</ID>
+    <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$token.startsWith("bcrt1", ignoreCase = true)</ID>
+    <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$token.startsWith("ln", ignoreCase = true) -&gt; activity.getString(R.string.wallet_card_lightning_invoice)</ID>
     <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$val</ID>
-    <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter.&lt;no name provided&gt;$override</ID>
-    <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter.&lt;no name provided&gt;$override fun onResourceReady(dr: Drawable, a: Any, t: Target&lt;Drawable&gt;, d: DataSource, i: Boolean)</ID>
+    <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$val isWalletMessage = payRequest != null || payResponse != null || payDenied != null || ecashToken != null || walletAction != null</ID>
     <ID>MaxLineLength:VCard.kt$Telephone::class.java</ID>
     <ID>MaxLineLength:VCard.kt$VCardPropertyWrapper.Companion$is Note -&gt; VCardPropertyWrapper(value, context.getString(org.fossify.commons.R.string.notes), property)</ID>
     <ID>MaxLineLength:VCard.kt$VCardPropertyWrapper.Companion$is Telephone -&gt; VCardPropertyWrapper(text.normalizePhoneNumber(), getPropertyTypeString(context), property)</ID>
     <ID>MaxLineLength:VCard.kt$VCardWrapper$data</ID>
     <ID>MaxLineLength:VCardViewerAdapter.kt$VCardViewerAdapter.VCardPropertyViewHolder$inner</ID>
+    <ID>MaxLineLength:WalletContactHelper.kt$WalletContactHelper$"${ContactsContract.Data.RAW_CONTACT_ID}=? AND ${ContactsContract.Data.MIMETYPE}=? AND ${ContactsContract.CommonDataKinds.Phone.TYPE}=? AND ${ContactsContract.CommonDataKinds.Phone.LABEL}=?"</ID>
+    <ID>MaxLineLength:WalletTokenParser.kt$WalletTokenParser$"(?i)(?:^|\\b)CPREQINV1:([A-Za-z0-9_\\-]{8,64}):([A-Za-z0-9._\\-]{1,120}):(\\d{1,18}):((?:lightning:)?ln(?:bc|tb|bcrt)[0-9a-z]+)(?:$|\\b)"</ID>
+    <ID>MaxLineLength:WalletTokenParser.kt$WalletTokenParser$private val fedimintEcashRegex = Regex("(?i)(?:^|\\b)CPFM1:([A-Za-z0-9._\\-]{1,120}):(\\d{1,18}):(\\d{1,18}):([A-Za-z0-9_\\-]+=*)(?:$|\\b)")</ID>
+    <ID>MayBeConst:RnsConstants.kt$RnsConstants$val HEADER_MAX_SIZE = 2 + 1 + (TRUNCATED_HASH_LENGTH_BITS / 8) * 2</ID>
+    <ID>MayBeConst:RnsConstants.kt$RnsConstants$val HEADER_MIN_SIZE = 2 + 1 + (TRUNCATED_HASH_LENGTH_BITS / 8)</ID>
+    <ID>NestedBlockDepth:Activity.kt$fun Activity.launchViewIntent(uri: Uri, mimetype: String, filename: String)</ID>
     <ID>NestedBlockDepth:AttachmentUtils.kt$AttachmentUtils$private fun readBody(parser: XmlPullParser): List&lt;String&gt;</ID>
     <ID>NestedBlockDepth:Context.kt$fun Context.getThreadParticipants( threadId: Long, contactsMap: HashMap&lt;Int, SimpleContact&gt;?, ): ArrayList&lt;SimpleContact&gt;</ID>
+    <ID>NestedBlockDepth:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$private fun createQrBitmap(content: String, size: Int): Bitmap?</ID>
+    <ID>NestedBlockDepth:MeshDiscoveryManager.kt$MeshDiscoveryManager$fun extractMeshAddress(text: String): String?</ID>
+    <ID>NestedBlockDepth:MessageCategorizer.kt$MessageCategorizer$fun isBlockedMessage( context: Context, address: String, body: String, isKnownContact: Boolean ): Boolean</ID>
     <ID>NestedBlockDepth:MessagesImporter.kt$MessagesImporter$private fun InputStream.importXml()</ID>
     <ID>NestedBlockDepth:MessagesWriter.kt$MessagesWriter$@SuppressLint("NewApi") private fun writeMmsPart(mmsPart: MmsPart, messageId: Long)</ID>
-    <ID>NestedBlockDepth:Messaging.kt$fun Context.sendMessageCompat( text: String, addresses: List&lt;String&gt;, subId: Int?, attachments: List&lt;Attachment&gt;, messageId: Long? = null )</ID>
+    <ID>NestedBlockDepth:Messaging.kt$@Suppress("DEPRECATION") fun Context.sendMessageCompat( text: String, addresses: List&lt;String&gt;, subId: Int?, attachments: List&lt;Attachment&gt;, messageId: Long? = null )</ID>
     <ID>NestedBlockDepth:MessagingUtils.kt$MessagingUtils$@Deprecated("TODO: Move/rewrite MMS code into the app.") fun sendMmsMessage( text: String, addresses: List&lt;String&gt;, attachment: Attachment?, settings: Settings, messageId: Long? = null )</ID>
     <ID>NestedBlockDepth:MessagingUtils.kt$MessagingUtils$fun updateSmsMessageSendingStatus(messageUri: Uri?, type: Int)</ID>
+    <ID>NestedBlockDepth:RnsNode.kt$RnsNode$private fun ensureLink(owner: RnsDestination, destination: RnsDestination): RnsLink?</ID>
+    <ID>NestedBlockDepth:RnsUdpInterface.kt$RnsUdpInterface$override fun start()</ID>
+    <ID>NestedBlockDepth:RnsUdpInterface.kt$RnsUdpInterface$override fun stop()</ID>
     <ID>NestedBlockDepth:SmsStatusDeliveredReceiver.kt$SmsStatusDeliveredReceiver$override fun updateAndroidDatabase(context: Context, intent: Intent, receiverResultCode: Int)</ID>
     <ID>NestedBlockDepth:ThreadActivity.kt$ThreadActivity$private fun setupButtons()</ID>
     <ID>NestedBlockDepth:ThreadAdapter.kt$ThreadAdapter$private fun setupSentMessageView(messageBinding: ItemMessageBinding, message: Message)</ID>
@@ -154,12 +403,37 @@
     <ID>PrintStackTrace:Context.kt$e</ID>
     <ID>PrintStackTrace:ScheduledMessageReceiver.kt$ScheduledMessageReceiver$e</ID>
     <ID>PrintStackTrace:SmsManager.kt$e</ID>
+    <ID>ReturnCount:CyberIdentityQr.kt$CyberIdentityQr$private fun extractLightningDestination(text: String): String?</ID>
+    <ID>ReturnCount:E2eManager.kt$E2eManager$fun getDisplayResult( context: Context, threadId: Long, text: String, messageDateSeconds: Long? ): DisplayResult</ID>
+    <ID>ReturnCount:LxmfRouter.kt$LxmfRouter$fun requestMessagesFromPropagationNode( maxMessages: Int = 0, retryOnFailure: Boolean = true ): Boolean</ID>
+    <ID>ReturnCount:LxmfRouter.kt$LxmfRouter$fun sendText( destinationHash: ByteArray, text: String, fields: Map&lt;Int, Any?&gt; = emptyMap(), onDelivered: (() -&gt; Unit)? = null ): Boolean</ID>
+    <ID>ReturnCount:LxmfRouter.kt$LxmfRouter$private fun parsePropagationAnnounceData(appData: ByteArray): PropagationAnnounceData?</ID>
+    <ID>ReturnCount:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$private fun isPreferredLightningDestination(value: String): Boolean</ID>
+    <ID>ReturnCount:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$private fun resolveLiquidityProviderName(directoryJson: String, providerId: String): String?</ID>
     <ID>ReturnCount:MapDeserializerDoubleAsIntFix.kt$MapDeserializerDoubleAsIntFix$fun read(element: JsonElement): Any?</ID>
+    <ID>ReturnCount:MeshCallRouter.kt$MeshCallRouter$private fun performProbe( context: Context, remoteDeliveryHash: ByteArray, preferredQuality: MeshCallQuality, timeoutMs: Long ): ProbeResult</ID>
+    <ID>ReturnCount:MeshDiscoveryManager.kt$MeshDiscoveryManager$fun extractMeshAddress(text: String): String?</ID>
+    <ID>ReturnCount:MeshService.kt$MeshService$private fun startBle()</ID>
+    <ID>ReturnCount:MessageCategorizer.kt$MessageCategorizer$fun isBlockedMessage( context: Context, address: String, body: String, isKnownContact: Boolean ): Boolean</ID>
+    <ID>ReturnCount:RnsLinkResourceManager.kt$RnsLinkResourceManager$fun handlePart(payload: ByteArray, link: RnsLink, send: (Int, Int, ByteArray) -&gt; Unit)</ID>
+    <ID>ReturnCount:RnsLinkResourceManager.kt$RnsLinkResourceManager$private fun assemble(resource: IncomingResource, link: RnsLink): AssembledResource?</ID>
+    <ID>ReturnCount:RnsLinkResourceManager.kt$RnsLinkResourceManager$private fun parseAdvertisement(payload: ByteArray): AdvertisementData?</ID>
+    <ID>ReturnCount:RnsNode.kt$RnsNode$private fun handleIncoming(raw: ByteArray, iface: RnsInterface)</ID>
+    <ID>ReturnCount:RnsNode.kt$RnsNode$private fun handleLinkPacket(packet: RnsPacket, iface: RnsInterface)</ID>
+    <ID>ReturnCount:ThreadActivity.kt$ThreadActivity$private fun sendMeshMessageToAddress( destination: String, text: String, allowFallback: Boolean, fallbackNumber: String? = null ): Boolean</ID>
+    <ID>ReturnCount:ThreadActivity.kt$ThreadActivity$private fun sendMessage()</ID>
+    <ID>ReturnCount:ThreadAdapter.kt$ThreadAdapter$private fun maybeAutoHandleWalletProtocolMessage(message: Message)</ID>
+    <ID>ReturnCount:WalletContactHelper.kt$WalletContactHelper$private fun looksLikeLightningDestination(value: String): Boolean</ID>
+    <ID>ReturnCount:WalletTokenParser.kt$WalletTokenParser$fun findActionToken(text: String): WalletActionToken?</ID>
+    <ID>ReturnCount:WalletTokenParser.kt$WalletTokenParser$fun findPayToken(text: String): String?</ID>
+    <ID>ReturnCount:WalletTokenParser.kt$WalletTokenParser$fun parseFedimintEcashToken(text: String): FedimintEcashToken?</ID>
+    <ID>ReturnCount:WalletTokenParser.kt$WalletTokenParser$fun parseFedimintPaymentDeniedResponse(text: String): FedimintPaymentDeniedResponse?</ID>
+    <ID>ReturnCount:WalletTokenParser.kt$WalletTokenParser$fun parseFedimintPaymentInvoiceResponse(text: String): FedimintPaymentInvoiceResponse?</ID>
+    <ID>ReturnCount:WalletTokenParser.kt$WalletTokenParser$fun parseFedimintPaymentRequest(text: String): FedimintPaymentRequest?</ID>
     <ID>SpreadOperator:Context.kt$(*scheduledMessages)</ID>
     <ID>SpreadOperator:MainActivity.kt$MainActivity$(*currentMessages.toTypedArray())</ID>
     <ID>SpreadOperator:ThreadActivity.kt$ThreadActivity$(*currentMessages.toTypedArray())</ID>
     <ID>SwallowedException:ArchivedConversationsActivity.kt$ArchivedConversationsActivity$e: Exception</ID>
-    <ID>SwallowedException:AttachmentPreviews.kt$e: Exception</ID>
     <ID>SwallowedException:BlockedKeywordsExporter.kt$BlockedKeywordsExporter$e: Exception</ID>
     <ID>SwallowedException:ImageCompressor.kt$ImageCompressor$e: Exception</ID>
     <ID>SwallowedException:JsonElement.kt$e: Exception</ID>
@@ -179,7 +453,6 @@
     <ID>ThrowsCount:SmsSender.kt$SmsSender$fun sendMessage( subId: Int, destination: String, body: String, serviceCenter: String?, requireDeliveryReport: Boolean, messageUri: Uri )</ID>
     <ID>TooGenericExceptionCaught:Activity.kt$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ArchivedConversationsActivity.kt$ArchivedConversationsActivity$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:AttachmentPreviews.kt$e: Exception</ID>
     <ID>TooGenericExceptionCaught:BlockedKeywordsExporter.kt$BlockedKeywordsExporter$e: Exception</ID>
     <ID>TooGenericExceptionCaught:BlockedKeywordsImporter.kt$BlockedKeywordsImporter$e: Exception</ID>
     <ID>TooGenericExceptionCaught:Context.kt$e: Exception</ID>
@@ -188,6 +461,11 @@
     <ID>TooGenericExceptionCaught:ImageCompressor.kt$ImageCompressor$e: Exception</ID>
     <ID>TooGenericExceptionCaught:JsonElement.kt$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ManageBlockedKeywordsActivity.kt$ManageBlockedKeywordsActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MeshManager.kt$MeshManager$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MeshQrScanActivity.kt$MeshQrScanActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MeshService.kt$MeshService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MeshWifiDirectController.kt$MeshWifiDirectController$e: Exception</ID>
     <ID>TooGenericExceptionCaught:MessagesImporter.kt$MessagesImporter$e: Exception</ID>
     <ID>TooGenericExceptionCaught:MessagesImporter.kt$MessagesImporter$e: Throwable</ID>
     <ID>TooGenericExceptionCaught:MessagesWriter.kt$MessagesWriter$e: Exception</ID>
@@ -209,26 +487,67 @@
     <ID>TooGenericExceptionCaught:VCardParser.kt$e: Exception</ID>
     <ID>TooManyFunctions:ArchivedConversationsActivity.kt$ArchivedConversationsActivity : SimpleActivity</ID>
     <ID>TooManyFunctions:BaseConversationsAdapter.kt$BaseConversationsAdapter : MyRecyclerViewListAdapterOnPopupTextUpdate</ID>
+    <ID>TooManyFunctions:Config.kt$Config : BaseConfig</ID>
     <ID>TooManyFunctions:ContactsAdapter.kt$ContactsAdapter : MyRecyclerViewAdapter</ID>
     <ID>TooManyFunctions:Context.kt$org.fossify.messages.extensions.Context.kt</ID>
     <ID>TooManyFunctions:ConversationsAdapter.kt$ConversationsAdapter : BaseConversationsAdapter</ID>
     <ID>TooManyFunctions:ConversationsDao.kt$ConversationsDao</ID>
+    <ID>TooManyFunctions:E2eManager.kt$E2eManager</ID>
     <ID>TooManyFunctions:JsonObject.kt$org.fossify.messages.extensions.gson.JsonObject.kt</ID>
+    <ID>TooManyFunctions:LxmfRouter.kt$LxmfRouter</ID>
+    <ID>TooManyFunctions:LxmfStore.kt$LxmfStore</ID>
     <ID>TooManyFunctions:MainActivity.kt$MainActivity : SimpleActivity</ID>
     <ID>TooManyFunctions:ManageBlockedKeywordsActivity.kt$ManageBlockedKeywordsActivity : SimpleActivityRefreshRecyclerViewListener</ID>
     <ID>TooManyFunctions:ManageBlockedKeywordsAdapter.kt$ManageBlockedKeywordsAdapter : MyRecyclerViewAdapter</ID>
+    <ID>TooManyFunctions:ManageE2eKeysActivity.kt$ManageE2eKeysActivity : SimpleActivity</ID>
+    <ID>TooManyFunctions:MeshBleController.kt$MeshBleController</ID>
+    <ID>TooManyFunctions:MeshCallRouter.kt$MeshCallRouter</ID>
+    <ID>TooManyFunctions:MeshContactHelper.kt$MeshContactHelper</ID>
+    <ID>TooManyFunctions:MeshDiscoveryManager.kt$MeshDiscoveryManager</ID>
+    <ID>TooManyFunctions:MeshService.kt$MeshService : Service</ID>
+    <ID>TooManyFunctions:MessageCategorizer.kt$MessageCategorizer</ID>
     <ID>TooManyFunctions:MessagesDao.kt$MessagesDao</ID>
     <ID>TooManyFunctions:MessagesWriter.kt$MessagesWriter</ID>
     <ID>TooManyFunctions:RecycleBinConversationsActivity.kt$RecycleBinConversationsActivity : SimpleActivity</ID>
+    <ID>TooManyFunctions:RnsLink.kt$RnsLink</ID>
+    <ID>TooManyFunctions:RnsLinkResourceManager.kt$RnsLinkResourceManager</ID>
+    <ID>TooManyFunctions:RnsNode.kt$RnsNode</ID>
+    <ID>TooManyFunctions:RnsUdpInterface.kt$RnsUdpInterface : RnsInterface</ID>
     <ID>TooManyFunctions:SearchResultsAdapter.kt$SearchResultsAdapter : MyRecyclerViewAdapter</ID>
     <ID>TooManyFunctions:SettingsActivity.kt$SettingsActivity : SimpleActivity</ID>
     <ID>TooManyFunctions:ShortcutHelper.kt$ShortcutHelper</ID>
     <ID>TooManyFunctions:ThreadActivity.kt$ThreadActivity : SimpleActivity</ID>
     <ID>TooManyFunctions:ThreadAdapter.kt$ThreadAdapter : MyRecyclerViewListAdapter</ID>
+    <ID>TooManyFunctions:WalletContactHelper.kt$WalletContactHelper</ID>
+    <ID>TooManyFunctions:WalletPaymentRequestStateManager.kt$WalletPaymentRequestStateManager</ID>
+    <ID>TooManyFunctions:WalletTokenParser.kt$WalletTokenParser</ID>
+    <ID>UnusedParameter:LxmfRouter.kt$LxmfRouter$linkId: ByteArray</ID>
+    <ID>UnusedParameter:LxmfRouter.kt$LxmfRouter$pathHash: ByteArray</ID>
+    <ID>UnusedParameter:LxmfRouter.kt$LxmfRouter$requestedAt: Double</ID>
+    <ID>UnusedParameter:MeshCallRouter.kt$MeshCallRouter$context: Context</ID>
+    <ID>UnusedParameter:RnsLinkResourceManager.kt$RnsLinkResourceManager$link: RnsLink</ID>
+    <ID>UnusedParameter:RnsNode.kt$RnsNode$context: Context</ID>
+    <ID>UnusedParameter:RnsNode.kt$RnsNode$packet: RnsPacket</ID>
+    <ID>UnusedParameter:RnsNode.kt$RnsNode$requestedIndices: List&lt;Int&gt;?</ID>
+    <ID>UnusedParameter:WalletTokenParser.kt$WalletTokenParser$federationName: String? = null</ID>
+    <ID>UnusedPrivateMember:ManageE2eKeysActivity.kt$ManageE2eKeysActivity$private fun getLocalWalletLastInvoice(): String?</ID>
+    <ID>UnusedPrivateMember:RnsNode.kt$RnsNode$private fun buildChunks(resource: RnsResource): List&lt;RnsResourceChunk&gt;</ID>
+    <ID>UnusedPrivateMember:RnsNode.kt$RnsNode$private fun handleResourceAdvertisementPayload(payload: ByteArray)</ID>
+    <ID>UnusedPrivateProperty:LxmfMessage.kt$LxmfMessage.Companion$i</ID>
+    <ID>UnusedPrivateProperty:LxmfRouter.kt$LxmfRouter$private const val ERROR_INVALID_STAMP = 0xF5</ID>
+    <ID>UnusedPrivateProperty:LxmfRouter.kt$LxmfRouter$private const val ERROR_THROTTLED = 0xF6</ID>
+    <ID>UnusedPrivateProperty:LxmfRouter.kt$LxmfRouter$val legacyValue = unpacker.unpackValue()</ID>
+    <ID>UnusedPrivateProperty:MeshWifiAwareController.kt$MeshWifiAwareController.Companion$private const val TAG = "MeshWifiAware"</ID>
+    <ID>UnusedPrivateProperty:RnsLink.kt$RnsLink.Companion$private const val SIG_PUB_SIZE = 32</ID>
+    <ID>UnusedPrivateProperty:WalletTokenParser.kt$WalletTokenParser$// Lightweight federation sidecar hint for plain invoice messages. // CPFED1:&lt;federationId&gt; private const val FEDERATION_HINT_PREFIX = "CPFED1:"</ID>
     <ID>UseCheckOrError:AttachmentUtils.kt$AttachmentUtils$throw IllegalStateException()</ID>
+    <ID>UseCheckOrError:LxmfRouter.kt$LxmfRouter$throw IllegalStateException("Resource link send failed")</ID>
     <ID>UseCheckOrError:MessagesImporter.kt$MessagesImporter$throw IllegalStateException()</ID>
+    <ID>UseRequire:RnsLink.kt$RnsLink.Companion$throw IllegalArgumentException("Unsupported link mode $mode")</ID>
+    <ID>UseRequire:RnsPacket.kt$RnsPacket$throw IllegalArgumentException("Packet size ${raw.size} exceeds MTU ${RnsConstants.MTU}")</ID>
+    <ID>UseRequire:RnsToken.kt$RnsToken$throw IllegalArgumentException("Token HMAC was invalid")</ID>
+    <ID>UseRequire:RnsToken.kt$RnsToken$throw IllegalArgumentException("Token too short for HMAC verification")</ID>
     <ID>UseRequire:SmsSender.kt$SmsSender$throw IllegalArgumentException("SmsSender: empty text message")</ID>
-    <ID>VariableNaming:MainActivity.kt$MainActivity$private val MAKE_DEFAULT_APP_REQUEST = 1</ID>
     <ID>VariableNaming:MessagesWriter.kt$MessagesWriter$private val INVALID_ID = -1L</ID>
     <ID>WildcardImport:AttachmentPreviews.kt$import org.fossify.commons.extensions.*</ID>
     <ID>WildcardImport:AttachmentPreviews.kt$import org.fossify.messages.extensions.*</ID>
