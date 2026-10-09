@@ -1198,6 +1198,7 @@ fun Context.deleteMessage(id: Long, isMMS: Boolean) {
 fun Context.deleteScheduledMessage(messageId: Long) {
     try {
         messagesDB.delete(messageId)
+        org.fossify.messages.helpers.ScheduledSendTracker.forContext(this).forget(messageId)
     } catch (e: Exception) {
         showErrorToast(e)
     }
@@ -1588,13 +1589,9 @@ fun Context.updateScheduledMessagesThreadId(messages: List<Message>, newThreadId
 
 fun Context.clearExpiredScheduledMessages(threadId: Long, messagesToDelete: List<Message>? = null) {
     val messages = messagesToDelete ?: messagesDB.getScheduledThreadMessages(threadId)
-    val now = System.currentTimeMillis() + 500L
-
+    // An overdue message may have failed to send. Only the send completion may delete it.
     try {
-        messages.filter { it.isScheduled && it.millis() < now }.forEach { msg ->
-            messagesDB.delete(msg.id)
-        }
-        if (messages.filterNot { it.isScheduled && it.millis() < now }.isEmpty()) {
+        if (messages.none { it.isScheduled }) {
             // delete empty temporary thread
             val conversation = conversationsDB.getConversationWithThreadId(threadId)
             if (conversation != null && conversation.isScheduled) {

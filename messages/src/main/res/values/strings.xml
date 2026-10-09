@@ -164,6 +164,8 @@
     <string name="e2e_encryption_enabled">Encryption enabled for this conversation.</string>
     <string name="e2e_encryption_disabled">Encryption disabled for this conversation.</string>
     <string name="e2e_no_shared_key">No shared key available for this conversation.</string>
+    <string name="e2e_keys_unavailable">Encrypted keys are unavailable. Try again or restore your key backup.</string>
+    <string name="e2e_send_failed">Message kept as a draft because encryption is unavailable.</string>
     <string name="e2e_backup_successful">Key backup saved.</string>
     <string name="e2e_keys_regenerated">Keys regenerated.</string>
     <string name="e2e_import_keys">Import keys from file</string>

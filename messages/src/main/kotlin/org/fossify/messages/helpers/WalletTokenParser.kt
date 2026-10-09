@@ -440,7 +440,7 @@ object WalletTokenParser {
 
     private fun decodePercentEncoded(value: String): String {
         val trimmed = value.trim()
-        return runCatching { URLDecoder.decode(trimmed, StandardCharsets.UTF_8) }
+        return runCatching { URLDecoder.decode(trimmed, StandardCharsets.UTF_8.name()) }
             .getOrDefault(trimmed)
     }
 }

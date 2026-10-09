@@ -706,8 +706,8 @@ object RnsNode {
     ): RnsRequestReceipt? {
         val link = ensureLink(owner, destination) ?: return null
         maybeIdentifyActiveInitiatorLink(link)
-        return link.request(path, data, { linkInstance, packetType, context, payload ->
-            sendLinkPacket(linkInstance, packetType, context, payload, null)
+        return link.request(path, data, { linkInstance, packetType, context, payload, beforeSend ->
+            sendLinkPacket(linkInstance, packetType, context, payload, null, beforeSend)
         }, onResponse, onFailure, { payload, requestId, isResponse ->
             sendLinkResource(link, payload, requestId, isResponse = isResponse, isRequest = !isResponse)
         })
@@ -1586,7 +1586,8 @@ object RnsNode {
         packetType: Int,
         context: Int,
         payload: ByteArray,
-        interfaceName: String?
+        interfaceName: String?,
+        beforeSend: ((ByteArray) -> Unit)? = null,
     ): ByteArray? {
         val encrypted = link.encryptForPacket(packetType, context, payload) ?: return null
         val packet = RnsPacket(
@@ -1596,6 +1597,7 @@ object RnsNode {
             context = context
         )
         val raw = packet.pack()
+        beforeSend?.invoke(raw)
         val iface = interfaceName?.let { name -> interfaces.firstOrNull { it.name == name } }
         if (iface != null) {
             iface.send(raw)

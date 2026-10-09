@@ -9,7 +9,11 @@ plugins {
 }
 
 android {
-    compileSdk = project.libs.versions.app.build.compileSDKVersion.get().toInt()
+    compileSdk {
+        version = release(project.libs.versions.app.build.compileSDKVersion.get().toInt()) {
+            minorApiLevel = project.libs.versions.app.build.compileSDKMinorVersion.get().toInt()
+        }
+    }
 
     defaultConfig {
         minSdk = project.libs.versions.app.build.minimumSDK.get().toInt()
@@ -68,6 +72,7 @@ detekt {
 }
 
 dependencies {
+    implementation(libs.androidx.appcompat)
     implementation(libs.fossify.commons)
     implementation(libs.eventbus)
     implementation(libs.indicator.fast.scroll)
@@ -89,4 +94,5 @@ dependencies {
     implementation(libs.mediapipe.tasks.text)
     detektPlugins(libs.compose.detekt)
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
 }

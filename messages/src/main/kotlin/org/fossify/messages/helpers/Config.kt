@@ -221,6 +221,10 @@ class Config(context: Context) : BaseConfig(context) {
         get() = SensitivePrefs.getString(prefs, E2E_PUBLIC_KEY)
         set(value) = SensitivePrefs.putString(prefs, E2E_PUBLIC_KEY, value)
 
+    fun saveE2eKeyPair(publicKey: String, privateKey: String) {
+        SensitivePrefs.putStrings(prefs, mapOf(E2E_PUBLIC_KEY to publicKey, E2E_PRIVATE_KEY to privateKey))
+    }
+
     var e2ePrivateKey: String
         get() = SensitivePrefs.getString(prefs, E2E_PRIVATE_KEY)
         set(value) = SensitivePrefs.putString(prefs, E2E_PRIVATE_KEY, value)

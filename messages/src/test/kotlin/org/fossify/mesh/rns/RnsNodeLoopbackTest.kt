@@ -42,7 +42,6 @@ class RnsNodeLoopbackTest {
         RnsNode.registerDestination(localDestination, { _, _ -> })
 
         val remoteLinkRef = AtomicReference<RnsLink?>(null)
-        lateinit var loopbackInterface: RnsInterface
         val loopback = object : RnsInterface {
             override val name: String = "loopback"
 
@@ -82,9 +81,8 @@ class RnsNodeLoopbackTest {
                                         packetType = packetType,
                                         context = context
                                     )
-                                    kotlin.concurrent.thread(start = true, name = "rns-loopback-response") {
-                                        RnsNode.handleIncomingFromInterface(responsePacket.pack(), loopbackInterface)
-                                    }
+                                    // Reply synchronously so a receipt registered after send always loses the response.
+                                    RnsNode.handleIncomingFromInterface(responsePacket.pack(), this)
                                 }
                             )
                         }
@@ -93,7 +91,6 @@ class RnsNodeLoopbackTest {
             }
         }
 
-        loopbackInterface = loopback
         RnsNode.addInterface(loopback)
 
         val responseRef = AtomicReference<Any?>(null)

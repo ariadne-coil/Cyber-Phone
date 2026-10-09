@@ -163,15 +163,19 @@ class MessagingUtils(val context: Context) {
         addresses: List<String>,
         attachment: Attachment?,
         settings: Settings,
-        messageId: Long? = null
-    ) {
+        messageId: Long? = null,
+        scheduledMessageId: Long? = null,
+        scheduledAttempt: String? = null,
+        scheduledPart: Int = 0,
+    ): Boolean {
         val transaction = Transaction(context, settings)
         val message = Message(text, addresses.toTypedArray())
 
         if (attachment != null) {
             try {
                 val uri = attachment.getUri()
-                context.contentResolver.openInputStream(uri)?.use {
+                val input = context.contentResolver.openInputStream(uri) ?: return false
+                input.use {
                     val bytes = it.readBytes()
                     val mimeType = if (attachment.mimetype.isPlainTextMimeType()) {
                         "application/txt"
@@ -183,19 +187,26 @@ class MessagingUtils(val context: Context) {
                 }
             } catch (e: Exception) {
                 context.showErrorToast(e)
+                return false
             } catch (e: Error) {
                 context.showErrorToast(e.localizedMessage ?: context.getString(org.fossify.commons.R.string.unknown_error_occurred))
+                return false
             }
         }
 
         val mmsSentIntent = Intent(context, MmsSentReceiver::class.java)
         mmsSentIntent.putExtra(MmsSentReceiver.EXTRA_ORIGINAL_RESENT_MESSAGE_ID, messageId)
+        scheduledMessageId?.let { mmsSentIntent.putExtra(MmsSentReceiver.EXTRA_SCHEDULED_MESSAGE_ID, it) }
+        mmsSentIntent.putExtra(MmsSentReceiver.EXTRA_SCHEDULED_ATTEMPT, scheduledAttempt)
+        mmsSentIntent.putExtra(MmsSentReceiver.EXTRA_SCHEDULED_PART, scheduledPart)
         transaction.setExplicitBroadcastForSentMms(mmsSentIntent)
 
         try {
             transaction.sendNewMessage(message)
+            return true
         } catch (e: Exception) {
             context.showErrorToast(e)
+            return false
         }
     }
 

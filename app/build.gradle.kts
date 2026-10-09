@@ -123,7 +123,11 @@ val generateFedimintWebRuntime by tasks.registering(Exec::class) {
 }
 
 android {
-    compileSdk = project.libs.versions.app.build.compileSDKVersion.get().toInt()
+    compileSdk {
+        version = release(project.libs.versions.app.build.compileSDKVersion.get().toInt()) {
+            minorApiLevel = project.libs.versions.app.build.compileSDKMinorVersion.get().toInt()
+        }
+    }
 
     defaultConfig {
         applicationId = project.property("APP_ID").toString()
@@ -246,6 +250,7 @@ detekt {
 }
 
 dependencies {
+    implementation(libs.androidx.appcompat)
     implementation(libs.fossify.commons)
     implementation(libs.indicator.fast.scroll)
     implementation(libs.autofit.text.view)
@@ -276,7 +281,22 @@ tasks.register("testClasses") {
     dependsOn("testDebugUnitTest")
 }
 
-tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
+val testFedimintBridge by tasks.registering(Exec::class) {
+    group = "verification"
+    description = "Tests the bundled Fedimint JavaScript bridge and pinned RPC contract."
+    workingDir(rootProject.projectDir)
+    commandLine("node", "--test", rootProject.file("scripts/test-fedimint-bridge.mjs").absolutePath)
+}
+
+tasks.matching { it.name.startsWith("test") && it.name.endsWith("UnitTest") }.configureEach {
+    dependsOn(testFedimintBridge)
+}
+
+tasks.matching {
+    (it.name.startsWith("merge") && it.name.endsWith("Assets")) ||
+            (it.name.startsWith("generate") && it.name.endsWith("LintReportModel")) ||
+            it.name.startsWith("lintAnalyze")
+}.configureEach {
     dependsOn(generateFedimintWebRuntime)
 }
 

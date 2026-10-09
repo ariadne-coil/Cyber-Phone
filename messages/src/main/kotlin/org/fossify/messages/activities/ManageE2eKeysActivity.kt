@@ -287,9 +287,12 @@ class ManageE2eKeysActivity : SimpleActivity() {
         }
         binding.manageE2eKeysRegenerateHolder.setOnClickListener {
             ConfirmationDialog(this, getString(R.string.e2e_regenerate_confirmation)) {
-                E2eManager.regenerateKeyPair(this)
-                refreshProfile()
-                toast(R.string.e2e_keys_regenerated)
+                if (E2eManager.regenerateKeyPair(this)) {
+                    refreshProfile()
+                    toast(R.string.e2e_keys_regenerated)
+                } else {
+                    toast(R.string.e2e_keys_unavailable)
+                }
             }
         }
     }

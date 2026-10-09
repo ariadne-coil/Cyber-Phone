@@ -211,6 +211,7 @@ import org.fossify.messages.messaging.isLongMmsMessage
 import org.fossify.messages.messaging.isShortCodeWithLetters
 import org.fossify.messages.messaging.scheduleMessage
 import org.fossify.messages.messaging.sendMessageCompat
+import org.fossify.messages.messaging.MessageSendResult
 import org.fossify.messages.models.Attachment
 import org.fossify.messages.models.AttachmentSelection
 import org.fossify.messages.models.Conversation
@@ -290,7 +291,7 @@ class ThreadActivity : SimpleActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
-        E2eManager.ensureKeyPair(this)
+        if (!E2eManager.ensureKeyPair(this)) toast(R.string.e2e_keys_unavailable)
         setupOptionsMenu()
         refreshMenuItems()
         setupEdgeToEdge(
@@ -597,10 +598,15 @@ class ThreadActivity : SimpleActivity() {
 
         val subscriptionId = availableSIMCards.getOrNull(currentSIMCardIndex)?.subscriptionId
             ?: SmsManager.getDefaultSmsSubscriptionId()
-        val message = E2eManager.buildKeyExchangeMessage(this)
-        E2eManager.markKeySent(this, threadId)
-        sendMessageCompat(message, listOf(address), subscriptionId, emptyList())
-        toast(R.string.e2e_key_exchange_sent)
+        val message = runCatching { E2eManager.buildKeyExchangeMessage(this) }.getOrNull()
+        if (message == null) {
+            toast(R.string.e2e_keys_unavailable)
+            return
+        }
+        if (sendMessageCompat(message, listOf(address), subscriptionId, emptyList()) != MessageSendResult.FAILED) {
+            E2eManager.markKeySent(this, threadId)
+            toast(R.string.e2e_key_exchange_sent)
+        }
     }
 
     private fun sendMeshAddressExchange() {
@@ -799,12 +805,18 @@ class ThreadActivity : SimpleActivity() {
         val currentKey = E2eManager.getContactPublicKey(this, contact)
         EditContactKeyDialog(this, currentKey) { newKey ->
             if (newKey.isNullOrBlank()) {
+                if (!E2eManager.clearSharedSecret(this, threadId)) {
+                    toast(R.string.e2e_keys_unavailable)
+                    return@EditContactKeyDialog
+                }
                 E2eManager.removeContactPublicKey(this, contact)
-                E2eManager.clearSharedSecret(this, threadId)
                 E2eManager.setThreadEncrypted(this, threadId, false)
             } else {
                 E2eManager.storeContactPublicKey(this, contact, newKey)
-                E2eManager.ensureSharedSecretFromContact(this, threadId, contact)
+                if (!E2eManager.ensureSharedSecretFromContact(this, threadId, contact)) {
+                    toast(R.string.e2e_keys_unavailable)
+                    return@EditContactKeyDialog
+                }
                 E2eManager.setThreadEncrypted(this, threadId, true)
             }
             refreshMenuItems()
@@ -817,7 +829,7 @@ class ThreadActivity : SimpleActivity() {
         if (requestCode == WALLET_SEND_TOKEN_INTENT || requestCode == WALLET_RESPOND_REQUEST_INTENT) {
             val token = resultData?.getStringExtra(EXTRA_WALLET_TOKEN_TEXT)?.trim().orEmpty()
             if (token.isNotBlank()) {
-                sendWalletProtocolToken(token)
+                sendWalletProtocolToken(token, resultData?.getBooleanExtra(EXTRA_WALLET_SECURE_CHANNEL, false) == true)
             } else {
                 showErrorToast(getString(org.fossify.commons.R.string.unknown_error_occurred))
             }
@@ -843,16 +855,22 @@ class ThreadActivity : SimpleActivity() {
         }
     }
 
-    private fun sendWalletProtocolToken(token: String) {
+    private fun sendWalletProtocolToken(token: String, requireSecureChannel: Boolean = false) {
         val cleanToken = token.trim()
         if (cleanToken.isBlank()) {
             showErrorToast(getString(org.fossify.commons.R.string.unknown_error_occurred))
             return
         }
 
-        // Wallet protocol replies should be sent as plain text only.
+        // Keep the token available as a draft until the send pipeline accepts it.
         getAttachmentsAdapter()?.clear()
-        binding.messageHolder.threadTypeMessage.setText("")
+        binding.messageHolder.threadTypeMessage.setText(cleanToken)
+        if (requireSecureChannel && !isMeshThread() &&
+            !(E2eManager.isThreadEncrypted(this, threadId) && E2eManager.hasSharedSecret(this, threadId))) {
+            saveDraftMessage()
+            toast(R.string.e2e_send_failed)
+            return
+        }
 
         val addresses = participants.getAddresses()
         val meshDestination = addresses.firstOrNull { LxmfAddress.isMeshLike(it) }
@@ -2558,7 +2576,10 @@ class ThreadActivity : SimpleActivity() {
 
         try {
             refreshedSinceSent = false
-            sendMessageCompat(text, addresses, subscriptionId, attachments, messageToResend)
+            if (sendMessageCompat(text, addresses, subscriptionId, attachments, messageToResend) == MessageSendResult.FAILED) {
+                saveDraftMessage()
+                return
+            }
             ensureBackgroundThread {
                 val messages = getMessages(threadId, limit = maxOf(1, attachments.size))
                     .filterNotInByKey(messages) { it.getStableId() }

@@ -401,11 +401,11 @@ self.onmessage = async (event) => {
         requestId,
       })
     } else if (type === 'rpc') {
-      const { module, method, body } = payload
-      if (!rpcHandler || !currentClientName) {
+      const { module, method, body, clientName } = payload
+      if (!rpcHandler || !currentClientName || clientName !== currentClientName) {
         self.postMessage({
           type: 'error',
-          error: 'Fedimint client is not initialized',
+          error: 'Fedimint client is not initialized or does not match the requested federation',
           requestId,
         })
         return

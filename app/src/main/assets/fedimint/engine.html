@@ -313,6 +313,9 @@
           if (!w.isOpen()) {
             throw new Error("Wallet not open");
           }
+          if (!p.expectedClientName || p.expectedClientName !== currentClientName) {
+            throw new Error("Wallet federation does not match the requested client");
+          }
 
           if (method === "getBalanceMsats") {
             const bal = await w.balance.getBalance();
@@ -482,7 +485,7 @@
 
           if (method === "spendNotes") {
             const amountMsats = Number(p.amountMsats || 0);
-            const tryCancelAfterSecs = Number(p.tryCancelAfterSecs || 86400);
+            const tryCancelAfterSecs = p.tryCancelAfterSecs == null ? 86400 : Number(p.tryCancelAfterSecs);
             // NOTE: We intentionally do not include invite codes in notes by default.
             const includeInvite = !!p.includeInvite;
             const extraMeta = p.extraMeta || {};
@@ -493,7 +496,14 @@
               extraMeta
             );
 
-            // The SDK returns an operation id. We then subscribe until we receive the out-of-band notes.
+            // Pinned upstream returns the tuple (OperationId, OOBNotes).
+            if (Array.isArray(op)) {
+              if (op.length !== 2 || typeof op[0] !== "string" || typeof op[1] !== "string" || !op[1].trim()) {
+                throw new Error("Invalid spend_notes response");
+              }
+              return ok({ operation_id: op[0], notes: op[1].trim() });
+            }
+            // Tolerate older SDKs returning named fields or an operation id.
             const opId =
               typeof op === "string"
                 ? op
@@ -632,11 +642,12 @@
         }
       }
 
+      let requestQueue = Promise.resolve();
       globalThis.__cyber_fedimint = {
         request(json) {
           const req = JSON.parse(json);
-          // Fire-and-forget; results are returned via the bridge.
-          handle(req);
+          // Client switches must wait for the previous operation, including its asynchronous work.
+          requestQueue = requestQueue.then(() => handle(req)).catch(reportFatal);
         },
       };
 

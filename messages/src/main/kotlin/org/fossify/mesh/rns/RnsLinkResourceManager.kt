@@ -2,7 +2,6 @@ package org.fossify.mesh.rns
 
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream
 import org.msgpack.core.MessagePack
-import org.msgpack.value.Value
 import java.security.SecureRandom
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.floor
@@ -30,6 +29,10 @@ class RnsLinkResourceManager(
         private const val INCOMING_LIMIT = 32
         private const val SEGMENT_QUEUE_LIMIT = 8
         private const val INCOMING_SEGMENT_LIMIT = 8
+        private const val MAX_RESOURCE_SIZE = 16 * 1024 * 1024
+        private const val MAX_BUFFER_BYTES = 32L * 1024 * 1024
+        private const val MAX_TRANSFER_SIZE = MAX_EFFICIENT_SIZE + 256
+        private const val MAX_SEGMENTS = (MAX_RESOURCE_SIZE + MAX_EFFICIENT_SIZE - 1) / MAX_EFFICIENT_SIZE
 
         private fun hashmapMaxLen(link: RnsLink): Int {
             val max = floor((link.mdu - ADV_OVERHEAD).toDouble() / MAP_HASH_LEN.toDouble()).toInt()
@@ -106,6 +109,7 @@ class RnsLinkResourceManager(
         val hasMetadata: Boolean
     )
 
+    @Synchronized
     fun advertise(
         resourceData: ByteArray,
         link: RnsLink,
@@ -115,6 +119,8 @@ class RnsLinkResourceManager(
         send: (Int, Int, ByteArray) -> Unit
     ): Boolean {
         maybeTrim()
+        if (resourceData.size > MAX_RESOURCE_SIZE || bufferBytes() + resourceData.size.toLong() * 4 > MAX_BUFFER_BYTES) return false
+        if (outgoing.size >= OUTGOING_LIMIT) return false
         if (resourceData.size > MAX_EFFICIENT_SIZE) {
             return advertiseSegmented(resourceData, link, requestId, isResponse, isRequest, send)
         }
@@ -136,11 +142,14 @@ class RnsLinkResourceManager(
         return true
     }
 
+    @Synchronized
     fun handleAdvertisement(payload: ByteArray, link: RnsLink, send: (Int, Int, ByteArray) -> Unit) {
         maybeTrim()
-        val adv = parseAdvertisement(payload) ?: return
+        val adv = parseAdvertisement(payload, hashmapMaxLen(link) * MAP_HASH_LEN) ?: return
+        if (!validAdvertisement(adv, link)) return
         val key = RnsHex.encode(adv.hash)
         if (incoming.containsKey(key)) return
+        if (incoming.size >= INCOMING_LIMIT || bufferBytes() + adv.transferSize + adv.totalParts * 16L > MAX_BUFFER_BYTES) return
         val incomingResource = IncomingResource(
             link = link,
             hash = adv.hash,
@@ -166,11 +175,13 @@ class RnsLinkResourceManager(
         requestMissingParts(incomingResource, link, send)
     }
 
+    @Synchronized
     fun handleRequest(payload: ByteArray, link: RnsLink, send: (Int, Int, ByteArray) -> Unit) {
         maybeTrim()
         val request = parseRequest(payload) ?: return
         val key = RnsHex.encode(request.hash)
         val resource = outgoing[key] ?: return
+        if (resource.link !== link) return
         val mapHashList = resource.mapHashes
         request.requestedHashes.forEach { requested ->
             val index = mapHashList.indexOfFirst { it.contentEquals(requested) }
@@ -191,21 +202,29 @@ class RnsLinkResourceManager(
         }
     }
 
+    @Synchronized
     fun handlePart(payload: ByteArray, link: RnsLink, send: (Int, Int, ByteArray) -> Unit) {
         maybeTrim()
         val part = payload
-        val hash = findIncomingByPart(part) ?: return
+        val hash = findIncomingByPart(part, link) ?: return
         val resource = incoming[hash] ?: return
         val randomHash = resource.randomHash
         val partHash = mapHash(randomHash, part)
         val index = resource.hashmap.indexOfFirst { it?.contentEquals(partHash) == true }
         if (index < 0) return
+        val sdu = (link.mtu - RnsConstants.HEADER_MAX_SIZE - RnsConstants.IFAC_MIN_SIZE).coerceAtLeast(1)
+        val expectedSize = if (index == resource.totalParts - 1) resource.transferSize - index * sdu else sdu
+        if (part.size != expectedSize) return
         if (resource.parts[index] == null) {
             resource.parts[index] = part
             resource.receivedCount++
         }
         if (resource.receivedCount >= resource.totalParts) {
-            val assembled = assemble(resource, link) ?: return
+            val assembled = assemble(resource, link)
+            if (assembled == null) {
+                incoming.remove(hash)
+                return
+            }
             sendProof(resource.hash, assembled.proof, link, send)
             incoming.remove(hash)
             maybeTrim()
@@ -215,30 +234,33 @@ class RnsLinkResourceManager(
         requestMissingParts(resource, link, send)
     }
 
+    @Synchronized
     fun handleHmu(payload: ByteArray, link: RnsLink, send: (Int, Int, ByteArray) -> Unit) {
         maybeTrim()
         if (payload.size < HASH_LEN) return
         val hash = payload.copyOfRange(0, HASH_LEN)
         val key = RnsHex.encode(hash)
         val resource = incoming[key] ?: return
-        val unpacker = MessagePack.newDefaultUnpacker(payload.copyOfRange(HASH_LEN, payload.size))
-        val size = unpacker.unpackArrayHeader()
-        if (size < 2) {
-            unpacker.close()
-            return
-        }
-        val segment = unpacker.unpackInt()
-        val hashmapValue = unpacker.unpackValue()
-        unpacker.close()
-        val hashmapBytes = when {
-            hashmapValue.isBinaryValue -> hashmapValue.asBinaryValue().asByteArray()
-            else -> return
-        }
-        applyHashmapSegment(resource, segment, hashmapBytes)
+        if (resource.link !== link) return
+        val update = runCatching {
+            MessagePack.newDefaultUnpacker(payload.copyOfRange(HASH_LEN, payload.size)).use { unpacker ->
+                if (unpacker.unpackArrayHeader() != 2) return@runCatching null
+                val segment = unpacker.unpackInt()
+                val length = unpacker.unpackBinaryHeader()
+                if (length !in 0..resource.hashmapMaxLen * MAP_HASH_LEN || length > payload.size) return@runCatching null
+                val bytes = unpacker.readPayload(length)
+                segment to bytes
+            }
+        }.getOrNull() ?: return
+        val (segment, bytes) = update
+        if (segment < 0 || segment.toLong() * resource.hashmapMaxLen >= resource.totalParts ||
+            bytes.size % MAP_HASH_LEN != 0 || bytes.size > resource.hashmapMaxLen * MAP_HASH_LEN) return
+        applyHashmapSegment(resource, segment, bytes)
         resource.awaitingHashmap = false
         requestMissingParts(resource, link, send)
     }
 
+    @Synchronized
     fun handleProof(payload: ByteArray, link: RnsLink, send: (Int, Int, ByteArray) -> Unit) {
         maybeTrim()
         if (payload.size < HASH_LEN * 2) return
@@ -246,6 +268,7 @@ class RnsLinkResourceManager(
         val proof = payload.copyOfRange(HASH_LEN, HASH_LEN * 2)
         val key = RnsHex.encode(hash)
         val resource = outgoing[key] ?: return
+        if (resource.link !== link) return
         if (proof.contentEquals(resource.expectedProof)) {
             outgoing.remove(key)
             maybeTrim()
@@ -454,36 +477,51 @@ class RnsLinkResourceManager(
         return packer.toByteArray()
     }
 
-    private fun parseAdvertisement(payload: ByteArray): AdvertisementData? {
+    private fun parseAdvertisement(payload: ByteArray, maxHashmapBytes: Int): AdvertisementData? {
         return try {
             val unpacker = MessagePack.newDefaultUnpacker(payload)
             val mapSize = unpacker.unpackMapHeader()
-            val entries = HashMap<String, Value>(mapSize)
+            if (mapSize !in 5..16) { unpacker.close(); return null }
+            val entries = HashMap<String, Any?>(mapSize)
             repeat(mapSize) {
-                val key = unpacker.unpackString()
-                val value = unpacker.unpackValue()
+                // Do not let generic MessagePack decoding allocate from an untrusted binary/array header.
+                require(unpacker.unpackRawStringHeader() == 1)
+                val key = String(unpacker.readPayload(1), Charsets.UTF_8)
+                require(!entries.containsKey(key))
+                val value = when (key) {
+                    "t", "d", "n", "i", "l", "f" -> unpacker.unpackInt()
+                    "h", "o", "r", "m", "q" -> {
+                        if (key == "q" && unpacker.tryUnpackNil()) null else {
+                            val length = unpacker.unpackBinaryHeader()
+                            val limit = when (key) {
+                                "r" -> RANDOM_HASH_SIZE
+                                "q" -> RnsConstants.TRUNCATED_HASH_LENGTH_BITS / 8
+                                "m" -> maxHashmapBytes
+                                else -> HASH_LEN
+                            }
+                            require(length in 0..limit && length <= payload.size)
+                            unpacker.readPayload(length)
+                        }
+                    }
+                    else -> return null
+                }
                 entries[key] = value
             }
             unpacker.close()
 
-            val transferSize = entries["t"]?.asIntegerValue()?.toInt() ?: return null
-            val totalSize = entries["d"]?.asIntegerValue()?.toInt() ?: return null
-            val totalParts = entries["n"]?.asIntegerValue()?.toInt() ?: return null
-            val hash = entries["h"]?.asBinaryValue()?.asByteArray() ?: return null
-            val randomHash = entries["r"]?.asBinaryValue()?.asByteArray() ?: return null
-            val originalHash = entries["o"]?.asBinaryValue()?.asByteArray() ?: hash
-            val segmentIndex = entries["i"]?.asIntegerValue()?.toInt() ?: 1
-            val totalSegments = entries["l"]?.asIntegerValue()?.toInt() ?: 1
-            val flags = entries["f"]?.asIntegerValue()?.toInt() ?: 0
-            val requestValue = entries["q"]
-            val requestId = when {
-                requestValue == null || requestValue.isNilValue -> null
-                requestValue.isBinaryValue -> requestValue.asBinaryValue().asByteArray()
-                else -> null
-            }
+            val transferSize = entries["t"] as? Int ?: return null
+            val totalSize = entries["d"] as? Int ?: return null
+            val totalParts = entries["n"] as? Int ?: return null
+            val hash = entries["h"] as? ByteArray ?: return null
+            val randomHash = entries["r"] as? ByteArray ?: return null
+            val originalHash = entries["o"] as? ByteArray ?: hash
+            val segmentIndex = entries["i"] as? Int ?: 1
+            val totalSegments = entries["l"] as? Int ?: 1
+            val flags = entries["f"] as? Int ?: 0
+            val requestId = entries["q"] as? ByteArray
             val isRequest = flags and 0x08 == 0x08
             val isResponse = flags and 0x10 == 0x10
-            val hashmapSegment = entries["m"]?.asBinaryValue()?.asByteArray() ?: ByteArray(0)
+            val hashmapSegment = entries["m"] as? ByteArray ?: ByteArray(0)
             AdvertisementData(
                 transferSize = transferSize,
                 totalSize = totalSize,
@@ -503,6 +541,25 @@ class RnsLinkResourceManager(
             null
         }
     }
+
+    private fun validAdvertisement(adv: AdvertisementData, link: RnsLink): Boolean {
+        val sdu = (link.mtu - RnsConstants.HEADER_MAX_SIZE - RnsConstants.IFAC_MIN_SIZE).coerceAtLeast(1)
+        if (adv.transferSize !in 1..MAX_TRANSFER_SIZE || adv.totalSize !in 0..MAX_RESOURCE_SIZE) return false
+        if (adv.totalParts.toLong() != (adv.transferSize.toLong() + sdu - 1) / sdu) return false
+        if (adv.totalSegments !in 1..MAX_SEGMENTS || adv.segmentIndex !in 1..adv.totalSegments) return false
+        if (adv.split != (adv.totalSegments > 1) || (!adv.split && adv.totalSize > MAX_EFFICIENT_SIZE)) return false
+        if (adv.hash.size != HASH_LEN || adv.originalHash.size != HASH_LEN || adv.randomHash.size != RANDOM_HASH_SIZE) return false
+        if (adv.requestId != null && adv.requestId.size != RnsConstants.TRUNCATED_HASH_LENGTH_BITS / 8) return false
+        if (adv.flags and 0x3F != adv.flags || (adv.isRequest && adv.isResponse)) return false
+        if (adv.hashmapSegment.size % MAP_HASH_LEN != 0 || adv.hashmapSegment.size > hashmapMaxLen(link) * MAP_HASH_LEN) return false
+        return true
+    }
+
+    private fun bufferBytes(): Long =
+        incoming.values.sumOf { it.transferSize + it.totalParts * 16L } +
+            incomingSegments.values.sumOf { it.totalSize.toLong() } +
+            outgoing.values.sumOf { it.dataPlain.size.toLong() + it.encryptedData.size * 2L } +
+            segmentQueues.values.sumOf { it.totalSize.toLong() }
 
     private fun buildHashmapSegment(mapHashes: List<ByteArray>, segment: Int, maxLen: Int): ByteArray {
         val start = segment * maxLen
@@ -532,7 +589,6 @@ class RnsLinkResourceManager(
 
     private fun requestMissingParts(resource: IncomingResource, link: RnsLink, send: (Int, Int, ByteArray) -> Unit) {
         if (resource.awaitingHashmap) return
-        val maxLen = resource.hashmapMaxLen
         val knownHashes = resource.hashmap.filterNotNull()
         val missingHashes = ArrayList<ByteArray>()
         for (hash in knownHashes) {
@@ -545,8 +601,7 @@ class RnsLinkResourceManager(
 
         val needsMoreHashmap = resource.hashmap.any { it == null }
         val lastMapHash = if (needsMoreHashmap) {
-            val lastIndex = min(maxLen - 1, knownHashes.size - 1)
-            if (lastIndex >= 0) knownHashes[lastIndex] else null
+            knownHashes.lastOrNull()
         } else {
             null
         }
@@ -608,8 +663,9 @@ class RnsLinkResourceManager(
         )
     }
 
-    private fun findIncomingByPart(part: ByteArray): String? {
+    private fun findIncomingByPart(part: ByteArray, link: RnsLink): String? {
         for ((key, resource) in incoming.entries) {
+            if (resource.link !== link) continue
             val partHash = mapHash(resource.randomHash, part)
             if (resource.hashmap.any { it?.contentEquals(partHash) == true }) {
                 return key
@@ -621,7 +677,15 @@ class RnsLinkResourceManager(
     private data class AssembledResource(val data: ByteArray, val proof: ByteArray)
 
     private fun assemble(resource: IncomingResource, link: RnsLink): AssembledResource? {
-        val encryptedStream = resource.parts.filterNotNull().fold(ByteArray(0)) { acc, bytes -> acc + bytes }
+        val encryptedStream = ByteArray(resource.transferSize)
+        var offset = 0
+        for (part in resource.parts) {
+            val bytes = part ?: return null
+            if (bytes.size > encryptedStream.size - offset) return null
+            bytes.copyInto(encryptedStream, offset)
+            offset += bytes.size
+        }
+        if (offset != encryptedStream.size) return null
         val decrypted = if (resource.encrypted) {
             link.decryptStream(encryptedStream) ?: return null
         } else {
@@ -632,6 +696,8 @@ class RnsLinkResourceManager(
         if (resource.compressed) {
             data = decompressBzip2(data) ?: return null
         }
+        if (data.size > MAX_EFFICIENT_SIZE || data.size > resource.totalSize) return null
+        if (!resource.split && data.size != resource.totalSize) return null
         val calculated = RnsHash.sha256(data + resource.randomHash)
         if (!calculated.contentEquals(resource.hash)) return null
         val proof = RnsHash.sha256(data + resource.hash)
@@ -650,7 +716,9 @@ class RnsLinkResourceManager(
             return
         }
 
-        val key = RnsHex.encode(resource.originalHash)
+        val key = link.linkIdHex() + "/" + RnsHex.encode(resource.originalHash)
+        if (!incomingSegments.containsKey(key) && (incomingSegments.size >= INCOMING_SEGMENT_LIMIT ||
+                bufferBytes() + resource.totalSize > MAX_BUFFER_BYTES)) return
         val assembly = incomingSegments.getOrPut(key) {
             SegmentAssembly(
                 originalHash = resource.originalHash,
@@ -659,14 +727,27 @@ class RnsLinkResourceManager(
                 meta = meta
             )
         }
-        val index = (resource.segmentIndex - 1).coerceIn(0, assembly.totalSegments - 1)
+        if (assembly.totalSegments != resource.totalSegments || assembly.totalSize != resource.totalSize || (assembly.meta.isRequest != meta.isRequest || assembly.meta.isResponse != meta.isResponse ||
+            assembly.meta.hasMetadata != meta.hasMetadata || !java.util.Arrays.equals(assembly.meta.requestId, meta.requestId))) return
+        val index = resource.segmentIndex - 1
+        if (index !in assembly.segments.indices) return
+        if (assembly.segments.filterNotNull().sumOf { it.size.toLong() } + data.size > assembly.totalSize) {
+            incomingSegments.remove(key)
+            return
+        }
         if (assembly.segments[index] == null) {
             assembly.segments[index] = data
             assembly.receivedCount += 1
         }
         if (assembly.receivedCount >= assembly.totalSegments) {
-            val combined = assembly.segments.filterNotNull().fold(ByteArray(0)) { acc, bytes -> acc + bytes }
             incomingSegments.remove(key)
+            if (assembly.segments.filterNotNull().sumOf { it.size.toLong() } != assembly.totalSize.toLong()) return
+            val combined = ByteArray(assembly.totalSize)
+            var offset = 0
+            assembly.segments.filterNotNull().forEach { bytes ->
+                bytes.copyInto(combined, offset)
+                offset += bytes.size
+            }
             onResourceComplete(combined, link, assembly.meta)
         }
     }
@@ -684,7 +765,15 @@ class RnsLinkResourceManager(
     private fun decompressBzip2(data: ByteArray): ByteArray? {
         return try {
             BZip2CompressorInputStream(data.inputStream()).use { stream ->
-                stream.readBytes()
+                val output = java.io.ByteArrayOutputStream()
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val count = stream.read(buffer)
+                    if (count < 0) break
+                    if (output.size().toLong() + count > MAX_EFFICIENT_SIZE) return null
+                    output.write(buffer, 0, count)
+                }
+                output.toByteArray()
             }
         } catch (_: Exception) {
             null

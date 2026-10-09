@@ -51,6 +51,7 @@ const logger = new Logger("none")
 class WorkerClient {
   constructor() {
     this.requestCounter = 0
+    this.clientName = null
     this.requestCallbacks = new Map()
     this.initPromise = null
     this.worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" })
@@ -161,6 +162,7 @@ class WorkerClient {
       type: "rpc",
       payload: {
         module: moduleName,
+        clientName: this.clientName,
         method,
         body,
       },
@@ -226,10 +228,14 @@ class MintModule {
     )
   }
 
-  async spendNotes(minAmount, tryCancelAfter, includeInvite, extraMeta) {
+  async spendNotes(amount, tryCancelAfter, includeInvite, extraMeta) {
+    if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error("Invalid ecash amount")
+    if (tryCancelAfter != null && (!Number.isSafeInteger(tryCancelAfter) || tryCancelAfter < 0)) {
+      throw new Error("Invalid ecash cancellation timeout")
+    }
     return this.client.rpcSingle("mint", "spend_notes", {
-      min_amount: minAmount,
-      try_cancel_after: tryCancelAfter,
+      amount,
+      try_cancel_after: tryCancelAfter == null ? null : { secs: tryCancelAfter, nanos: 0 },
       include_invite: includeInvite,
       extra_meta: extraMeta,
     })
@@ -437,6 +443,7 @@ class FedimintWallet {
     const { success } = await this._client.sendSingleMessage("open", { clientName })
     if (success) {
       this._isOpen = true
+      this._client.clientName = clientName
       this._resolveOpen()
     }
     return success
@@ -453,6 +460,7 @@ class FedimintWallet {
     const response = await this._client.sendSingleMessage("join", { inviteCode, clientName })
     if (response.success) {
       this._isOpen = true
+      this._client.clientName = clientName
       this._resolveOpen()
     }
   }
@@ -460,6 +468,7 @@ class FedimintWallet {
   async cleanup() {
     this._openPromise = null
     this._isOpen = false
+    this._client.clientName = null
     this._client.cleanup()
   }
 

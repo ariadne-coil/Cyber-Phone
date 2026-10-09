@@ -49,6 +49,7 @@ import org.fossify.phone.wallet.WalletFederationTopupManager
 import org.fossify.phone.wallet.WalletPaymentsAdapter
 import org.fossify.phone.wallet.WalletPolicy
 import org.fossify.phone.wallet.WalletStoragePaths
+import org.fossify.phone.wallet.LdkBackupRestore
 import org.fossify.phone.wallet.WalletUiDialogs
 import org.fossify.messages.activities.NewConversationActivity
 import org.fossify.messages.activities.ThreadActivity
@@ -2659,8 +2660,6 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                     throw IllegalStateException(host.getString(R.string.wallet_backup_invalid_format))
                 }
 
-                FederationDirectoryManager.upsertFederation(host, backupFederation)
-
                 if (envelope.walletType == "fedimint") {
                     val payload = JSONObject(plaintext.toString(Charsets.UTF_8))
                     val mnemonic = payload.optString("mnemonic").orEmpty().trim()
@@ -2678,8 +2677,12 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                         throw IllegalStateException(host.getString(R.string.wallet_unknown_error))
                     }
                     ZipInputStream(ByteArrayInputStream(plaintext)).use { zip ->
-                        extractWalletBackupZip(zip, backupFederation.id)
+                        LdkBackupRestore.restore(zip, backupFederation.id,
+                            WalletStoragePaths.ldkFederationDir(host, backupFederation.id), maxBackupPayloadBytes) { directory ->
+                            LdkWalletManager.validateRestoredStorageBlocking(host, backupFederation, directory)
+                        }
                     }
+                    FederationDirectoryManager.upsertFederation(host, backupFederation)
                     host.config.walletSelectedFederationId = backupFederation.id
                     clearReceiveCacheForFederation(backupFederation.id)
                     ok = true
@@ -2696,6 +2699,7 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                 }
 
                 if (ok && envelope.walletType == "fedimint") {
+                    FederationDirectoryManager.upsertFederation(host, backupFederation)
                     host.config.walletSelectedFederationId = backupFederation.id
                 }
             } catch (t: Throwable) {
@@ -2854,88 +2858,6 @@ class WalletFragment(context: Context, attributeSet: AttributeSet) :
                 file.inputStream().use { it.copyTo(zip) }
                 zip.closeEntry()
             }
-    }
-
-    private fun extractWalletBackupZip(zip: ZipInputStream, federationId: String) {
-        val storageDirName = WalletStoragePaths.federationDirName(federationId)
-        val targetBase = WalletStoragePaths.ldkFederationDir(context, federationId)
-        val parent = targetBase.parentFile ?: throw IllegalStateException("Wallet storage parent unavailable")
-        if (!parent.exists()) parent.mkdirs()
-        val tempBase = File(parent, ".${targetBase.name}.restore-${System.currentTimeMillis()}")
-        if (tempBase.exists()) {
-            deleteRecursively(tempBase)
-        }
-        tempBase.mkdirs()
-
-        var extractedFiles = 0
-
-        var entry: ZipEntry? = zip.nextEntry
-        val acceptedPrefixes = arrayOf("ldk/$storageDirName/", "ldk/$federationId/")
-        while (entry != null) {
-            val name = entry.name.replace('\\', '/')
-            val prefix = acceptedPrefixes.firstOrNull { name.startsWith(it) }
-            if (prefix == null) {
-                entry = zip.nextEntry
-                continue
-            }
-            val rel = name.removePrefix(prefix).trimStart('/')
-            if (rel.isBlank()) {
-                entry = zip.nextEntry
-                continue
-            }
-            if (rel.contains("..")) {
-                entry = zip.nextEntry
-                continue
-            }
-            val outFile = File(tempBase, rel)
-            if (entry.isDirectory) {
-                outFile.mkdirs()
-            } else {
-                outFile.parentFile?.mkdirs()
-                outFile.outputStream().use { out ->
-                    zip.copyTo(out)
-                }
-                extractedFiles++
-            }
-            entry = zip.nextEntry
-        }
-
-        if (extractedFiles == 0) {
-            deleteRecursively(tempBase)
-            throw IllegalArgumentException("Backup does not contain wallet files for the selected federation")
-        }
-
-        val previous = if (targetBase.exists()) {
-            File(parent, ".${targetBase.name}.pre-restore-${System.currentTimeMillis()}").also {
-                if (!targetBase.renameTo(it)) {
-                    deleteRecursively(tempBase)
-                    throw IllegalStateException("Could not prepare existing wallet for restore")
-                }
-            }
-        } else {
-            null
-        }
-
-        val moved = tempBase.renameTo(targetBase)
-        if (!moved) {
-            deleteRecursively(tempBase)
-            if (previous != null && previous.exists()) {
-                previous.renameTo(targetBase)
-            }
-            throw IllegalStateException("Could not finalize restored wallet files")
-        }
-
-        if (previous != null && previous.exists()) {
-            deleteRecursively(previous)
-        }
-    }
-
-    private fun deleteRecursively(file: File) {
-        if (!file.exists()) return
-        if (file.isDirectory) {
-            file.listFiles()?.forEach { deleteRecursively(it) }
-        }
-        runCatching { file.delete() }
     }
 
     private fun showReceiveOptionsDialog() {

@@ -101,7 +101,7 @@ class MainActivity : SimpleActivity() {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
         appLaunched(packageName)
-        E2eManager.ensureKeyPair(this)
+        if (!E2eManager.ensureKeyPair(this)) toast(R.string.e2e_keys_unavailable)
         setupOptionsMenu()
         setupCategoryFilters()
         refreshMenuItems()

@@ -1,0 +1,19 @@
+name: Set up Android and wallet build tools
+description: Install the SDK and WebAssembly tools required by the current dependencies.
+runs:
+  using: composite
+  steps:
+    - name: Install Android SDK packages
+      shell: bash
+      run: |
+        "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" \
+          "platforms;android-37.2" "build-tools;37.0.0"
+
+    - name: Set up Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+
+    - name: Install wasm-bindgen CLI
+      shell: bash
+      run: cargo install wasm-bindgen-cli --version 0.2.106 --locked

@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger
 object FedimintWebEngine {
     private const val TAG = "FedimintWebEngine"
     // Versioned query forces WebView to load the latest bundled engine script after updates.
-    private const val ENGINE_URL = "https://appassets.androidplatform.net/assets/fedimint/engine.html?v=20260217d"
+    private const val ENGINE_URL = "https://appassets.androidplatform.net/assets/fedimint/engine.html?v=20261009a"
     private const val ENGINE_HOST = "appassets.androidplatform.net"
     private const val ENGINE_SCHEME = "https"
 
@@ -312,14 +312,17 @@ object FedimintWebEngine {
      *
      * Must be called off the UI thread.
      */
+    @Synchronized
     fun callBlocking(context: Context, method: String, params: JSONObject, timeoutMs: Long = 60_000L): String? {
         if (Looper.getMainLooper().thread === Thread.currentThread()) {
             throw IllegalStateException("FedimintWebEngine.callBlocking must not run on the UI thread")
         }
 
         for (attempt in 0..1) {
-            val response = callOnce(context, method, params, timeoutMs)
-            if (response != null) {
+            val dispatched = FedimintRequestState()
+            val response = callOnce(context, method, params, timeoutMs, dispatched)
+            if (response != null || dispatched.wasDispatched) {
+                // A timeout after dispatch is an unknown outcome, not permission to repeat a spend.
                 return response
             }
             if (attempt == 0) {
@@ -330,7 +333,8 @@ object FedimintWebEngine {
         return null
     }
 
-    private fun callOnce(context: Context, method: String, params: JSONObject, timeoutMs: Long): String? {
+    private fun callOnce(context: Context, method: String, params: JSONObject, timeoutMs: Long,
+                         dispatched: FedimintRequestState): String? {
         val id = nextId.getAndIncrement()
         val latch = CountDownLatch(1)
         var response: String? = null
@@ -379,6 +383,7 @@ object FedimintWebEngine {
         runOnMain {
             try {
                 val wv = webView ?: throw IllegalStateException("WebView not initialized")
+                if (!dispatched.tryDispatch()) return@runOnMain
                 wv.evaluateJavascript(
                     "globalThis.__cyber_fedimint && globalThis.__cyber_fedimint.request(${JSONObject.quote(request.toString())});",
                     null
@@ -390,8 +395,12 @@ object FedimintWebEngine {
             }
         }
 
-        val ok = latch.await(timeoutMs, TimeUnit.MILLISECONDS)
-        pending.remove(id)
+        val ok = try {
+            latch.await(timeoutMs, TimeUnit.MILLISECONDS)
+        } finally {
+            dispatched.cancelBeforeDispatch()
+            pending.remove(id)
+        }
 
         if (!ok) {
             val t = RuntimeException("Fedimint engine timeout calling $method")

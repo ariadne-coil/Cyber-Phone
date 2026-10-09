@@ -15,6 +15,7 @@ import org.fossify.messages.helpers.REPLY
 import org.fossify.messages.helpers.THREAD_ID
 import org.fossify.messages.helpers.THREAD_NUMBER
 import org.fossify.messages.messaging.sendMessageCompat
+import org.fossify.messages.messaging.MessageSendResult
 import org.fossify.mesh.MeshConfig
 import org.fossify.mesh.MeshMode
 import org.fossify.mesh.MeshContactHelper
@@ -77,8 +78,11 @@ class DirectReplyReceiver : BroadcastReceiver() {
                 var messageId = 0L
                 var sentSuccessfully = false
                 try {
-                    context.sendMessageCompat(body, listOf(address), subscriptionId, emptyList())
-                    sentSuccessfully = true
+                    sentSuccessfully = context.sendMessageCompat(body, listOf(address), subscriptionId, emptyList()) != MessageSendResult.FAILED
+                    if (!sentSuccessfully) {
+                        context.saveSmsDraft(body, threadId)
+                        return@ensureBackgroundThread
+                    }
                     val message = context.getMessages(
                         threadId = threadId, includeScheduledMessages = false, limit = 1
                     ).lastOrNull()

@@ -1,57 +1,61 @@
 [versions]
 #jetbrains
-geocoderVersion = "3.26"
-carrierVersion = "2.26"
-kotlin = "2.3.10"
-kotlinxSerializationJson = "1.10.0"
+geocoderVersion = "3.41"
+carrierVersion = "2.41"
+kotlin = "2.4.21"
+kotlinxSerializationJson = "1.11.0"
 #KSP
-ksp = "2.3.6"
+ksp = "2.3.12"
 #Detekt
 detekt = "1.23.8"
-detektCompose = "0.5.6"
+# Rules 0.5+ require prerelease Detekt 2; this is the latest compatible stable version.
+detektCompose = "0.4.28"
 #AndroidX
-androidx-constraintlayout = "2.2.1"
+androidx-appcompat = "1.8.0"
+androidx-constraintlayout = "2.2.2"
 androidx-swiperefreshlayout = "1.2.0"
-androidx-lifecycleprocess = "2.10.0"
+androidx-lifecycleprocess = "2.11.0"
 androidx-documentfile = "1.1.0"
-androidx-webkit = "1.15.0"
+androidx-webkit = "1.17.1"
 #Eventbus
 eventbus = "3.3.1"
 #Room
-room = "2.8.4"
+room = "2.8.5"
 #Commons stack
-commons = "6.1.6"
+commons = "7.1.1"
 commons-compress = "1.28.0"
 mmslib = "1.0.0"
-indicator-fast-scroll = "4524cd0b61"
+indicator-fast-scroll = "c7873f7168"
 #Gradle
-gradlePlugins-agp = "9.2.0"
+gradlePlugins-agp = "9.4.1"
 #Helpers
 ez-vcard = "0.12.2"
 #Other
 autofitTextView = "0.2.1"
-libphonenumberVersion = "9.0.26"
+libphonenumberVersion = "9.0.41"
 libphonenumberinfo = "c77bdd2b69"
-mediapipeTasksTextVersion = "0.10.26.1"
-okhttp = "5.3.2"
+mediapipeTasksTextVersion = "1.1.0"
+okhttp = "5.5.0"
 slf4j = "1.7.36"
-work = "2.11.1"
-bouncycastle = "1.83"
-msgpack = "0.9.11"
+work = "2.12.0"
+bouncycastle = "1.86"
+msgpack = "0.9.12"
 zxingCore = "3.5.4"
 zxingEmbedded = "4.3.0"
-concentus = "6c2328dc19"
+concentus = "3885c4e465"
 junit = "4.13.2"
-robolectric = "4.16.1"
+robolectric = "4.17"
 ldkNode = "0.7.0"
 #build
-app-build-compileSDKVersion = "36"
+app-build-compileSDKVersion = "37"
+app-build-compileSDKMinorVersion = "2"
 app-build-targetSDK = "36"
 app-build-minimumSDK = "26"
 app-build-javaVersion = "VERSION_17"
 app-build-kotlinJVMTarget = "17"
 
 [libraries]
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidx-appcompat" }
 #AndroidX
 androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "androidx-constraintlayout" }
 androidx-lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.ref = "androidx-lifecycleprocess" }
@@ -89,7 +93,7 @@ bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "boun
 msgpack-core = { module = "org.msgpack:msgpack-core", version.ref = "msgpack" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxingCore" }
 zxing-embedded = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxingEmbedded" }
-concentus = { module = "com.github.lostromb:concentus", version.ref = "concentus" }
+concentus = { module = "com.github.lostromb.Concentus:Concentus", version.ref = "concentus" }
 junit = { module = "junit:junit", version.ref = "junit" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 ldk-node-android = { module = "org.lightningdevkit:ldk-node-android", version.ref = "ldkNode" }

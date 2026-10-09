@@ -16,9 +16,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
-      - name: Compare pinned commons versions with Maven Central
+      - name: Compare pinned commons versions with their Maven repositories
         run: |
           set -euo pipefail
           python3 <<'PY'
@@ -35,7 +35,9 @@ jobs:
             return m.group(1)
 
           def latest_maven(group, artifact):
-            path = f"https://repo1.maven.org/maven2/{group.replace('.', '/')}/{artifact}/maven-metadata.xml"
+            # Fossify's custom Maven coordinates are published by JitPack.
+            registry = "https://jitpack.io" if group == "org.fossify" else "https://repo.maven.apache.org/maven2"
+            path = f"{registry}/{group.replace('.', '/')}/{artifact}/maven-metadata.xml"
             try:
               data = urllib.request.urlopen(path, timeout=20).read().decode('utf-8', 'replace')
             except Exception:

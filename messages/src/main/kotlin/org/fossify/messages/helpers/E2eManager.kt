@@ -11,7 +11,6 @@ import org.fossify.messages.R
 import org.fossify.messages.extensions.config
 import org.fossify.messages.messaging.sendMessageCompat
 import org.fossify.messages.extensions.getContactFromAddress
-import org.fossify.mesh.rns.RnsHkdf
 import java.security.KeyFactory
 import java.security.KeyPair
 import java.security.KeyPairGenerator
@@ -22,56 +21,56 @@ import java.security.Signature
 import java.security.spec.ECGenParameterSpec
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
-import javax.crypto.Cipher
 import javax.crypto.KeyAgreement
-import javax.crypto.spec.GCMParameterSpec
-import javax.crypto.spec.SecretKeySpec
 
 object E2eManager {
     private const val KEY_ALGORITHM = "EC"
     private const val CURVE_NAME = "secp256r1"
     private const val AGREEMENT_ALGORITHM = "ECDH"
-    private const val CIPHER_TRANSFORM = "AES/GCM/NoPadding"
-    private const val AES_KEY_BYTES = 32
-    private const val GCM_TAG_BITS = 128
-    private const val NONCE_BYTES = 12
     private const val CONTACT_KEY_MIME = "vnd.android.cursor.item/vnd.cyberphone.e2e_key"
     private const val CONTACT_KEY_LABEL = "Cyber Phone E2E Key"
 
-    fun ensureKeyPair(context: Context) {
-        val cfg = context.config
-        if (cfg.e2ePublicKey.isNotBlank() && cfg.e2ePrivateKey.isNotBlank()) {
-            return
-        }
+    private val keyPairLock = Any()
 
-        val keyPair = generateKeyPair()
-        cfg.e2ePublicKey = encodeBase64(keyPair.public.encoded)
-        cfg.e2ePrivateKey = encodeBase64(keyPair.private.encoded)
+    fun ensureKeyPair(context: Context): Boolean = synchronized(keyPairLock) {
+        runCatching {
+            val cfg = context.config
+            val publicKey = cfg.e2ePublicKey
+            val privateKey = cfg.e2ePrivateKey
+            if (publicKey.isNotBlank() || privateKey.isNotBlank()) {
+                return@runCatching isValidKeyPair(publicKey, privateKey)
+            }
+            val pair = generateKeyPair()
+            cfg.saveE2eKeyPair(encodeBase64(pair.public.encoded), encodeBase64(pair.private.encoded))
+            true
+        }.getOrDefault(false)
     }
 
-    fun regenerateKeyPair(context: Context) {
-        val cfg = context.config
-        val keyPair = generateKeyPair()
-        cfg.e2ePublicKey = encodeBase64(keyPair.public.encoded)
-        cfg.e2ePrivateKey = encodeBase64(keyPair.private.encoded)
-        cfg.e2eSharedSecrets = ""
-        cfg.e2eEncryptedThreads = emptySet()
-        cfg.e2eKeySentThreads = emptySet()
-        cfg.e2eKeySetTimes = ""
+    fun regenerateKeyPair(context: Context): Boolean = synchronized(keyPairLock) {
+        runCatching {
+            val cfg = context.config
+            val pair = generateKeyPair()
+            cfg.saveE2eKeyPair(encodeBase64(pair.public.encoded), encodeBase64(pair.private.encoded))
+            cfg.e2eSharedSecrets = ""
+            cfg.e2eEncryptedThreads = emptySet()
+            cfg.e2eKeySentThreads = emptySet()
+            cfg.e2eKeySetTimes = ""
+            true
+        }.getOrDefault(false)
     }
 
     fun getPublicKeyBase64(context: Context): String {
-        ensureKeyPair(context)
-        return context.config.e2ePublicKey
+        if (!ensureKeyPair(context)) return ""
+        return runCatching { context.config.e2ePublicKey }.getOrDefault("")
     }
 
     fun getPrivateKeyBase64(context: Context): String {
-        ensureKeyPair(context)
-        return context.config.e2ePrivateKey
+        if (!ensureKeyPair(context)) return ""
+        return runCatching { context.config.e2ePrivateKey }.getOrDefault("")
     }
 
     fun buildBackupData(context: Context): String {
-        ensureKeyPair(context)
+        if (!ensureKeyPair(context)) throw SensitivePrefs.UnavailableException()
         return buildString {
             appendLine("cyber_phone_e2e_key_backup_v1")
             appendLine("public=${context.config.e2ePublicKey}")
@@ -98,8 +97,7 @@ object E2eManager {
         }
 
         val cfg = context.config
-        cfg.e2ePublicKey = publicKey
-        cfg.e2ePrivateKey = privateKey
+        cfg.saveE2eKeyPair(publicKey, privateKey)
         cfg.e2eSharedSecrets = ""
         cfg.e2eEncryptedThreads = emptySet()
         cfg.e2eKeySentThreads = emptySet()
@@ -112,11 +110,13 @@ object E2eManager {
     }
 
     fun buildKeyExchangeMessage(context: Context): String {
-        return E2E_KEY_MESSAGE_PREFIX + getPublicKeyBase64(context)
+        val publicKey = getPublicKeyBase64(context)
+        if (publicKey.isBlank()) throw SensitivePrefs.UnavailableException()
+        return E2E_KEY_MESSAGE_PREFIX + publicKey
     }
 
     fun isEncryptedMessage(text: String): Boolean {
-        return text.startsWith(E2E_ENCRYPTED_MESSAGE_PREFIX)
+        return E2eCipher.isEncrypted(text)
     }
 
     fun handleIncomingKeyExchange(
@@ -129,36 +129,20 @@ object E2eManager {
     ): Boolean {
         val publicKeyBase64 = extractKeyFromMessage(text) ?: return false
         val secret = deriveSharedSecret(context, publicKeyBase64) ?: return false
-        storeSharedSecret(context, threadId, secret, receivedAtMillis / 1000L)
+        if (runCatching { storeSharedSecret(context, threadId, secret, receivedAtMillis / 1000L) }.isFailure) return false
         setThreadEncrypted(context, threadId, true)
         storeContactPublicKeyForAddress(context, address, publicKeyBase64)
 
         if (!isKeySent(context, threadId)) {
-            markKeySent(context, threadId)
-            val message = buildKeyExchangeMessage(context)
-            context.sendMessageCompat(message, listOf(address), subscriptionId, emptyList())
+            val message = runCatching { buildKeyExchangeMessage(context) }.getOrNull() ?: return false
+            if (context.sendMessageCompat(message, listOf(address), subscriptionId, emptyList()) !=
+                org.fossify.messages.messaging.MessageSendResult.FAILED) markKeySent(context, threadId)
         }
         return true
     }
 
-    fun encryptOutgoing(context: Context, threadId: Long, text: String): String? {
-        if (!isThreadEncrypted(context, threadId)) {
-            return null
-        }
-        if (isKeyExchangeMessage(text) || isEncryptedMessage(text) || MeshDiscoveryManager.isMeshAddressMessage(text)) {
-            return null
-        }
-
-        val secret = getSharedSecret(context, threadId) ?: return null
-        val key = deriveAesKey(secret, threadId)
-        val nonce = ByteArray(NONCE_BYTES).also { SecureRandom().nextBytes(it) }
-        val cipher = Cipher.getInstance(CIPHER_TRANSFORM)
-        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(GCM_TAG_BITS, nonce))
-        val ciphertext = cipher.doFinal(text.toByteArray(Charsets.UTF_8))
-        val combined = ByteArray(nonce.size + ciphertext.size)
-        nonce.copyInto(combined, 0, 0, nonce.size)
-        ciphertext.copyInto(combined, nonce.size, 0, ciphertext.size)
-        return E2E_ENCRYPTED_MESSAGE_PREFIX + encodeBase64(combined)
+    fun encryptOutgoing(context: Context, threadId: Long, text: String): String {
+        return E2eCipher.prepareOutgoing(isThreadEncrypted(context, threadId), getSharedSecret(context, threadId), text)
     }
 
     data class DisplayResult(
@@ -202,21 +186,8 @@ object E2eManager {
 
         val secret = getSharedSecret(context, threadId)
             ?: return DisplayResult(text, false)
-        val payload = decodeBase64(text.removePrefix(E2E_ENCRYPTED_MESSAGE_PREFIX)) ?: return context.getString(
-            R.string.e2e_decrypt_failed
-        ).let { DisplayResult(it, false) }
-        if (payload.size <= NONCE_BYTES) {
-            return DisplayResult(context.getString(R.string.e2e_decrypt_failed), false)
-        }
-
-        val nonce = payload.copyOfRange(0, NONCE_BYTES)
-        val ciphertext = payload.copyOfRange(NONCE_BYTES, payload.size)
         return try {
-            val cipher = Cipher.getInstance(CIPHER_TRANSFORM)
-            val key = deriveAesKey(secret, threadId)
-            cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(GCM_TAG_BITS, nonce))
-            val plain = cipher.doFinal(ciphertext)
-            DisplayResult(String(plain, Charsets.UTF_8), true)
+            DisplayResult(E2eCipher.decrypt(secret, text, threadId), true)
         } catch (_: Exception) {
             DisplayResult(context.getString(R.string.e2e_decrypt_failed), false)
         }
@@ -258,11 +229,13 @@ object E2eManager {
         }
         val publicKey = getContactPublicKey(context, contact) ?: return false
         val secret = deriveSharedSecret(context, publicKey) ?: return false
-        storeSharedSecret(context, threadId, secret, System.currentTimeMillis() / 1000L)
-        return true
+        return runCatching {
+            storeSharedSecret(context, threadId, secret, System.currentTimeMillis() / 1000L)
+            true
+        }.getOrDefault(false)
     }
 
-    fun clearSharedSecret(context: Context, threadId: Long) {
+    fun clearSharedSecret(context: Context, threadId: Long): Boolean = runCatching {
         val cfg = context.config
         val secrets = decodeSharedSecrets(cfg.e2eSharedSecrets).toMutableMap()
         secrets.remove(threadId.toString())
@@ -270,7 +243,8 @@ object E2eManager {
         val times = decodeKeySetTimes(cfg.e2eKeySetTimes).toMutableMap()
         times.remove(threadId.toString())
         cfg.e2eKeySetTimes = encodeKeySetTimes(times)
-    }
+        true
+    }.getOrDefault(false)
 
     fun storeContactPublicKey(
         context: Context,
@@ -561,24 +535,20 @@ object E2eManager {
     }
 
     private fun getSharedSecret(context: Context, threadId: Long): ByteArray? {
-        val secrets = decodeSharedSecrets(context.config.e2eSharedSecrets)
-        val encoded = secrets[threadId.toString()] ?: return null
-        return decodeBase64(encoded)
+        return runCatching {
+            val secrets = decodeSharedSecrets(context.config.e2eSharedSecrets)
+            secrets[threadId.toString()]?.let { decodeBase64(it) }
+        }.getOrNull()
     }
 
     private fun deriveSharedSecret(context: Context, remotePublicKeyBase64: String): ByteArray? {
-        ensureKeyPair(context)
-        val privateKey = decodePrivateKey(context.config.e2ePrivateKey) ?: return null
+        if (!ensureKeyPair(context)) return null
+        val privateKey = runCatching { decodePrivateKey(context.config.e2ePrivateKey) }.getOrNull() ?: return null
         val publicKey = decodePublicKey(remotePublicKeyBase64) ?: return null
         val agreement = KeyAgreement.getInstance(AGREEMENT_ALGORITHM)
         agreement.init(privateKey)
         agreement.doPhase(publicKey, true)
         return agreement.generateSecret()
-    }
-
-    private fun deriveAesKey(secret: ByteArray, threadId: Long): ByteArray {
-        val context = threadId.toString().toByteArray(Charsets.UTF_8)
-        return RnsHkdf.derive(AES_KEY_BYTES, secret, context = context)
     }
 
     private fun extractKeyFromMessage(text: String): String? {

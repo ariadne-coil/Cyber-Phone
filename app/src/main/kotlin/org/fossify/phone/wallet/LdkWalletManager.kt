@@ -2309,6 +2309,7 @@ object LdkWalletManager {
         context: Context,
         federation: FederationEntry,
         esploraUrlOverride: String? = null,
+        storageDirOverride: java.io.File? = null,
     ): Node {
         // ldk-node-android uses JNA internally; on some Android versions the JNA loader needs an
         // explicit hint (and/or extracted native libs) to find and load its native dispatch lib.
@@ -2327,7 +2328,7 @@ object LdkWalletManager {
             else -> defaultRgsUrl(network)
         }
 
-        val storageDir = WalletStoragePaths.ldkFederationDir(context, federation.id)
+        val storageDir = storageDirOverride ?: WalletStoragePaths.ldkFederationDir(context, federation.id)
         if (!storageDir.exists()) {
             storageDir.mkdirs()
         }
@@ -2360,7 +2361,7 @@ object LdkWalletManager {
             if (lsps1NodeId.isNotBlank() && lsps1Address.isNotBlank()) {
                 builder.setLiquiditySourceLsps1(lsps1NodeId, lsps1Address, lsps1Token)
             }
-            synchronized(lock) {
+            if (storageDirOverride == null) synchronized(lock) {
                 activeLiquidityProviderId = providerId.ifBlank { null }
             }
 
@@ -2371,6 +2372,18 @@ object LdkWalletManager {
                 builder.close()
             } catch (_: Throwable) {
             }
+        }
+    }
+
+    /** Loading state performs local SDK format checks without starting network sync or replacing the live node. */
+    fun validateRestoredStorageBlocking(context: Context, federation: FederationEntry, directory: java.io.File): Boolean {
+        return try {
+            val candidate = buildNode(context, federation, storageDirOverride = directory)
+            candidate.close()
+            true
+        } catch (t: Throwable) {
+            lastError = t
+            false
         }
     }
 

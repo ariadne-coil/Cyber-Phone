@@ -12,6 +12,9 @@ import org.fossify.commons.extensions.showErrorToast
 import org.fossify.commons.extensions.toast
 import org.fossify.messages.R
 import org.fossify.messages.extensions.deleteMessage
+import org.fossify.messages.extensions.deleteScheduledMessage
+import org.fossify.messages.extensions.clearExpiredScheduledMessages
+import org.fossify.messages.helpers.ScheduledSendTracker
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
 import java.io.File
@@ -41,8 +44,17 @@ class MmsSentReceiver : SendStatusReceiver() {
         }
 
         // In case of resent message, delete original to prevent duplication
-        if (originalResentMessageId != -1L) {
+        if (originalResentMessageId != -1L && receiverResultCode == Activity.RESULT_OK) {
             context.deleteMessage(originalResentMessageId, true)
+        }
+
+        val scheduledId = intent.getLongExtra(EXTRA_SCHEDULED_MESSAGE_ID, -1L)
+        val attempt = intent.getStringExtra(EXTRA_SCHEDULED_ATTEMPT)
+        if (scheduledId != -1L && attempt != null && ScheduledSendTracker.forContext(context).complete(
+                scheduledId, attempt, intent.getIntExtra(EXTRA_SCHEDULED_PART, 0), receiverResultCode == Activity.RESULT_OK
+            )) {
+            context.deleteScheduledMessage(scheduledId)
+            context.clearExpiredScheduledMessages(scheduledId)
         }
 
         val filePath = intent.getStringExtra(EXTRA_FILE_PATH)
@@ -60,5 +72,8 @@ class MmsSentReceiver : SendStatusReceiver() {
         private const val EXTRA_CONTENT_URI = "content_uri"
         private const val EXTRA_FILE_PATH = "file_path"
         const val EXTRA_ORIGINAL_RESENT_MESSAGE_ID = "original_message_id"
+        const val EXTRA_SCHEDULED_MESSAGE_ID = "scheduled_message_id"
+        const val EXTRA_SCHEDULED_ATTEMPT = "scheduled_attempt"
+        const val EXTRA_SCHEDULED_PART = "scheduled_part"
     }
 }

@@ -36,6 +36,9 @@ object FedimintWalletManager {
     private var federationId: String? = null
 
     @Volatile
+    private var activeClientName: String? = null
+
+    @Volatile
     private var isStarting: Boolean = false
 
     @Volatile
@@ -58,10 +61,11 @@ object FedimintWalletManager {
 
     fun isRunning(): Boolean = federationId?.isNotBlank() == true && !isStarting
 
+    @Synchronized
     fun verifyRunningFederationBlocking(context: Context, federation: FederationEntry): Boolean {
         if (federationId != federation.id || federationId.isNullOrBlank()) return false
         return try {
-            val res = FedimintWebEngine.callBlocking(
+            val res = callEngine(
                 context = context,
                 method = "isOpen",
                 params = JSONObject(),
@@ -72,7 +76,7 @@ object FedimintWalletManager {
             val ok = obj.optBoolean("ok", false)
             val open = if (ok) {
                 when (val result = obj.opt("result")) {
-                    is JSONObject -> result.optBoolean("open", false)
+                    is JSONObject -> result.optBoolean("open", false) && result.optString("clientName") == clientNameForFederation(federation)
                     is Boolean -> result
                     else -> false
                 }
@@ -91,6 +95,7 @@ object FedimintWalletManager {
         }
     }
 
+    @Synchronized
     fun ensureStartedBlocking(context: Context, federation: FederationEntry): Boolean {
         val invite = normalizeInviteCode(federation.invite)
         val clientName = clientNameForFederation(federation)
@@ -134,7 +139,7 @@ object FedimintWalletManager {
         }
 
         return try {
-            val res = FedimintWebEngine.callBlocking(
+            val res = callEngine(
                 context = context,
                 method = "openOrJoin",
                 params = JSONObject().apply {
@@ -152,6 +157,7 @@ object FedimintWalletManager {
             val ok = parseOk(res)
             if (ok) {
                 federationId = federation.id
+                activeClientName = clientName
                 lastError = null
             } else {
                 lastError = RuntimeException(parseError(res))
@@ -185,11 +191,12 @@ object FedimintWalletManager {
     /**
      * Returns the balance in sats.
      */
+    @Synchronized
     fun getBalanceSatsBlocking(context: Context, federation: FederationEntry): Long? {
         if (!ensureStartedBlocking(context, federation)) return null
 
         return try {
-            val res = FedimintWebEngine.callBlocking(
+            val res = callEngine(
                 context = context,
                 method = "getBalanceMsats",
                 params = JSONObject(),
@@ -226,6 +233,7 @@ object FedimintWalletManager {
         }
     }
 
+    @Synchronized
     fun createBolt11InvoiceBlocking(
         context: Context,
         federation: FederationEntry,
@@ -249,7 +257,7 @@ object FedimintWalletManager {
                 lastError = IllegalArgumentException("Amount is too large")
                 return null
             }
-            val res = FedimintWebEngine.callBlocking(
+            val res = callEngine(
                 context = context,
                 method = "createInvoice",
                 params = JSONObject().apply {
@@ -296,6 +304,7 @@ object FedimintWalletManager {
      *
      * This is used as an automatic fallback when Lightning liquidity bootstrap is unavailable.
      */
+    @Synchronized
     fun createOnchainDepositAddressBlocking(
         context: Context,
         federation: FederationEntry,
@@ -367,6 +376,7 @@ object FedimintWalletManager {
         return null
     }
 
+    @Synchronized
     fun rawClientRpcBlocking(
         context: Context,
         module: Any?,
@@ -380,7 +390,7 @@ object FedimintWalletManager {
         }
 
         return try {
-            val res = FedimintWebEngine.callBlocking(
+            val res = callEngine(
                 context = context,
                 method = "clientRpc",
                 params = JSONObject().apply {
@@ -420,6 +430,7 @@ object FedimintWalletManager {
         }
     }
 
+    @Synchronized
     fun payBolt11InvoiceBlocking(context: Context, federation: FederationEntry, invoice: String): Boolean {
         val cleaned = invoice.trim()
         if (cleaned.isBlank()) {
@@ -450,7 +461,7 @@ object FedimintWalletManager {
 
     private fun attemptPayInvoice(context: Context, invoice: String): Boolean {
         return try {
-            val res = FedimintWebEngine.callBlocking(
+            val res = callEngine(
                 context = context,
                 method = "payInvoice",
                 params = JSONObject().apply {
@@ -485,9 +496,8 @@ object FedimintWalletManager {
 
     private fun isTransientGatewayError(msg: String): Boolean {
         val lower = msg.lowercase()
-        return lower.contains("timeout") ||
-            lower.contains("timed out") ||
-            (lower.contains("connection") && lower.contains("refused")) ||
+        // A timed-out payment may already have committed. Do not replay it.
+        return (lower.contains("connection") && lower.contains("refused")) ||
             lower.contains("no route") ||
             (lower.contains("gateway") && lower.contains("unavailable"))
     }
@@ -497,6 +507,7 @@ object FedimintWalletManager {
      *
      * Amount is in sats. Returns the notes string on success.
      */
+    @Synchronized
     fun spendEcashBlocking(
         context: Context,
         federation: FederationEntry,
@@ -519,7 +530,7 @@ object FedimintWalletManager {
                 lastError = IllegalArgumentException("Amount is too large")
                 return null
             }
-            val res = FedimintWebEngine.callBlocking(
+            val res = callEngine(
                 context = context,
                 method = "spendNotes",
                 params = JSONObject().apply {
@@ -575,6 +586,7 @@ object FedimintWalletManager {
         }
     }
 
+    @Synchronized
     fun tryCancelSpendBlocking(context: Context, federation: FederationEntry, operationId: String): Boolean {
         val cleaned = operationId.trim()
         if (cleaned.isBlank()) {
@@ -585,7 +597,7 @@ object FedimintWalletManager {
         if (!ensureStartedBlocking(context, federation)) return false
 
         return try {
-            val res = FedimintWebEngine.callBlocking(
+            val res = callEngine(
                 context = context,
                 method = "tryCancelSpendNotes",
                 params = JSONObject().apply { put("operationId", cleaned) },
@@ -609,6 +621,7 @@ object FedimintWalletManager {
         }
     }
 
+    @Synchronized
     fun redeemEcashBlocking(context: Context, federation: FederationEntry, notes: String): Boolean {
         val cleaned = notes.trim()
         if (cleaned.isBlank()) {
@@ -619,7 +632,7 @@ object FedimintWalletManager {
         if (!ensureStartedBlocking(context, federation)) return false
 
         return try {
-            val res = FedimintWebEngine.callBlocking(
+            val res = callEngine(
                 context = context,
                 method = "redeemEcash",
                 params = JSONObject().apply { put("notes", cleaned) },
@@ -648,6 +661,7 @@ object FedimintWalletManager {
         }
     }
 
+    @Synchronized
     fun discoverLightningGatewayNodeIdsBlocking(
         context: Context,
         federation: FederationEntry,
@@ -700,10 +714,12 @@ object FedimintWalletManager {
         return ids.toList()
     }
 
+    @Synchronized
     fun exportMnemonicBlocking(context: Context, federation: FederationEntry): String? {
+        if (!ensureStartedBlocking(context, federation)) return null
         return try {
             val clientName = clientNameForFederation(federation)
-            val res = FedimintWebEngine.callBlocking(
+            val res = callEngine(
                 context = context,
                 method = "getMnemonic",
                 params = JSONObject().apply { put("clientName", clientName) },
@@ -746,6 +762,7 @@ object FedimintWalletManager {
         }
     }
 
+    @Synchronized
     fun importMnemonicBlocking(context: Context, federation: FederationEntry, mnemonic: String): Boolean {
         val cleaned = mnemonic.trim().lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }.joinToString(" ")
         if (cleaned.isBlank()) {
@@ -755,7 +772,7 @@ object FedimintWalletManager {
 
         return try {
             val clientName = clientNameForFederation(federation)
-            val setRes = FedimintWebEngine.callBlocking(
+            val setRes = callEngine(
                 context = context,
                 method = "setMnemonic",
                 params = JSONObject().apply {
@@ -784,6 +801,16 @@ object FedimintWalletManager {
             lastError = t
             false
         }
+    }
+
+    private fun callEngine(context: Context, method: String, params: JSONObject, timeoutMs: Long): String? {
+        if (method !in setOf("openOrJoin", "isOpen", "getMnemonic", "setMnemonic")) {
+            val expectedClient = activeClientName ?: return null.also {
+                lastError = IllegalStateException("Wallet not open")
+            }
+            params.put("expectedClientName", expectedClient)
+        }
+        return FedimintWebEngine.callBlocking(context, method, params, timeoutMs)
     }
 
     private fun parseOk(payload: String): Boolean {

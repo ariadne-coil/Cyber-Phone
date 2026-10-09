@@ -15,6 +15,7 @@ import org.fossify.messages.extensions.messagingUtils
 import org.fossify.messages.extensions.shortcutHelper
 import org.fossify.messages.helpers.WalletTokenParser
 import org.fossify.messages.helpers.E2eManager
+import org.fossify.messages.helpers.ScheduledSendTracker
 import org.fossify.messages.messaging.SmsException.Companion.EMPTY_DESTINATION_ADDRESS
 import org.fossify.messages.messaging.SmsException.Companion.ERROR_PERSISTING_MESSAGE
 import org.fossify.messages.messaging.SmsException.Companion.ERROR_SENDING_MESSAGE
@@ -46,8 +47,9 @@ fun Context.sendMessageCompat(
     addresses: List<String>,
     subId: Int?,
     attachments: List<Attachment>,
-    messageId: Long? = null
-) {
+    messageId: Long? = null,
+    scheduledMessageId: Long? = null,
+): MessageSendResult {
     val maxLinkSmsParts = 6
     // Fedimint ecash tokens can be long and are frequently blocked/broken when converted to
     // "text-only MMS". Prefer segmented SMS for a bounded size to keep delivery reliable.
@@ -55,12 +57,15 @@ fun Context.sendMessageCompat(
     val cleanAddresses = addresses.filterNot { LxmfAddress.isMeshLike(it) }
     if (cleanAddresses.isEmpty()) {
         toast(id = R.string.mesh_disabled, length = LENGTH_LONG)
-        return
+        return MessageSendResult.FAILED
     }
     val threadId = getThreadId(cleanAddresses.toSet())
-    val canEncrypt = cleanAddresses.none { LxmfAddress.isMeshAddress(it) }
-    val encryptedText = if (canEncrypt) E2eManager.encryptOutgoing(this, threadId, text) else null
-    val outgoingText = encryptedText ?: text
+    val outgoingText = try {
+        E2eManager.encryptOutgoing(this, threadId, text)
+    } catch (_: Exception) {
+        toast(R.string.e2e_send_failed)
+        return MessageSendResult.FAILED
+    }
     val settings = getSendMessageSettings()
     if (subId != null) {
         settings.subscriptionId = subId
@@ -88,20 +93,24 @@ fun Context.sendMessageCompat(
             cleanAddresses.size > 1 && settings.group
         )
     if (isMms) {
+        val attempt = scheduledMessageId?.let { ScheduledSendTracker.forContext(this).begin(it, maxOf(1, attachments.size)) }
         // we send all MMS attachments separately to reduces the chances of hitting provider MMS limit.
         if (attachments.isNotEmpty()) {
             val lastIndex = attachments.lastIndex
             if (attachments.size > 1) {
                 for (i in 0 until lastIndex) {
                     val attachment = attachments[i]
-                    messagingUtils.sendMmsMessage("", cleanAddresses, attachment, settings, messageId)
+                    if (!messagingUtils.sendMmsMessage("", cleanAddresses, attachment, settings, messageId,
+                            scheduledMessageId, attempt, i)) return MessageSendResult.FAILED
                 }
             }
 
             val lastAttachment = attachments[lastIndex]
-            messagingUtils.sendMmsMessage(outgoingText, cleanAddresses, lastAttachment, settings, messageId)
+            if (!messagingUtils.sendMmsMessage(outgoingText, cleanAddresses, lastAttachment, settings, messageId,
+                    scheduledMessageId, attempt, lastIndex)) return MessageSendResult.FAILED
         } else {
-            messagingUtils.sendMmsMessage(outgoingText, cleanAddresses, null, settings, messageId)
+            if (!messagingUtils.sendMmsMessage(outgoingText, cleanAddresses, null, settings, messageId,
+                    scheduledMessageId, attempt, 0)) return MessageSendResult.FAILED
         }
     } else {
         try {
@@ -129,13 +138,16 @@ fun Context.sendMessageCompat(
                     length = LENGTH_LONG
                 )
             }
+            return MessageSendResult.FAILED
         } catch (e: Exception) {
             showErrorToast(e)
+            return MessageSendResult.FAILED
         }
     }
     ensureBackgroundThread {
         shortcutHelper.reportSendMessageUsage(threadId)
     }
+    return if (isMms) MessageSendResult.PENDING else MessageSendResult.ACCEPTED
 }
 
 /**

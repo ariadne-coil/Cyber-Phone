@@ -3,10 +3,8 @@ package org.fossify.phone.activities
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.os.Bundle
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
-import androidx.work.workDataOf
+import androidx.lifecycle.ViewModelProvider
+import org.fossify.phone.wallet.WalletSendTokenViewModel
 import androidx.core.view.isVisible
 import com.google.android.material.textfield.TextInputLayout
 import org.fossify.commons.extensions.adjustAlpha
@@ -24,15 +22,11 @@ import org.fossify.phone.extensions.config
 import org.fossify.phone.wallet.ExchangeRateManager
 import org.fossify.phone.wallet.FederationDirectoryManager
 import org.fossify.phone.wallet.FederationEntry
-import org.fossify.phone.wallet.FedimintWalletManager
-import org.fossify.phone.wallet.WalletEcashCancelWorker
 import org.fossify.phone.wallet.WalletPolicy
 import org.fossify.messages.helpers.EXTRA_WALLET_SECURE_CHANNEL
 import org.fossify.messages.helpers.EXTRA_WALLET_TOKEN_TEXT
-import org.fossify.messages.helpers.WalletTokenParser
 import java.text.NumberFormat
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 
 /**
  * Generates a Fedimint out-of-band ecash token and returns it to the caller as message text.
@@ -44,6 +38,7 @@ class WalletSendTokenActivity : SimpleActivity() {
 
     private var allFederations: List<FederationEntry> = emptyList()
     private var secureChannel: Boolean = false
+    private val sendModel by lazy { ViewModelProvider(this)[WalletSendTokenViewModel::class.java] }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,7 +57,28 @@ class WalletSendTokenActivity : SimpleActivity() {
             if (secureChannel) R.string.wallet_send_token_channel_secure else R.string.wallet_send_token_channel_insecure
         )
 
+        sendModel.cancelConfirmation()
         binding.walletSendTokenButton.setOnClickListener { startSendToken() }
+        sendModel.state.observe(this) { state ->
+            val busy = state == WalletSendTokenViewModel.State.Working || state == WalletSendTokenViewModel.State.Confirming ||
+                state is WalletSendTokenViewModel.State.Success
+            binding.walletSendTokenButton.isEnabled = !busy
+            binding.walletSendTokenFederationCard.isEnabled = !busy
+            binding.walletSendTokenFederationValue.isEnabled = !busy
+            binding.walletSendTokenProgress.isVisible = state == WalletSendTokenViewModel.State.Working
+            binding.walletSendTokenError.isVisible = state is WalletSendTokenViewModel.State.Failure
+            when (state) {
+                is WalletSendTokenViewModel.State.Failure -> binding.walletSendTokenError.text = getString(
+                    R.string.wallet_send_token_failed, state.message.ifBlank { getString(R.string.wallet_unknown_error) })
+                is WalletSendTokenViewModel.State.Success -> {
+                    sendModel.markDelivered()
+                    setResult(RESULT_OK, Intent().putExtra(EXTRA_WALLET_TOKEN_TEXT, state.token)
+                        .putExtra(EXTRA_WALLET_SECURE_CHANNEL, secureChannel))
+                    finish()
+                }
+                else -> Unit
+            }
+        }
 
         ensureBackgroundThread {
             // Only show Fedimint-backed entries for OOB ecash tokens.
@@ -218,6 +234,7 @@ class WalletSendTokenActivity : SimpleActivity() {
             return
         }
 
+        if (!sendModel.reserve()) return
         // Low value => no confirmation. High/unknown => confirmation.
         val shouldConfirm = isHighValue == true || isUnknownValue
         if (shouldConfirm) {
@@ -233,6 +250,7 @@ class WalletSendTokenActivity : SimpleActivity() {
                 .setPositiveButton(R.string.ok) { _, _ -> performSendToken(selected, amountSats) }
                 .setNegativeButton(R.string.cancel, null)
                 .show()
+                .setOnDismissListener { sendModel.cancelConfirmation() }
             return
         }
 
@@ -240,78 +258,6 @@ class WalletSendTokenActivity : SimpleActivity() {
     }
 
     private fun performSendToken(selected: FederationEntry, amountSats: Long) {
-        binding.walletSendTokenProgress.isVisible = true
-        binding.walletSendTokenError.isVisible = false
-
-        // Plain SMS tokens should expire quickly.
-        val tryCancelAfterSecs = if (secureChannel) 24 * 60 * 60 else 10 * 60
-        val expiresAtEpochSec = (System.currentTimeMillis() / 1000L) + tryCancelAfterSecs
-
-        ensureBackgroundThread {
-            val spend = FedimintWalletManager.spendEcashBlocking(
-                context = this,
-                federation = selected,
-                amountSats = amountSats,
-                tryCancelAfterSecs = tryCancelAfterSecs,
-            )
-
-            val error = FedimintWalletManager.getLastErrorMessage().orEmpty().ifBlank {
-                getString(R.string.wallet_unknown_error)
-            }
-
-            runOnUiThread {
-                binding.walletSendTokenProgress.isVisible = false
-                if (spend == null || spend.notes.isBlank()) {
-                    binding.walletSendTokenError.text = getString(R.string.wallet_send_token_failed, error)
-                    binding.walletSendTokenError.isVisible = true
-                    return@runOnUiThread
-                }
-
-                val tokenText = WalletTokenParser.buildFedimintEcashMessage(
-                    federationId = selected.id,
-                    amountSats = amountSats,
-                    expiresAtEpochSec = expiresAtEpochSec,
-                    notes = spend.notes,
-                )
-                scheduleSpendTryCancel(
-                    federationId = selected.id,
-                    operationId = spend.operationId,
-                    tryCancelAfterSecs = tryCancelAfterSecs,
-                )
-
-                setResult(
-                    RESULT_OK,
-                    Intent().putExtra(EXTRA_WALLET_TOKEN_TEXT, tokenText)
-                )
-                finish()
-            }
-        }
-    }
-
-    private fun scheduleSpendTryCancel(
-        federationId: String,
-        operationId: String?,
-        tryCancelAfterSecs: Int,
-    ) {
-        val op = operationId?.trim().orEmpty()
-        if (op.isBlank()) return
-
-        val delaySecs = tryCancelAfterSecs.coerceAtLeast(0).toLong()
-        val input = workDataOf(
-            WalletEcashCancelWorker.KEY_FEDERATION_ID to federationId,
-            WalletEcashCancelWorker.KEY_OPERATION_ID to op,
-        )
-        val req = OneTimeWorkRequestBuilder<WalletEcashCancelWorker>()
-            .setInputData(input)
-            .setInitialDelay(delaySecs, TimeUnit.SECONDS)
-            .addTag(WalletEcashCancelWorker.TAG)
-            .build()
-
-        WorkManager.getInstance(applicationContext)
-            .enqueueUniqueWork(
-                WalletEcashCancelWorker.uniqueName(federationId, op),
-                ExistingWorkPolicy.REPLACE,
-                req
-            )
+        sendModel.send(applicationContext, selected, amountSats, secureChannel)
     }
 }

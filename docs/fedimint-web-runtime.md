@@ -7,7 +7,7 @@ Pinned source:
 
 - Submodule: `third_party/fedimint-web`
 - Upstream: `https://github.com/fedimint/fedimint.git`
-- Pinned commit: `e8570bc6b4f9`
+- Pinned commit: `53be4684015c (v0.12.2)`
 - Crate: `fedimint-client-wasm`
 
 Static source assets kept in the app repo:
@@ -49,7 +49,7 @@ the repo lives on a normal drive mount, Gradle falls back to running this genera
 2. Ensure the Rust toolchain can target WebAssembly:
    - `rustup target add wasm32-unknown-unknown`
 3. Install `wasm-bindgen-cli` matching upstream's pinned `wasm-bindgen` version:
-   - `cargo install --locked wasm-bindgen-cli --version 0.2.100`
+   - `cargo install --locked wasm-bindgen-cli --version 0.2.106`
 
 ## Manual Validation
 

@@ -340,7 +340,7 @@ class RnsLink private constructor(
     fun request(
         path: String,
         data: Any?,
-        sendPacket: (RnsLink, Int, Int, ByteArray) -> ByteArray?,
+        sendPacket: (RnsLink, Int, Int, ByteArray, (ByteArray) -> Unit) -> ByteArray?,
         onResponse: ((RnsRequestReceipt) -> Unit)? = null,
         onFailure: ((RnsRequestReceipt) -> Unit)? = null,
         sendResource: ((ByteArray, ByteArray, Boolean) -> Boolean)? = null
@@ -348,25 +348,26 @@ class RnsLink private constructor(
         if (!isActive()) return null
         trimPendingRequests()
         val requestPayload = packRequest(path, data)
-        val requestId = if (requestPayload.size <= mdu) {
-            val raw = sendPacket(this, RnsPacket.DATA, RnsPacket.REQUEST, requestPayload) ?: run {
-                val failed = RnsRequestReceipt(ByteArray(0), onResponse, onFailure)
-                onFailure?.invoke(failed)
-                return null
-            }
-            RnsHash.truncatedHash(RnsHash.sha256(RnsPacket.getHashablePart(raw)))
+        var receipt: RnsRequestReceipt? = null
+        fun register(requestId: ByteArray) {
+            receipt = RnsRequestReceipt(requestId, onResponse, onFailure)
+            pendingRequests[RnsHex.encode(requestId)] = requireNotNull(receipt)
+        }
+        val sent = if (requestPayload.size <= mdu) {
+            sendPacket(this, RnsPacket.DATA, RnsPacket.REQUEST, requestPayload) { raw ->
+                // A fast or loopback peer can reply during sendPacket, before it returns.
+                register(RnsHash.truncatedHash(RnsHash.sha256(RnsPacket.getHashablePart(raw))))
+            } != null
         } else {
             val computed = RnsHash.truncatedHash(RnsHash.sha256(requestPayload))
-            val sent = sendResource?.invoke(requestPayload, computed, false) ?: false
-            if (!sent) {
-                val failed = RnsRequestReceipt(ByteArray(0), onResponse, onFailure)
-                onFailure?.invoke(failed)
-                return null
-            }
-            computed
+            register(computed)
+            sendResource?.invoke(requestPayload, computed, false) ?: false
         }
-        val receipt = RnsRequestReceipt(requestId, onResponse, onFailure)
-        pendingRequests[RnsHex.encode(requestId)] = receipt
+        if (!sent) {
+            receipt?.let { pendingRequests.remove(RnsHex.encode(it.requestId)) }
+            onFailure?.invoke(receipt ?: RnsRequestReceipt(ByteArray(0), onResponse, onFailure))
+            return null
+        }
         trimPendingRequests()
         return receipt
     }
